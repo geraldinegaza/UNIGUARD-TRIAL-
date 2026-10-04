@@ -1,0 +1,11 @@
+{
+  "name": " OCT 4 (2) UniGuard - Unified DRRM Platform",
+  "description": "Offline-resilient DRRM Progressive Web Application for LDRRMC coordination in Lingayen, Pangasinan. Features crowd corroboration, multi-hazard reporting, evacuation directories, and emergency alerts.",
+  "requestFramePermissions": [
+    "geolocation",
+    "notifications"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

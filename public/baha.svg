@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1600" width="100%" height="100%">
+  <defs>
+    <linearGradient id="nightSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#05070D"/>
+      <stop offset="40%" stop-color="#0B1220"/>
+      <stop offset="70%" stop-color="#141E33"/>
+      <stop offset="100%" stop-color="#090E17"/>
+    </linearGradient>
+    <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#142338"/>
+      <stop offset="35%" stop-color="#1A2D48"/>
+      <stop offset="75%" stop-color="#283A4A"/>
+      <stop offset="100%" stop-color="#0A1017"/>
+    </linearGradient>
+    <radialGradient id="streetlightGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFDD78" stop-opacity="0.9"/>
+      <stop offset="25%" stop-color="#FFBE3B" stop-opacity="0.5"/>
+      <stop offset="60%" stop-color="#FF9E00" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="carHood" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#181D24"/>
+      <stop offset="50%" stop-color="#0A0C0E"/>
+      <stop offset="100%" stop-color="#020304"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Night Storm Sky -->
+  <rect width="1200" height="1600" fill="url(#nightSky)"/>
+
+  <!-- Rain Streaks -->
+  <g stroke="#8FA8C8" stroke-width="1.5" opacity="0.35" stroke-linecap="round">
+    <line x1="100" y1="50" x2="60" y2="280" />
+    <line x1="300" y1="20" x2="250" y2="290" />
+    <line x1="500" y1="80" x2="440" y2="350" />
+    <line x1="750" y1="40" x2="690" y2="320" />
+    <line x1="950" y1="10" x2="890" y2="300" />
+    <line x1="1100" y1="90" x2="1040" y2="380" />
+    <line x1="200" y1="350" x2="140" y2="650" />
+    <line x1="450" y1="400" x2="380" y2="700" />
+    <line x1="680" y1="360" x2="610" y2="690" />
+    <line x1="880" y1="380" x2="800" y2="720" />
+    <line x1="150" y1="750" x2="80" y2="1050" />
+    <line x1="520" y1="720" x2="450" y2="1080" />
+    <line x1="820" y1="750" x2="740" y2="1100" />
+    <line x1="1020" y1="720" x2="940" y2="1060" />
+  </g>
+
+  <!-- Deep Flood Waters across Roadway -->
+  <path d="M0 680 Q 600 640 1200 680 L 1200 1600 L 0 1600 Z" fill="url(#waterGrad)"/>
+
+  <!-- Water Ripple reflections -->
+  <g stroke="#FFE28A" stroke-width="2" opacity="0.3">
+    <ellipse cx="880" cy="850" rx="90" ry="12" fill="none"/>
+    <ellipse cx="860" cy="980" rx="140" ry="18" fill="none"/>
+    <ellipse cx="820" cy="1150" rx="200" ry="25" fill="none"/>
+    <ellipse cx="780" cy="1320" rx="280" ry="32" fill="none"/>
+  </g>
+
+  <!-- Storm-blown Palm Trees on Left Shore -->
+  <g fill="#090E14">
+    <!-- Palm 1 -->
+    <path d="M120 780 Q 90 520 180 320 Q 200 520 160 780 Z"/>
+    <!-- Fronds bending in fierce typhoon wind -->
+    <path d="M180 320 Q 260 280 340 330 Q 280 350 180 340 Z"/>
+    <path d="M180 320 Q 290 310 390 380 Q 300 400 180 350 Z"/>
+    <path d="M180 320 Q 280 360 360 450 Q 260 440 180 360 Z"/>
+    <path d="M180 320 Q 140 250 160 200 Q 180 260 180 320 Z"/>
+
+    <!-- Palm 2 -->
+    <path d="M280 820 Q 260 580 340 380 Q 360 580 320 820 Z"/>
+    <path d="M340 380 Q 420 340 510 400 Q 430 420 340 400 Z"/>
+    <path d="M340 380 Q 450 370 540 460 Q 440 470 340 420 Z"/>
+  </g>
+
+  <!-- Row of Glowing Streetlights along the Flooded Avenue -->
+  <!-- Lamp 1 (Closest) -->
+  <line x1="940" y1="500" x2="940" y2="780" stroke="#252F3E" stroke-width="12"/>
+  <circle cx="940" cy="490" r="140" fill="url(#streetlightGlow)"/>
+  <circle cx="940" cy="490" r="22" fill="#FFFBE6"/>
+
+  <!-- Lamp 2 -->
+  <line x1="860" y1="540" x2="860" y2="740" stroke="#202835" stroke-width="9"/>
+  <circle cx="860" cy="535" r="95" fill="url(#streetlightGlow)"/>
+  <circle cx="860" cy="535" r="15" fill="#FFFBE6"/>
+
+  <!-- Lamp 3 -->
+  <line x1="790" y1="570" x2="790" y2="710" stroke="#1B212D" stroke-width="7"/>
+  <circle cx="790" cy="565" r="65" fill="url(#streetlightGlow)"/>
+  <circle cx="790" cy="565" r="10" fill="#FFFBE6"/>
+
+  <!-- Dashcam Car Hood in Lower Right -->
+  <path d="M480 1600 L 720 1200 Q 980 1140 1200 1240 L 1200 1600 Z" fill="url(#carHood)"/>
+  <path d="M720 1200 Q 980 1140 1200 1240" stroke="#3D4A5A" stroke-width="4" fill="none"/>
+  
+  <!-- Rain droplet streaks on windshield -->
+  <g fill="#AEC7E8" opacity="0.4">
+    <ellipse cx="600" cy="850" rx="3" ry="12"/>
+    <ellipse cx="640" cy="920" rx="4" ry="18"/>
+    <ellipse cx="510" cy="1100" rx="5" ry="24"/>
+    <ellipse cx="780" cy="1020" rx="4" ry="16"/>
+  </g>
+</svg>
