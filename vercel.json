@@ -1,0 +1,11 @@
+{
+  "framework": "vite",
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/(sw.js|push-sw.js|registerSW.js|manifest.webmanifest)",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    }
+  ]
+}

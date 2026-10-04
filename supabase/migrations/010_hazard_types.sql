@@ -35,6 +35,8 @@ alter table public.reports validate constraint reports_other_requires_text;
 
 -- reports_feed (migration 004) is the read view the client queries; recreate
 -- it with the new column so it keeps returning every column the client reads
+-- the column list changes, which CREATE OR REPLACE VIEW cannot do, so drop it first
+drop view if exists public.reports_feed;
 create or replace view public.reports_feed as
   select r.id, r.code, r.hazard_type, r.hazard_other_text, r.barangay_id, r.barangay, r.description,
          r.severity, r.urgency, r.status, r.lat, r.lng, r.photo_path, r.reporter_id,

@@ -196,6 +196,8 @@ create policy reports_delete on public.reports
 -- Residents need to see what is happening around them without seeing who filed
 -- what. The view runs with owner rights and applies its own filter, exposing no
 -- reporter identity at all.
+-- a later migration widens this view; drop it first so this file stays re-runnable
+drop view if exists public.reports_feed;
 create or replace view public.reports_feed as
 select r.id,
        r.code,

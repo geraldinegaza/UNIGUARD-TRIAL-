@@ -92,9 +92,19 @@ alter table public.authorized_beneficiaries add column if not exists created_at 
 alter table public.authorized_beneficiaries add column if not exists updated_at        timestamptz not null default now();
 
 create index if not exists authorized_beneficiaries_barangay_idx on public.authorized_beneficiaries (barangay_id, active);
-create index if not exists authorized_beneficiaries_name_trgm    on public.authorized_beneficiaries
-  using gin (lower(beneficiary_name) gin_trgm_ops);
--- ^ requires pg_trgm. Guarded below so the migration still runs without it.
+-- Name search index. It needs pg_trgm, so enable the extension first; if either
+-- step is unavailable the migration still runs, search just is not indexed.
+do $$
+begin
+  begin
+    create extension if not exists pg_trgm;
+  exception when others then null;
+  end;
+  begin
+    execute 'create index if not exists authorized_beneficiaries_name_trgm on public.authorized_beneficiaries using gin (lower(beneficiary_name) gin_trgm_ops)';
+  exception when others then null;
+  end;
+end $$;
 
 do $$
 begin
