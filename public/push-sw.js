@@ -10,8 +10,8 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil(self.registration.showNotification(payload.title, {
     body: payload.body,
-    icon: '/shield-alert.svg',
-    badge: '/shield-alert.svg',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/badge-96.png',
     tag: payload.tag || payload.advisory_id || 'uniguard',
     renotify: !!payload.renotify,
     requireInteraction: payload.severity === 'emergency',

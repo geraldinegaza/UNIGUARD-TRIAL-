@@ -32,6 +32,7 @@ import { LdrrmcOthersReviewView } from './components/LdrrmcOthersReviewView';
 import { ResidentNotificationsView } from './components/ResidentNotificationsView';
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
 import { ResidentHomeDraftView } from './components/ResidentHomeDraftView';
+import { portalForRole, useBrandThemeColor } from './brand';
 
 // The emergency alerts already acknowledged on this device, so a refresh does
 // not re-fire the same one.
@@ -58,6 +59,9 @@ export default function App() {
   const [authReady, setAuthReady] = useState<boolean>(false);
   const [recovery, setRecovery] = useState<boolean>(false);
   const isAuthenticated = !!currentUser && !recovery;
+  // Which Triad Shield look this session gets; the status bar follows it
+  const portal = portalForRole(isAuthenticated ? currentUser?.role : null);
+  useBrandThemeColor(portal);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [topView, setTopView] = useState<'Overview' | 'Trends' | 'Analytics'>('Overview');
   const [selectedBarangay, setSelectedBarangay] = useState<string>('all');

@@ -11,7 +11,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['shield-alert.svg', 'push-sw.js'],
+        includeAssets: ['icons/favicon.svg', 'icons/favicon-32.png', 'icons/apple-touch-icon.png', 'icons/badge-96.png', 'push-sw.js'],
         workbox: {
           // push display, notification click and the background sync hook
           importScripts: ['push-sw.js'],
@@ -21,15 +21,33 @@ export default defineConfig(() => {
           name: 'UniGuard - Unified DRRM Platform',
           short_name: 'UniGuard',
           description: 'Unified Disaster Risk Reduction and Management System for LDRRMC Coordination in Lingayen, Pangasinan.',
-          theme_color: '#0284c7',
-          background_color: '#f8fafc',
+          theme_color: '#0E2243',
+          background_color: '#FAF0F2',
           display: 'standalone',
           start_url: '/',
           scope: '/',
           icons: [
             {
-              src: '/shield-alert.svg',
-              sizes: '192x192 512x512',
+              src: '/icons/icon-192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/icons/icon-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/icons/icon-maskable-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+            {
+              src: '/icons/icon.svg',
+              sizes: 'any',
               type: 'image/svg+xml',
               purpose: 'any',
             },
