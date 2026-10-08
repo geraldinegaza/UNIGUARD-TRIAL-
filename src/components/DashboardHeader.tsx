@@ -34,6 +34,7 @@ import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { fmtCoords, locate } from '../lib/geo';
 import { absTime } from '../lib/util';
+import { PortalTag, UniGuardLockup, portalForRole } from '../brand';
 
 export interface LguNotificationItem {
   id: string;
@@ -163,6 +164,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const [sosError, setSosError] = useState<string | null>(null);
 
   const data = useRepo();
+  const portal = portalForRole(currentUser?.role);
 
   // One tap sends the current GPS position and the caller's profile snapshot to
   // the LGU duty officers. Without a GPS fix the SOS is still sent.
@@ -422,7 +424,20 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </button>
           )}
 
-          <div>
+          <div className="min-w-0">
+            {/* Brand lockup for phones and tablets, where the sidebar is tucked away */}
+            <div className="lg:hidden flex flex-wrap items-center gap-x-2 gap-y-1 mb-1.5">
+              <UniGuardLockup
+                layout="compact"
+                portal={portal}
+                size={30}
+                context={{ barangayName: currentUser?.barangay_name }}
+                style={{ flexWrap: 'wrap', rowGap: 4 }}
+              />
+              {data.queue.length > 0 && (
+                <PortalTag portal={portal} dotColor="#F59E0B">{data.queue.length} queued</PortalTag>
+              )}
+            </div>
             {isResident ? (
               <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-900 tracking-tight">
                 {getNavTitle(activeTab)}

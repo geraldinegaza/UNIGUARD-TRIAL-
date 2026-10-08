@@ -24,6 +24,8 @@ export interface UniGuardLockupProps {
   state?: EmblemState;
   /** hide the chip below this breakpoint by passing a class, e.g. "hidden sm:inline-flex" */
   tagClassName?: string;
+  /** same for the wordmark text, e.g. "hidden sm:inline" to keep only emblem + chip on phones */
+  wordmarkClassName?: string;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -32,14 +34,17 @@ export function Wordmark({
   portal = 'auth',
   variant = 'light',
   fontSize,
+  className,
 }: {
   portal?: Portal;
   variant?: EmblemVariant;
   fontSize: number;
+  className?: string;
 }) {
   const t = THEMES[portal];
   return (
     <span
+      className={className}
       style={{
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         fontWeight: 800,
@@ -65,6 +70,7 @@ export function UniGuardLockup({
   context = {},
   state = 'idle',
   tagClassName,
+  wordmarkClassName,
   className = '',
   style,
 }: UniGuardLockupProps) {
@@ -81,7 +87,7 @@ export function UniGuardLockup({
         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: s * 0.16, ...style }}
       >
         <TriadEmblem portal={portal} variant={variant} size={s} state={state} />
-        <Wordmark portal={portal} variant={variant} fontSize={Math.round(s * 0.42)} />
+        <Wordmark portal={portal} variant={variant} fontSize={Math.round(s * 0.42)} className={wordmarkClassName} />
         {lineText && (
           <span style={{ fontSize: Math.max(9, Math.round(s * 0.13)), fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.tagText[variant] }}>
             {lineText}
@@ -97,7 +103,7 @@ export function UniGuardLockup({
     return (
       <div className={className} style={{ display: 'inline-flex', alignItems: 'center', gap: Math.round(s * 0.3), minWidth: 0, ...style }}>
         <TriadEmblem portal={portal} variant={variant} size={s} state={state} />
-        <Wordmark portal={portal} variant={variant} fontSize={Math.round(s * 0.62)} />
+        <Wordmark portal={portal} variant={variant} fontSize={Math.round(s * 0.62)} className={wordmarkClassName} />
         {chipText && <PortalTag portal={portal} variant={variant} className={tagClassName}>{chipText}</PortalTag>}
       </div>
     );
@@ -109,7 +115,7 @@ export function UniGuardLockup({
       <TriadEmblem portal={portal} variant={variant} size={s} state={state} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: Math.round(s * 0.12), minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <Wordmark portal={portal} variant={variant} fontSize={Math.round(s * 0.55)} />
+          <Wordmark portal={portal} variant={variant} fontSize={Math.round(s * 0.55)} className={wordmarkClassName} />
           {chipText && <PortalTag portal={portal} variant={variant} className={tagClassName}>{chipText}</PortalTag>}
         </div>
         {lineText && (
