@@ -9,7 +9,6 @@ import {
   MapPin,
   Clock,
   Shield,
-  RefreshCw,
   ExternalLink,
   Flame,
   Droplet,
@@ -32,6 +31,7 @@ import {
 import { Barangay, IncidentReport, EvacuationCenter, Advisory, User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
+import { BrandLoader, portalForRole } from '../brand';
 import { CENTER } from '../lib/geo';
 
 export interface BarangayOfficialPortalProps {
@@ -1286,10 +1286,13 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
                     className="px-6 py-2.5 rounded-full text-xs font-medium text-white bg-[#052659] hover:bg-[#5482B4] transition-all shadow-xs cursor-pointer disabled:bg-[#7EA0C5] disabled:opacity-70 flex items-center gap-2 border border-[#011025]"
                   >
                     {isBroadcasting ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Broadcasting...</span>
-                      </>
+                      <BrandLoader
+                        mode="inline"
+                        portal={portalForRole(currentUser.role)}
+                        process="publish"
+                        variant="reverse"
+                        context={{ barangayName: currentUser.barangay_name }}
+                      />
                     ) : (
                       <>
                         <AlertTriangle className="w-3.5 h-3.5 text-white" />

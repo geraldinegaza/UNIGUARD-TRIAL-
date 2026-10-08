@@ -32,7 +32,7 @@ import { LdrrmcOthersReviewView } from './components/LdrrmcOthersReviewView';
 import { ResidentNotificationsView } from './components/ResidentNotificationsView';
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
 import { ResidentHomeDraftView } from './components/ResidentHomeDraftView';
-import { TriadEmblem, portalForRole, useBrandThemeColor } from './brand';
+import { BrandLoader, TriadEmblem, portalForRole, useBrandThemeColor } from './brand';
 
 // The emergency alerts already acknowledged on this device, so a refresh does
 // not re-fire the same one.
@@ -44,6 +44,12 @@ function ackedAlertIds(): string[] {
     return [];
   }
 }
+// The first-load screen only appears once loading has taken this long, so a
+// fast load never flashes it, and it always lifts after the cap so a hung
+// network cannot keep anyone out of the cached portal.
+const WORKSPACE_LOADER_DELAY_MS = 250;
+const WORKSPACE_LOADER_MAX_MS = 12000;
+
 function markAlertAcked(id: string) {
   const ids = ackedAlertIds();
   if (ids.includes(id)) return;
@@ -106,9 +112,29 @@ export default function App() {
 
   // Load everything for the signed in account, then send anything queued offline
   const userId = currentUser?.id;
+  const [workspaceReady, setWorkspaceReady] = useState<boolean>(false);
+  const [workspaceSlow, setWorkspaceSlow] = useState<boolean>(false);
   useEffect(() => {
     if (!userId) return;
-    repo.loadAll().then(() => repo.flushQueue());
+    let cancelled = false;
+    setWorkspaceReady(false);
+    setWorkspaceSlow(false);
+    const slowTimer = setTimeout(() => !cancelled && setWorkspaceSlow(true), WORKSPACE_LOADER_DELAY_MS);
+    const capTimer = setTimeout(() => !cancelled && setWorkspaceReady(true), WORKSPACE_LOADER_MAX_MS);
+    repo
+      .loadAll()
+      .finally(() => {
+        clearTimeout(slowTimer);
+        clearTimeout(capTimer);
+        if (!cancelled) setWorkspaceReady(true);
+      })
+      .then(() => repo.flushQueue())
+      .catch(() => null);
+    return () => {
+      cancelled = true;
+      clearTimeout(slowTimer);
+      clearTimeout(capTimer);
+    };
   }, [userId]);
 
   // Emergency Alert Notification Popup: fires only for an emergency-severity
@@ -133,8 +159,10 @@ export default function App() {
     setTopView('Overview');
   };
 
+  const [isSigningOut, setIsSigningOut] = useState<boolean>(false);
   const handleSignOut = () => {
-    auth.signOut();
+    setIsSigningOut(true);
+    auth.signOut().finally(() => setIsSigningOut(false));
   };
 
   const handleAcknowledgeAlert = () => {
@@ -168,7 +196,7 @@ export default function App() {
 
   // GATEWAY LOGIN PORTAL (Phase 1 Gateway Screen - "dont change anything from the portal")
   if (!authReady) {
-    return <div className="h-screen h-[100dvh] w-full bg-gradient-to-br from-[#FAF0F2] via-[#F5E6E9] to-[#EEDCE2]" />;
+    return <BrandLoader portal="auth" process="session" mode="screen" />;
   }
   if (!currentUser || recovery) {
     return (
@@ -295,6 +323,7 @@ export default function App() {
 
             {/* Offline Sync Buffer Banner */}
             <OfflineSyncBanner
+              portal={portal}
               isOnline={isOnline}
               pendingCount={outbox.length}
               onSyncCompleted={refreshData}
@@ -622,6 +651,20 @@ export default function App() {
 
       {/* PWA In-App Install Prompt Banner */}
       <PWAInstallPrompt />
+
+      {/* What the system is doing, in this portal's words: first load, then sign out */}
+      {isSigningOut ? (
+        <BrandLoader portal={portal} process="signout" mode="screen" />
+      ) : (
+        !workspaceReady && workspaceSlow && (
+          <BrandLoader
+            portal={portal}
+            process="workspace"
+            mode="screen"
+            context={{ barangayName: currentUser.barangay_name }}
+          />
+        )
+      )}
     </div>
   );
 }

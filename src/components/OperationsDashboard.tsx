@@ -9,7 +9,6 @@ import {
   MapPin,
   Clock,
   Shield,
-  RefreshCw,
   ExternalLink,
   Flame,
   Droplet,
@@ -31,6 +30,7 @@ import {
 import { Barangay, IncidentReport, EvacuationCenter, Advisory, User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
+import { BrandLoader, portalForRole } from '../brand';
 import { CENTER } from '../lib/geo';
 
 interface OperationsDashboardProps {
@@ -1273,10 +1273,13 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
                     className="px-6 py-2.5 rounded-full text-xs font-medium text-white bg-[#18181b] hover:bg-[#27272a] transition-all shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
                   >
                     {isBroadcasting ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Broadcasting...</span>
-                      </>
+                      <BrandLoader
+                        mode="inline"
+                        portal={portalForRole(currentUser.role)}
+                        process="publish"
+                        variant="reverse"
+                        context={{ count: barangays.length }}
+                      />
                     ) : (
                       <>
                         <AlertTriangle className="w-3.5 h-3.5 text-white" />

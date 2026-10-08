@@ -20,6 +20,7 @@ import { CONFIG } from '../lib/config';
 import { locate } from '../lib/geo';
 import { HAZARD_LABELS, classifyHazard, isOtherHazard } from '../lib/hazards';
 import { compressImage } from '../lib/util';
+import { BrandLoader, portalForRole } from '../brand';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -520,8 +521,20 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             disabled={isSubmitting}
             className="w-full py-3.5 px-6 rounded-full bg-red-900 hover:bg-red-800 active:scale-98 text-white font-extrabold text-xs sm:text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Check className="w-4 h-4 stroke-[3]" />
-            <span>Submit Ground Hazard Report</span>
+            {isSubmitting ? (
+              <BrandLoader
+                mode="inline"
+                portal={portalForRole(currentUser.role)}
+                process="submit"
+                variant="reverse"
+                context={{ barangayName: selectedBarangayName }}
+              />
+            ) : (
+              <>
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>Submit Ground Hazard Report</span>
+              </>
+            )}
           </button>
 
           <p className="text-[11px] text-neutral-400">
