@@ -261,7 +261,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     const isBarangay = currentUser.role === 'barangay';
 
     return (
-      <header className={`w-full px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between gap-1.5 sm:gap-2.5 backdrop-blur-md shrink-0 z-30 transition-colors ${
+      <header className={`w-full px-3 sm:px-5 py-2 sm:py-2.5 flex flex-wrap lg:flex-nowrap items-center justify-between gap-1.5 sm:gap-2.5 backdrop-blur-md shrink-0 z-30 transition-colors ${
         isBarangay
           ? 'bg-[#f4f7fb]/95 border-b border-[#7EA0C5]/30'
           : 'bg-[#f4f4f6]/95 border-b border-gray-200/70'
@@ -294,7 +294,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         </div>
 
         {/* Navigation Links: Visibly organized container with horizontal scroll and dynamic fade masks */}
-        <div className={`relative flex-1 min-w-0 max-w-[280px] sm:max-w-[400px] md:max-w-[520px] lg:max-w-[640px] xl:max-w-[720px] shrink rounded-full backdrop-blur-xs shadow-2xs p-1 overflow-hidden mx-1.5 sm:mx-2.5 ${
+        <div className={`relative flex-1 min-w-0 order-last lg:order-none basis-full lg:basis-0 max-w-full lg:max-w-[640px] xl:max-w-[720px] shrink rounded-full backdrop-blur-xs shadow-2xs p-1 overflow-hidden mx-0 lg:mx-2.5 ${
           isBarangay
             ? 'bg-white/80 border border-[#7EA0C5]/40'
             : 'bg-white/70 border border-gray-200/60'
@@ -381,7 +381,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         {/* Right Controls: "search incidents, responders, or locations", notifications, and menu */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0" ref={rightControlsRef}>
           {/* Search Input Box with organized, responsive width */}
-          <div className="relative flex items-center min-w-0">
+          <div className="relative hidden md:flex items-center min-w-0">
             <div className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 h-8.5 sm:h-9.5 rounded-full text-xs shadow-2xs transition-all w-32 sm:w-44 md:w-52 lg:w-60 xl:w-64 min-w-0 ${
               isBarangay
                 ? 'border border-[#7EA0C5]/40 bg-white hover:bg-[#C2E8FF]/15 focus-within:bg-white focus-within:border-[#052659] focus-within:ring-1 focus-within:ring-[#052659]/30 text-[#011025]'
@@ -465,7 +465,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
             {/* Notifications Dropdown */}
             {isNotifsOpen && (
-              <div className={`absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden ${
+              <div className={`absolute right-0 mt-2 w-80 max-sm:fixed max-sm:left-3 max-sm:right-3 max-sm:top-12 max-sm:mt-0 max-sm:w-auto bg-white rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden ${
                 isBarangay ? 'border border-[#7EA0C5]/30' : 'border border-gray-200'
               }`}>
                 <div className={`px-3.5 py-2 border-b flex items-center justify-between ${
