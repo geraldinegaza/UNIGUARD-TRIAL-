@@ -32,6 +32,7 @@ import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { relTime } from '../lib/util';
 import { UniGuardLogo } from './UniGuardLogo';
+import { portalForRole } from '../brand';
 
 export interface DashboardSidebarProps {
   activeTab: string;
@@ -275,7 +276,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           <div className={`w-4 h-4 rounded-full bg-white flex items-center justify-center p-0.5 border shadow-2xs ${
             isBarangay ? 'border-[#7EA0C5]/40' : 'border-gray-200'
           }`}>
-            <UniGuardLogo size="xs" />
+            <UniGuardLogo size="xs" fill portal={isBarangay ? 'barangay' : 'command'} />
           </div>
           <h1 className={`text-xs sm:text-sm font-semibold tracking-tight leading-none ${
             isBarangay ? 'text-[#011025]' : 'text-neutral-900'
@@ -710,7 +711,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         <div className="pt-5 pb-2 px-2 flex flex-col items-center relative z-10 shrink-0">
           {/* Centered Circular Logo Badge */}
           <div className="w-10 h-10 rounded-2xl bg-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] flex items-center justify-center p-1.5 shrink-0 border border-rose-100 transition-transform hover:scale-105">
-            <UniGuardLogo size="xs" />
+            <UniGuardLogo size="xs" fill portal="resident" />
           </div>
 
           {/* Lingayen below the logo */}
@@ -732,7 +733,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         <div className="pt-5 px-4 flex flex-col items-center text-center relative z-10 shrink-0">
           {/* Circular White Pill Badge with Official UniGuard Logo */}
           <div className="w-12 h-12 rounded-full bg-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] flex items-center justify-center p-1.5 border-2 border-rose-100 transition-transform hover:scale-105">
-            <UniGuardLogo size="xs" />
+            <UniGuardLogo size="xs" fill portal="resident" />
           </div>
 
           {/* Brand Name */}
@@ -764,7 +765,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         /* Fallback header for non-resident vertical view */
         <div className="pt-5 sm:pt-6 px-4 flex flex-col items-center text-center relative z-10 shrink-0">
           <div className="w-12 h-12 rounded-full bg-white shadow-xs flex items-center justify-center p-1.5 mb-2.5 border border-neutral-200">
-            <UniGuardLogo size="xs" />
+            <UniGuardLogo size="xs" fill portal={portalForRole(currentUser.role)} />
           </div>
           <h1 className="text-base font-bold tracking-tight text-neutral-900 leading-none">
             Uni<span className="text-neutral-500">Guard</span>

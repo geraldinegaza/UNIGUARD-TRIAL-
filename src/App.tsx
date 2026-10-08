@@ -616,6 +616,7 @@ export default function App() {
         onClose={() => setIsAlertNotificationOpen(false)}
         onAcknowledge={handleAcknowledgeAlert}
         advisory={notificationAdvisory}
+        portal={portal}
       />
 
       {/* PWA In-App Install Prompt Banner */}

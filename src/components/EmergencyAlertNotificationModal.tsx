@@ -3,12 +3,15 @@ import { AlertTriangle, MapPin, X, Check, ShieldAlert } from 'lucide-react';
 import { Advisory } from '../types';
 import { UniGuardLogo } from './UniGuardLogo';
 import { relTime } from '../lib/util';
+import type { Portal } from '../brand';
 
 interface EmergencyAlertNotificationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAcknowledge?: () => void;
   advisory?: Advisory | null;
+  /** the viewer's portal, so the beacon takes their palette */
+  portal?: Portal;
 }
 
 export const EmergencyAlertNotificationModal: React.FC<EmergencyAlertNotificationModalProps> = ({
@@ -16,6 +19,7 @@ export const EmergencyAlertNotificationModal: React.FC<EmergencyAlertNotificatio
   onClose,
   onAcknowledge,
   advisory,
+  portal = 'auth',
 }) => {
   // Play attention chime sound EXACTLY when notification pops up
   useEffect(() => {
@@ -126,7 +130,7 @@ export const EmergencyAlertNotificationModal: React.FC<EmergencyAlertNotificatio
         <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 pt-3.5 border-t border-neutral-100">
           {/* Subtle branding matching the portal */}
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-400">
-            <UniGuardLogo size="xs" className="scale-75 origin-left" />
+            <UniGuardLogo size="xs" portal={portal} state="alert" className="scale-75 origin-left" />
             <span>Municipality of Lingayen MDRRMO</span>
           </div>
 
