@@ -1,0 +1,90 @@
+/* UniGuard Triad Shield: motion and process states.
+   Every animation stops for people who ask for reduced motion. */
+
+.ug-triad { display: block; overflow: visible; }
+.ug-triad .ug-piece,
+.ug-triad .ug-hub,
+.ug-triad .ug-dot,
+.ug-triad .ug-pulse,
+.ug-triad .ug-orbit {
+  transform-box: view-box;
+  transform-origin: 32px 32px;
+}
+.ug-triad .ug-pulse,
+.ug-triad .ug-orbit,
+.ug-triad .ug-dot { transform-origin: 32px 21.5px; }
+.ug-triad .ug-pulse,
+.ug-triad .ug-orbit { opacity: 0; }
+
+/* loading: the three pieces (barangay, LDRRMO, residents) come together in turn,
+   while the beacon sends out a ring */
+.ug-triad--loading .ug-piece { animation: ug-assemble 1.8s cubic-bezier(.45,0,.25,1) infinite; }
+.ug-triad--loading .ug-piece--left  { animation-delay: 0s; }
+.ug-triad--loading .ug-piece--right { animation-delay: .22s; }
+.ug-triad--loading .ug-piece--keel  { animation-delay: .44s; }
+.ug-triad--loading .ug-pulse { animation: ug-pulse 1.8s ease-out infinite .5s; }
+
+/* syncing: steady shield, an orbit circles the beacon */
+.ug-triad--syncing .ug-orbit { opacity: 1; animation: ug-orbit 1.1s linear infinite; }
+.ug-triad--syncing .ug-dot { animation: ug-blink 1.1s ease-in-out infinite; }
+
+/* alert: the beacon beats */
+.ug-triad--alert .ug-dot { animation: ug-beat 1s ease-in-out infinite; }
+.ug-triad--alert .ug-pulse { animation: ug-pulse 1s ease-out infinite; }
+
+/* success: one settle */
+.ug-triad--success .ug-piece { animation: ug-settle .5s ease-out both; }
+.ug-triad--success .ug-pulse { animation: ug-pulse .9s ease-out 1 both; }
+
+/* offline: desaturated, beacon hollow */
+.ug-triad--offline .ug-piece { filter: grayscale(1); opacity: .5; }
+.ug-triad--offline .ug-dot { opacity: 0; }
+
+@keyframes ug-assemble {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  40% { transform: scale(.9); opacity: .38; }
+  60% { transform: scale(1.02); opacity: 1; }
+}
+@keyframes ug-pulse {
+  0% { transform: scale(1); opacity: .7; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+@keyframes ug-orbit { to { transform: rotate(360deg); } }
+@keyframes ug-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes ug-beat {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.5); }
+  60% { transform: scale(.95); }
+}
+@keyframes ug-settle {
+  0% { transform: scale(.92); opacity: .6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* three-step tracker under the loader, one step per emblem piece */
+.ug-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.ug-step { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ug-step__bar { position: relative; height: 4px; border-radius: 999px; overflow: hidden; background: var(--ug-track); }
+.ug-step__bar::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--ug-fill);
+  transform-origin: left center; transform: scaleX(var(--ug-progress, 0));
+  transition: transform .4s ease;
+}
+.ug-steps--auto .ug-step__bar::after { animation: ug-fill 3s ease-in-out infinite; animation-delay: var(--ug-delay, 0s); }
+.ug-step__label {
+  font-size: 11px; font-weight: 700; letter-spacing: .02em; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+@keyframes ug-fill {
+  0% { transform: scaleX(0); }
+  30%, 85% { transform: scaleX(1); }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+.ug-loader-screen { animation: ug-fade-in .25s ease-out both; }
+@keyframes ug-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ug-triad *, .ug-step__bar::after, .ug-loader-screen { animation: none !important; transition: none !important; }
+  .ug-steps--auto .ug-step__bar::after { transform: scaleX(.6); }
+}
