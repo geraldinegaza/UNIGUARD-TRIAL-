@@ -16,6 +16,7 @@ import { EmergencyHotline, EvacuationCenter, Advisory, User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { CONFIG } from '../lib/config';
+import { BrandLoader, TriadEmblem, portalForRole } from '../brand';
 
 interface OfflineSyncCenterProps {
   isOnline: boolean;
@@ -45,6 +46,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
   const [isForceRefreshing, setIsForceRefreshing] = useState(false);
   const [statusNotification, setStatusNotification] = useState<string | null>(null);
   const isBarangay = currentUser?.role === 'barangay';
+  const portal = portalForRole(currentUser?.role);
 
   // Last successful sync, from the data store
   const { lastSync } = useRepo();
@@ -243,7 +245,11 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
                 ? 'bg-[#C2E8FF]/40 border border-[#7EA0C5]/40 text-[#052659]'
                 : 'bg-neutral-100 border border-neutral-200 text-neutral-700'
             } flex items-center justify-center mx-auto shadow-2xs`}>
-              <WifiOff className="w-7 h-7" />
+              <TriadEmblem
+                portal={portal}
+                size={30}
+                state={isCheckingConnection ? 'syncing' : isOnline ? 'idle' : 'offline'}
+              />
             </div>
 
             {/* Title from screenshot */}
@@ -268,8 +274,20 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
                     : 'bg-[#18181b] hover:bg-neutral-800'
                 } shadow-xs transition-all cursor-pointer disabled:opacity-50 active:scale-95`}
               >
-                <Wifi className={`w-4 h-4 ${isCheckingConnection ? 'animate-spin' : ''}`} />
-                <span>Check Connection</span>
+                {isCheckingConnection ? (
+                  <BrandLoader
+                    mode="inline"
+                    portal={portal}
+                    process={pendingOutboxCount > 0 ? 'sync' : 'refresh'}
+                    variant="reverse"
+                    context={{ count: pendingOutboxCount, barangayName: currentUser?.barangay_name }}
+                  />
+                ) : (
+                  <>
+                    <Wifi className="w-4 h-4" />
+                    <span>Check Connection</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -328,8 +346,19 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
                   : 'text-neutral-700 bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200/80'
               } transition-colors cursor-pointer disabled:opacity-50 shadow-2xs`}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isForceRefreshing ? 'animate-spin' : ''} ${isBarangay ? 'text-[#052659]' : 'text-neutral-600'}`} />
-              <span>Force Refresh</span>
+              {isForceRefreshing ? (
+                <BrandLoader
+                  mode="inline"
+                  portal={portal}
+                  process="refresh"
+                  context={{ barangayName: currentUser?.barangay_name }}
+                />
+              ) : (
+                <>
+                  <RefreshCw className={`w-3.5 h-3.5 ${isBarangay ? 'text-[#052659]' : 'text-neutral-600'}`} />
+                  <span>Force Refresh</span>
+                </>
+              )}
             </button>
 
             <p className={`text-[11px] text-center ${isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'}`}>

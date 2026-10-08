@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SystemAuditLog, User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
+import { BrandLoader, portalForRole } from '../brand';
 import {
   FileText,
   Search,
@@ -153,9 +154,19 @@ export const LdrrmcAuditLogView: React.FC<LdrrmcAuditLogViewProps> = ({ currentU
       {/* 1. Header Section matching initial draft: Title + Subtitle + Buttons (Refresh, Export CSV) */}
       <div className="px-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className={`text-xl sm:text-2xl font-semibold tracking-tight ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-            Audit Log
-          </h1>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className={`text-xl sm:text-2xl font-semibold tracking-tight ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
+              Audit Log
+            </h1>
+            {isRefreshing && (
+              <BrandLoader
+                mode="inline"
+                portal={portalForRole(currentUser?.role)}
+                process="refresh"
+                context={{ barangayName: currentUser?.barangay_name }}
+              />
+            )}
+          </div>
           <p className={`text-xs sm:text-sm mt-0.5 max-w-2xl leading-relaxed ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
             Every privileged action, newest first.
           </p>

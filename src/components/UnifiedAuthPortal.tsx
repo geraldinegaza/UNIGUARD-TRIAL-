@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { UniGuardLogo } from './UniGuardLogo';
+import { BrandLoader } from '../brand';
 import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import { normalisePhone } from '../lib/util';
@@ -304,7 +305,7 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                     className="px-8 py-2.5 bg-gradient-to-r from-[#D32F2F] to-[#E53935] hover:from-[#B71C1C] hover:to-[#D32F2F] active:scale-[0.98] text-white font-semibold rounded-xl shadow-lg shadow-red-700/25 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-60 cursor-pointer"
                   >
                     {isLoading ? (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <BrandLoader mode="inline" portal="auth" process="signin" variant="reverse" />
                     ) : (
                       <span>Login</span>
                     )}

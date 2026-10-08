@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
+import { BrandLoader, portalForRole } from '../brand';
 import {
   Bell,
   Radio,
@@ -710,14 +711,31 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
                 <div className="flex items-center gap-2.5">
                   <button
                     type="submit"
+                    disabled={isPublishing}
                     className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-medium text-white ${
                       isBarangay
                         ? 'bg-[#052659] hover:bg-[#5482B4] border border-[#011025]'
                         : 'bg-[#18181b] hover:bg-neutral-800'
                     } transition-colors shadow-xs cursor-pointer`}
                   >
-                    <Megaphone className="w-4 h-4" />
-                    <span>Publish Broadcast</span>
+                    {isPublishing ? (
+                      <BrandLoader
+                        mode="inline"
+                        portal={portalForRole(currentUser.role)}
+                        process="publish"
+                        variant="reverse"
+                        context={{
+                          barangayName: currentUser.barangay_name,
+                          // LDRRMO: how many barangays this broadcast reaches
+                          count: barangays.some((b) => b.name === affectedArea) ? 1 : barangays.length,
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <Megaphone className="w-4 h-4" />
+                        <span>Publish Broadcast</span>
+                      </>
+                    )}
                   </button>
 
                   <button
