@@ -623,7 +623,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
               {/* SOS Popover Dropdown - Anchored to SOS button, matches Home styling */}
               {isSosOpen && (
-                <div className="absolute right-[-70px] sm:right-0 mt-2 w-[340px] sm:w-[390px] max-w-[calc(100vw-24px)] bg-white text-neutral-900 rounded-3xl border border-neutral-100/90 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute right-[-70px] sm:right-0 mt-2 w-[340px] sm:w-[390px] max-w-[calc(100vw-24px)] max-sm:fixed max-sm:left-3 max-sm:right-3 max-sm:top-full max-sm:w-auto max-sm:max-w-none bg-white text-neutral-900 rounded-3xl border border-neutral-100/90 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                   {/* Header Banner - Matching Home section header */}
                   <div className="p-4 sm:p-5 bg-white border-b border-neutral-100 relative">
                     <div className="flex items-center justify-between gap-2">
@@ -813,7 +813,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
               {/* Notifications Dropdown - Anchored to Bell, matches Home styling */}
               {isNotificationsOpen && (
-                <div className="absolute right-[-40px] sm:right-0 mt-2 w-[340px] sm:w-[390px] max-w-[calc(100vw-24px)] bg-white text-neutral-900 rounded-3xl border border-neutral-100/90 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute right-[-40px] sm:right-0 mt-2 w-[340px] sm:w-[390px] max-w-[calc(100vw-24px)] max-sm:fixed max-sm:left-3 max-sm:right-3 max-sm:top-full max-sm:w-auto max-sm:max-w-none bg-white text-neutral-900 rounded-3xl border border-neutral-100/90 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                   {/* 1. Header Banner - Crisp White with refined typography */}
                   <div className="p-4 sm:p-5 bg-white border-b border-neutral-100 relative">
                     <div className="flex items-center justify-between gap-2">
@@ -1112,7 +1112,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
               {/* Menu Dropdown - Anchored to Menu button, matches Home styling */}
               {isMenuOpen && (
-                <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white text-neutral-900 rounded-3xl border border-neutral-100/90 shadow-2xl p-3.5 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 space-y-2">
+                <div className="absolute right-0 mt-2 w-72 sm:w-80 max-sm:fixed max-sm:left-3 max-sm:right-3 max-sm:top-full max-sm:w-auto max-sm:max-w-none bg-white text-neutral-900 rounded-3xl border border-neutral-100/90 shadow-2xl p-3.5 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 space-y-2">
                   {/* User Profile Card inside Menu - Signature Gradient matching Home Cards */}
                   <div className={`rounded-2xl p-4 sm:p-5 shadow-md flex flex-col items-center justify-center text-center relative overflow-hidden group ${
                     isResident

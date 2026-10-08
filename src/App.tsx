@@ -558,7 +558,7 @@ export default function App() {
                 ? 'border-t border-[#7EA0C5]/30 text-[#5482B4]'
                 : 'border-t border-slate-100 text-slate-500'
             }`}>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start text-center sm:text-left gap-x-2 gap-y-0.5">
                 <span className={`font-bold ${currentUser.role === 'barangay' ? 'text-[#011025]' : 'text-slate-800'}`}>
                   {currentUser.role === 'barangay'
                     ? `UniGuard BDRRMC • Brgy. ${(currentUser.barangay_name || '').toUpperCase()}`
