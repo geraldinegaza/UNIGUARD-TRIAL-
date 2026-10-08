@@ -31,8 +31,7 @@ import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { relTime } from '../lib/util';
-import { UniGuardLogo } from './UniGuardLogo';
-import { portalForRole } from '../brand';
+import { TriadEmblem, UniGuardLockup, portalForRole } from '../brand';
 
 export interface DashboardSidebarProps {
   activeTab: string;
@@ -273,25 +272,14 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             ? 'border border-[#7EA0C5]/40 bg-white/70 shadow-2xs'
             : 'border border-gray-300 bg-transparent'
         }`}>
-          <div className={`w-4 h-4 rounded-full bg-white flex items-center justify-center p-0.5 border shadow-2xs ${
-            isBarangay ? 'border-[#7EA0C5]/40' : 'border-gray-200'
-          }`}>
-            <UniGuardLogo size="xs" fill portal={isBarangay ? 'barangay' : 'command'} />
-          </div>
-          <h1 className={`text-xs sm:text-sm font-semibold tracking-tight leading-none ${
-            isBarangay ? 'text-[#011025]' : 'text-neutral-900'
-          }`}>
-            Uni<span className={isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}>Guard</span>
-          </h1>
-          <span className={`text-[9px] uppercase font-bold tracking-wider ${
-            isBarangay
-              ? 'text-[#052659] bg-[#C2E8FF]/60 px-2 py-0.5 rounded-full border border-[#7EA0C5]/30'
-              : 'text-neutral-500'
-          }`}>
-            {currentUser.role === 'barangay'
-              ? `Brgy. ${currentUser.barangay_name || 'Hub'}`
-              : 'Lingayen'}
-          </span>
+          {/* Emblem and chip always show; the wordmark joins from sm up */}
+          <UniGuardLockup
+            layout="compact"
+            portal={isBarangay ? 'barangay' : 'command'}
+            size={26}
+            context={{ barangayName: currentUser.barangay_name }}
+            wordmarkClassName="hidden sm:inline"
+          />
         </div>
 
         {/* Navigation Links: Visibly organized container with horizontal scroll and dynamic fade masks */}
@@ -709,10 +697,8 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       {/* Top Header & Brand Lockup */}
       {isResident && isMinimized ? (
         <div className="pt-5 pb-2 px-2 flex flex-col items-center relative z-10 shrink-0">
-          {/* Centered Circular Logo Badge */}
-          <div className="w-10 h-10 rounded-2xl bg-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] flex items-center justify-center p-1.5 shrink-0 border border-rose-100 transition-transform hover:scale-105">
-            <UniGuardLogo size="xs" fill portal="resident" />
-          </div>
+          {/* Centered Triad Shield, reversed on the crimson sidebar */}
+          <TriadEmblem portal="resident" variant="reverse" size={36} className="shrink-0 transition-transform hover:scale-105" />
 
           {/* Lingayen below the logo */}
           <span className="text-[8px] uppercase font-bold tracking-wider text-rose-200 mt-1">
@@ -731,22 +717,15 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         </div>
       ) : isResident ? (
         <div className="pt-5 px-4 flex flex-col items-center text-center relative z-10 shrink-0">
-          {/* Circular White Pill Badge with Official UniGuard Logo */}
-          <div className="w-12 h-12 rounded-full bg-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] flex items-center justify-center p-1.5 border-2 border-rose-100 transition-transform hover:scale-105">
-            <UniGuardLogo size="xs" fill portal="resident" />
-          </div>
-
-          {/* Brand Name */}
-          <h1 className="text-base sm:text-lg font-bold tracking-tight text-white leading-tight mt-2">
-            Uni<span className="text-rose-200">Guard</span>
-          </h1>
-
-          {/* Lingayen below the logo */}
-          <div className="mt-1">
-            <span className="text-[9px] uppercase font-extrabold tracking-wider px-2 py-0.5 rounded-full inline-block leading-none bg-white/15 text-white border border-white/20">
-              Lingayen
-            </span>
-          </div>
+          {/* Stacked brand lockup: emblem, wordmark and the resident's barangay chip */}
+          <UniGuardLockup
+            layout="stacked"
+            portal="resident"
+            variant="reverse"
+            size={52}
+            descriptor={null}
+            context={{ barangayName: currentUser.barangay_name }}
+          />
 
           {/* The triangle (indication for minimizing) between the logo and the home */}
           <div className="mt-3.5 w-full flex items-center justify-end px-1">
@@ -764,15 +743,11 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       ) : (
         /* Fallback header for non-resident vertical view */
         <div className="pt-5 sm:pt-6 px-4 flex flex-col items-center text-center relative z-10 shrink-0">
-          <div className="w-12 h-12 rounded-full bg-white shadow-xs flex items-center justify-center p-1.5 mb-2.5 border border-neutral-200">
-            <UniGuardLogo size="xs" fill portal={portalForRole(currentUser.role)} />
-          </div>
-          <h1 className="text-base font-bold tracking-tight text-neutral-900 leading-none">
-            Uni<span className="text-neutral-500">Guard</span>
-          </h1>
-          <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200 mt-1">
-            Lingayen
-          </span>
+          <UniGuardLockup
+            layout="compact"
+            portal={portalForRole(currentUser.role)}
+            context={{ barangayName: currentUser.barangay_name }}
+          />
           <div className="w-full h-px my-3 bg-neutral-100" />
         </div>
       )}

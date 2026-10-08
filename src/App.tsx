@@ -32,7 +32,7 @@ import { LdrrmcOthersReviewView } from './components/LdrrmcOthersReviewView';
 import { ResidentNotificationsView } from './components/ResidentNotificationsView';
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
 import { ResidentHomeDraftView } from './components/ResidentHomeDraftView';
-import { portalForRole, useBrandThemeColor } from './brand';
+import { TriadEmblem, portalForRole, useBrandThemeColor } from './brand';
 
 // The emergency alerts already acknowledged on this device, so a refresh does
 // not re-fire the same one.
@@ -563,6 +563,7 @@ export default function App() {
                 : 'border-t border-slate-100 text-slate-500'
             }`}>
               <div className="flex flex-wrap items-center justify-center sm:justify-start text-center sm:text-left gap-x-2 gap-y-0.5">
+                <TriadEmblem portal={portal} size={16} className="shrink-0" />
                 <span className={`font-bold ${currentUser.role === 'barangay' ? 'text-[#011025]' : 'text-slate-800'}`}>
                   {currentUser.role === 'barangay'
                     ? `UniGuard BDRRMC • Brgy. ${(currentUser.barangay_name || '').toUpperCase()}`
