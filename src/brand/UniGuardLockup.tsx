@@ -86,7 +86,7 @@ export function UniGuardLockup({
         className={className}
         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: s * 0.16, ...style }}
       >
-        <TriadEmblem portal={portal} variant={variant} size={s} state={state} />
+        <TriadEmblem portal={portal} variant={variant} size={s} state={state} style={{ flexShrink: 0 }} />
         <Wordmark portal={portal} variant={variant} fontSize={Math.round(s * 0.42)} className={wordmarkClassName} />
         {lineText && (
           <span style={{ fontSize: Math.max(9, Math.round(s * 0.13)), fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.tagText[variant] }}>
@@ -101,8 +101,8 @@ export function UniGuardLockup({
   if (layout === 'compact') {
     const s = size ?? 28;
     return (
-      <div className={className} style={{ display: 'inline-flex', alignItems: 'center', gap: Math.round(s * 0.3), minWidth: 0, ...style }}>
-        <TriadEmblem portal={portal} variant={variant} size={s} state={state} />
+      <div className={className} style={{ display: 'inline-flex', alignItems: 'center', gap: Math.round(s * 0.3), minWidth: 0, maxWidth: '100%', ...style }}>
+        <TriadEmblem portal={portal} variant={variant} size={s} state={state} style={{ flexShrink: 0 }} />
         <Wordmark portal={portal} variant={variant} fontSize={Math.round(s * 0.62)} className={wordmarkClassName} />
         {chipText && <PortalTag portal={portal} variant={variant} className={tagClassName}>{chipText}</PortalTag>}
       </div>
@@ -112,7 +112,7 @@ export function UniGuardLockup({
   const s = size ?? 48;
   return (
     <div className={className} style={{ display: 'inline-flex', alignItems: 'center', gap: Math.round(s * 0.26), minWidth: 0, ...style }}>
-      <TriadEmblem portal={portal} variant={variant} size={s} state={state} />
+      <TriadEmblem portal={portal} variant={variant} size={s} state={state} style={{ flexShrink: 0 }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: Math.round(s * 0.12), minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Wordmark portal={portal} variant={variant} fontSize={Math.round(s * 0.55)} className={wordmarkClassName} />

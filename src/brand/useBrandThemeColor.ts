@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { THEMES, type Portal } from './brandTokens';
 
-/** Tints the browser / installed-PWA status bar with the active portal's color. */
+/** Tints the browser / installed-PWA status bar and safe-area strips with the active portal's color. */
 export function useBrandThemeColor(portal: Portal) {
   useEffect(() => {
     const color = THEMES[portal].themeColor;
@@ -12,6 +12,9 @@ export function useBrandThemeColor(portal: Portal) {
       document.head.appendChild(meta);
     }
     meta.content = color;
+    // the strips behind the notch and the home indicator of an installed app
+    document.documentElement.style.setProperty('--ug-bar', color);
+    document.documentElement.style.setProperty('--ug-surface', THEMES[portal].surface);
   }, [portal]);
 }
 

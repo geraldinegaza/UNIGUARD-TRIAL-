@@ -162,7 +162,7 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
   };
 
   return (
-    <div className="h-screen h-[100dvh] w-full bg-gradient-to-br from-[#FAF0F2] via-[#F5E6E9] to-[#EEDCE2] relative flex items-center justify-center p-4 sm:p-6 md:p-10 font-sans selection:bg-[#D32F2F] selection:text-white overflow-y-auto overflow-x-hidden">
+    <div className="h-full w-full bg-gradient-to-br from-[#FAF0F2] via-[#F5E6E9] to-[#EEDCE2] relative flex items-center justify-center p-4 sm:p-6 md:p-10 font-sans selection:bg-[#D32F2F] selection:text-white overflow-y-auto overflow-x-hidden">
       
       {/* Background Ambience: Soft aesthetic matching the Niagahoster reference backdrop */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">

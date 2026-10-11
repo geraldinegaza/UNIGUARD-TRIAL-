@@ -426,7 +426,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
           <div className="min-w-0">
             {/* Brand lockup for phones and tablets, where the sidebar is tucked away */}
-            <div className="lg:hidden flex flex-wrap items-center gap-x-2 gap-y-1 mb-1.5">
+            <div className="lg:hidden flex flex-wrap items-center gap-x-2 gap-y-1 md:mb-1.5">
               <UniGuardLockup
                 layout="compact"
                 portal={portal}
@@ -439,7 +439,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               )}
             </div>
             {isResident ? (
-              <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-900 tracking-tight">
+              <h2 className="hidden md:block text-xl sm:text-2xl font-extrabold text-neutral-900 tracking-tight">
                 {getNavTitle(activeTab)}
               </h2>
             ) : (
@@ -452,7 +452,13 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       </div>
 
       {/* Right Controls */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <div className="flex flex-wrap items-center max-md:justify-between gap-2 sm:gap-3">
+        {/* On phones the page title shares this row with the actions */}
+        {isResident && (
+          <h2 className="md:hidden flex-1 min-w-0 truncate text-xl font-extrabold text-neutral-900 tracking-tight">
+            {getNavTitle(activeTab)}
+          </h2>
+        )}
 
         {/* Search Command with Magnifying Glass Symbol - LDRRMO Portal Header */}
         {!isResident && (

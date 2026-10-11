@@ -268,7 +268,7 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
                     <td className="px-6 py-4 font-mono text-xs">
                       <a
                         href={telHref(event.phoneNumber)}
-                        className={`inline-flex items-center gap-1.5 font-semibold transition-colors ${
+                        className={`inline-flex items-center gap-1.5 py-2 pr-2 font-semibold transition-colors ${
                           isBarangay ? 'text-[#011025] hover:text-[#052659]' : 'text-neutral-800 hover:text-black'
                         }`}
                       >

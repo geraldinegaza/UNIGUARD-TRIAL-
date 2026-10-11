@@ -213,13 +213,13 @@ export const LdrrmcAnalyticsView: React.FC<LdrrmcAnalyticsViewProps> = ({
       </div>
 
       {/* 2. Top 4 Stat Cards in 2x2 Grid (Matching home dashboard design, structure, and number positioning) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 w-full">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5 w-full">
         {/* Card 1: REPORTS THIS WEEK */}
         <div
           onClick={() => onOpenDrillDown && onOpenDrillDown('active_incidents', 'all')}
           className={`${
             isBarangay ? 'bg-[#052659] border-[#011025]/30' : 'bg-[#18181b] border-neutral-800'
-          } text-white rounded-[22px] p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border cursor-pointer hover:border-white/20 transition-all`}
+          } text-white rounded-[22px] p-4 sm:p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border cursor-pointer hover:border-white/20 transition-all`}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -231,10 +231,10 @@ export const LdrrmcAnalyticsView: React.FC<LdrrmcAnalyticsViewProps> = ({
               </p>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 text-white flex items-center justify-center">
                 <Inbox className="w-4 h-4 text-white" />
               </div>
-              <span className={`w-6 h-6 rounded-full border border-white/20 ${isBarangay ? 'text-[#C2E8FF]' : 'text-neutral-400'} flex items-center justify-center text-[11px]`}>
+              <span className={`hidden sm:flex w-6 h-6 rounded-full border border-white/20 ${isBarangay ? 'text-[#C2E8FF]' : 'text-neutral-400'} items-center justify-center text-[11px]`}>
                 ↗
               </span>
             </div>
@@ -250,7 +250,7 @@ export const LdrrmcAnalyticsView: React.FC<LdrrmcAnalyticsViewProps> = ({
           onClick={() => onOpenDrillDown && onOpenDrillDown('verified_share', 'all')}
           className={`${
             isBarangay ? 'bg-[#052659] border-[#011025]/30' : 'bg-[#18181b] border-neutral-800'
-          } text-white rounded-[22px] p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border cursor-pointer hover:border-white/20 transition-all`}
+          } text-white rounded-[22px] p-4 sm:p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border cursor-pointer hover:border-white/20 transition-all`}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -262,10 +262,10 @@ export const LdrrmcAnalyticsView: React.FC<LdrrmcAnalyticsViewProps> = ({
               </p>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 text-white flex items-center justify-center">
                 <ShieldCheck className="w-4 h-4 text-white" />
               </div>
-              <span className={`w-6 h-6 rounded-full border border-white/20 ${isBarangay ? 'text-[#C2E8FF]' : 'text-neutral-400'} flex items-center justify-center text-[11px]`}>
+              <span className={`hidden sm:flex w-6 h-6 rounded-full border border-white/20 ${isBarangay ? 'text-[#C2E8FF]' : 'text-neutral-400'} items-center justify-center text-[11px]`}>
                 ↗
               </span>
             </div>
@@ -281,7 +281,7 @@ export const LdrrmcAnalyticsView: React.FC<LdrrmcAnalyticsViewProps> = ({
           onClick={() => onOpenDrillDown && onOpenDrillDown('corroboration_rate', 'all')}
           className={`${
             isBarangay ? 'bg-[#052659] border-[#011025]/30' : 'bg-[#18181b] border-neutral-800'
-          } text-white rounded-[22px] p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border cursor-pointer hover:border-white/20 transition-all`}
+          } text-white rounded-[22px] p-4 sm:p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border cursor-pointer hover:border-white/20 transition-all`}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -293,10 +293,10 @@ export const LdrrmcAnalyticsView: React.FC<LdrrmcAnalyticsViewProps> = ({
               </p>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 text-white flex items-center justify-center">
                 <Clock className="w-4 h-4 text-white" />
               </div>
-              <span className={`w-6 h-6 rounded-full border border-white/20 ${isBarangay ? 'text-[#C2E8FF]' : 'text-neutral-400'} flex items-center justify-center text-[11px]`}>
+              <span className={`hidden sm:flex w-6 h-6 rounded-full border border-white/20 ${isBarangay ? 'text-[#C2E8FF]' : 'text-neutral-400'} items-center justify-center text-[11px]`}>
                 ↗
               </span>
             </div>
@@ -312,7 +312,7 @@ export const LdrrmcAnalyticsView: React.FC<LdrrmcAnalyticsViewProps> = ({
           onClick={() => onOpenDrillDown && onOpenDrillDown('shelters_capacity', 'all')}
           className={`${
             isBarangay ? 'bg-[#052659] border-[#011025]/30' : 'bg-[#18181b] border-neutral-800'
-          } text-white rounded-[22px] p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border cursor-pointer hover:border-white/20 transition-all`}
+          } text-white rounded-[22px] p-4 sm:p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border cursor-pointer hover:border-white/20 transition-all`}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -324,10 +324,10 @@ export const LdrrmcAnalyticsView: React.FC<LdrrmcAnalyticsViewProps> = ({
               </p>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 text-white flex items-center justify-center">
                 <Home className="w-4 h-4 text-white" />
               </div>
-              <span className={`w-6 h-6 rounded-full border border-white/20 ${isBarangay ? 'text-[#C2E8FF]' : 'text-neutral-400'} flex items-center justify-center text-[11px]`}>
+              <span className={`hidden sm:flex w-6 h-6 rounded-full border border-white/20 ${isBarangay ? 'text-[#C2E8FF]' : 'text-neutral-400'} items-center justify-center text-[11px]`}>
                 ↗
               </span>
             </div>
@@ -347,7 +347,7 @@ export const LdrrmcAnalyticsView: React.FC<LdrrmcAnalyticsViewProps> = ({
             Incident Trend, Last 14 Days
           </h2>
 
-          <div className="flex items-center gap-3 self-end sm:self-auto">
+          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5 max-w-full self-end sm:self-auto">
             <span className={`text-[10px] font-mono font-medium uppercase tracking-wider ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-400'}`}>
               REPORTS PER DAY
             </span>

@@ -457,7 +457,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
 
         {/* Offline Notification Toast */}
         {savedOfflineNotice && (
-          <div className="fixed bottom-6 right-6 bg-neutral-900 text-white px-5 py-3 rounded-2xl shadow-2xl text-xs font-bold animate-in slide-in-from-bottom-2 z-50 flex items-center gap-2 border border-white/20">
+          <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 sm:right-6 max-w-[calc(100vw-2rem)] bg-neutral-900 text-white px-5 py-3 rounded-2xl shadow-2xl text-xs font-bold animate-in slide-in-from-bottom-2 z-50 flex items-center gap-2 border border-white/20">
             <Check className="w-4 h-4 text-emerald-400" />
             <span>{savedOfflineNotice}</span>
           </div>
@@ -822,7 +822,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
 
       {/* Offline Toast Notification */}
       {savedOfflineToast && (
-        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-full shadow-2xl text-xs font-medium flex items-center gap-2.5 animate-in slide-in-from-bottom-2 ${
+        <div className={`fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 sm:right-6 max-w-[calc(100vw-2rem)] z-50 px-4 py-3 rounded-full shadow-2xl text-xs font-medium flex items-center gap-2.5 animate-in slide-in-from-bottom-2 ${
           isBarangay
             ? 'bg-[#052659] text-white border border-[#7EA0C5]/40'
             : 'bg-[#18181b] text-white border border-neutral-800'
