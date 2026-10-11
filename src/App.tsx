@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as repo from './services/repo';
 import * as auth from './services/auth';
 import { useRepo } from './hooks/useRepo';
@@ -32,6 +32,7 @@ import { LdrrmcOthersReviewView } from './components/LdrrmcOthersReviewView';
 import { ResidentNotificationsView } from './components/ResidentNotificationsView';
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
 import { ResidentHomeDraftView } from './components/ResidentHomeDraftView';
+import { StaffBottomNav, STAFF_TOP_TABS, useStaffSwipeTabs } from './components/StaffMobileNav';
 import { BrandLoader, TriadEmblem, portalForRole, useBrandThemeColor } from './brand';
 
 // The emergency alerts already acknowledged on this device, so a refresh does
@@ -159,6 +160,21 @@ export default function App() {
     setTopView('Overview');
   };
 
+  // Staff phone navigation: the top-strip sections slide when swiped or tapped
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null);
+  const changeStaffTab = (tab: string) => {
+    const from = STAFF_TOP_TABS.findIndex((t) => t.id === activeTab);
+    const to = STAFF_TOP_TABS.findIndex((t) => t.id === tab);
+    const sliding = from >= 0 && to >= 0 && from !== to;
+    setSlideDir(sliding ? (to > from ? 'left' : 'right') : null);
+    if (sliding && contentRef.current) contentRef.current.scrollTop = 0;
+    setActiveTab(tab);
+    if (tab === 'overview') setTopView('Overview');
+  };
+  // the content area only exists once the start-up screen is gone
+  useStaffSwipeTabs(contentRef, authReady && isAuthenticated && currentUser?.role !== 'citizen', activeTab, changeStaffTab);
+
   const [isSigningOut, setIsSigningOut] = useState<boolean>(false);
   const handleSignOut = () => {
     setIsSigningOut(true);
@@ -249,10 +265,7 @@ export default function App() {
           <div className="w-full shrink-0 z-30">
             <DashboardSidebar
               activeTab={activeTab}
-              setActiveTab={(tab) => {
-                setActiveTab(tab);
-                if (tab === 'overview') setTopView('Overview');
-              }}
+              setActiveTab={changeStaffTab}
               currentUser={currentUser}
               isOnline={isOnline}
               pendingOutboxCount={outbox.length}
@@ -332,7 +345,7 @@ export default function App() {
           </div>
 
           {/* Isolated Scrollable Dashboard Content Area */}
-          <div className={`flex-1 min-h-0 overflow-y-auto w-full flex flex-col ${
+          <div ref={contentRef} className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden w-full flex flex-col ${
             currentUser.role === 'citizen'
               ? 'bg-[#FFF5F5]/40'
               : currentUser.role === 'barangay'
@@ -340,7 +353,12 @@ export default function App() {
               : 'bg-gradient-to-br from-[#f8fafc] via-[#f1f6fb] to-[#e6eff8]'
           }`}>
             {/* Workspace Body Content */}
-            <main className="flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-5 sm:space-y-8 w-full max-w-full">
+            <main
+              key={slideDir ? activeTab : undefined}
+              className={`flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-5 sm:space-y-8 w-full max-w-full ${
+                slideDir ? `ug-slide-from-${slideDir === 'left' ? 'right' : 'left'}` : ''
+              }`}
+            >
             {/* View 1: Main Dashboard (when activeTab is 'overview' or 'home') */}
             {(activeTab === 'overview' || activeTab === 'home') && (
               <>
@@ -617,6 +635,11 @@ export default function App() {
           )}
         </div>
       </div>
+
+        {/* Phone bottom navigation for barangay and LDRRMO: tap only */}
+        {currentUser.role !== 'citizen' && (
+          <StaffBottomNav activeTab={activeTab} setActiveTab={changeStaffTab} currentUser={currentUser} />
+        )}
     </div>
 
       {/* Drill-Down Inspection Modal */}
