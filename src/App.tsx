@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as repo from './services/repo';
 import * as auth from './services/auth';
 import { useRepo } from './hooks/useRepo';
@@ -33,6 +33,7 @@ import { ResidentNotificationsView } from './components/ResidentNotificationsVie
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
 import { ResidentHomeDraftView } from './components/ResidentHomeDraftView';
 import { StaffBottomNav } from './components/StaffMobileNav';
+import { residentTabIndex, useResidentSwipeTabs } from './components/ResidentMobileNav';
 import { BrandLoader, TriadEmblem, portalForRole, useBrandThemeColor } from './brand';
 
 // The emergency alerts already acknowledged on this device, so a refresh does
@@ -159,6 +160,22 @@ export default function App() {
     setActiveTab('overview');
     setTopView('Overview');
   };
+
+  // Resident phone navigation: moving between the sections of the top strip,
+  // by swipe or tap, slides the page in from that side
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [slide, setSlide] = useState<{ tab: string; from: 'left' | 'right' } | null>(null);
+  const changeResidentTab = (tab: string) => {
+    const from = residentTabIndex(activeTab);
+    const to = residentTabIndex(tab);
+    const sliding = from >= 0 && to >= 0 && from !== to;
+    setSlide(sliding ? { tab, from: to > from ? 'right' : 'left' } : null);
+    if (sliding && contentRef.current) contentRef.current.scrollTop = 0;
+    setActiveTab(tab);
+    if (tab === 'overview') setTopView('Overview');
+  };
+  // the content area only exists once the start-up screen is gone
+  useResidentSwipeTabs(contentRef, authReady && isAuthenticated && currentUser?.role === 'citizen', activeTab, changeResidentTab);
 
   const changeStaffTab = (tab: string) => {
     setActiveTab(tab);
@@ -320,7 +337,7 @@ export default function App() {
                 totalActiveHazards={displayedReports.filter((r) => r.status !== 'resolved').length}
                 currentUser={currentUser}
                 onSignOut={handleSignOut}
-                  setActiveTab={setActiveTab}
+                  setActiveTab={changeResidentTab}
               />
             )}
 
@@ -335,7 +352,7 @@ export default function App() {
           </div>
 
           {/* Isolated Scrollable Dashboard Content Area */}
-          <div className={`flex-1 min-h-0 overflow-y-auto w-full flex flex-col ${
+          <div ref={contentRef} className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden w-full flex flex-col ${
             currentUser.role === 'citizen'
               ? 'bg-[#FFF5F5]/40'
               : currentUser.role === 'barangay'
@@ -343,7 +360,12 @@ export default function App() {
               : 'bg-gradient-to-br from-[#f8fafc] via-[#f1f6fb] to-[#e6eff8]'
           }`}>
             {/* Workspace Body Content */}
-            <main className="flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-5 sm:space-y-8 w-full max-w-full">
+            <main
+              key={slide?.tab === activeTab ? activeTab : undefined}
+              className={`flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-5 sm:space-y-8 w-full max-w-full ${
+                slide?.tab === activeTab ? `ug-slide-from-${slide.from}` : ''
+              }`}
+            >
             {/* View 1: Main Dashboard (when activeTab is 'overview' or 'home') */}
             {(activeTab === 'overview' || activeTab === 'home') && (
               <>

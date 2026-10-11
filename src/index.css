@@ -47,6 +47,17 @@ body {
   }
 }
 
+/* Resident phone navigation: the page slides in when moving between top-strip sections */
+@media (max-width: 767px) {
+  .ug-slide-from-right { animation: ug-slide-from-right 0.24s cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+  .ug-slide-from-left { animation: ug-slide-from-left 0.24s cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+}
+@keyframes ug-slide-from-right { from { transform: translateX(36%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ug-slide-from-left { from { transform: translateX(-36%); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .ug-slide-from-right, .ug-slide-from-left { animation: none; }
+}
+
 /* Custom horizontal scrollbar hiding utility */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

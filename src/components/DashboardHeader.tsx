@@ -35,6 +35,7 @@ import * as repo from '../services/repo';
 import { fmtCoords, locate } from '../lib/geo';
 import { absTime } from '../lib/util';
 import { PortalTag, UniGuardLockup, portalForRole } from '../brand';
+import { ResidentTopTabs } from './ResidentMobileNav';
 
 export interface LguNotificationItem {
   id: string;
@@ -165,6 +166,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
   const data = useRepo();
   const portal = portalForRole(currentUser?.role);
+  const isCitizen = currentUser?.role === 'citizen';
 
   // One tap sends the current GPS position and the caller's profile snapshot to
   // the LGU duty officers. Without a GPS fix the SOS is still sent.
@@ -403,17 +405,17 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       : `${selectedBarangayObj?.name || selectedBarangay} Selected`;
 
   return (
-    <header className={`px-3.5 sm:px-6 lg:px-8 py-3.5 sm:py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 sticky top-0 z-15 w-full ${
+    <header className={`px-3.5 sm:px-6 lg:px-8 py-2.5 md:py-5 flex flex-row flex-wrap md:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 md:gap-4 sticky top-0 z-15 w-full ${
       isResident ? 'border-b border-neutral-100 bg-white/95 backdrop-blur-md' : 'border-b border-neutral-200/60 bg-[#f4f4f6]/90 backdrop-blur-md'
     }`}>
       {/* Brand Lockup */}
       <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {/* Mobile Menu Toggle Button */}
           {onToggleMobileSidebar && (
             <button
               onClick={onToggleMobileSidebar}
-              className={`lg:hidden p-2 rounded-xl transition-colors cursor-pointer ${
+              className={`${isCitizen ? 'hidden md:block' : ''} lg:hidden p-2 rounded-xl transition-colors cursor-pointer ${
                 isResident
                   ? 'bg-white border border-neutral-200 text-neutral-800 hover:bg-red-900 hover:text-white'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -426,13 +428,24 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
           <div className="min-w-0">
             {/* Brand lockup for phones and tablets, where the sidebar is tucked away */}
-            <div className="lg:hidden flex flex-wrap items-center gap-x-2 gap-y-1 md:mb-1.5">
+            <div className="lg:hidden flex items-center gap-2 min-w-0 md:mb-1.5">
+              {/* Phones show the emblem and barangay chip only; the wordmark joins from md up */}
               <UniGuardLockup
                 layout="compact"
                 portal={portal}
-                size={30}
+                size={32}
                 context={{ barangayName: currentUser?.barangay_name }}
-                style={{ flexWrap: 'wrap', rowGap: 4 }}
+                wordmarkClassName="hidden md:inline"
+                tagClassName="max-[359px]:!hidden"
+                tag={
+                  currentUser?.barangay_name ? (
+                    <>
+                      {/* the short name fits beside the actions on a phone */}
+                      <span className="hidden md:inline">Brgy. </span>
+                      {currentUser.barangay_name}
+                    </>
+                  ) : undefined
+                }
               />
               {data.queue.length > 0 && (
                 <PortalTag portal={portal} dotColor="#F59E0B">{data.queue.length} queued</PortalTag>
@@ -452,13 +465,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       </div>
 
       {/* Right Controls */}
-      <div className="flex flex-wrap items-center max-md:justify-between gap-2 sm:gap-3">
-        {/* On phones the page title shares this row with the actions */}
-        {isResident && (
-          <h2 className="md:hidden flex-1 min-w-0 truncate text-xl font-extrabold text-neutral-900 tracking-tight">
-            {getNavTitle(activeTab)}
-          </h2>
-        )}
+      <div className="flex flex-wrap items-center shrink-0 gap-2 sm:gap-3">
 
         {/* Search Command with Magnifying Glass Symbol - LDRRMO Portal Header */}
         {!isResident && (
@@ -600,7 +607,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
 
         {/* Header Actions: All Barangays Selected (LGU), SOS (Residents/Barangay), Notifications, Report Hazard (Residents/Barangay), Menu */}
-        <div ref={actionsRef} className="flex items-center gap-2">
+        <div ref={actionsRef} className="flex items-center gap-1.5 sm:gap-2">
           {/* 0. SOS with Caution Sign (Before Notification Bell for residents & barangay officials only) */}
           {isResident && (
             <div className="relative group">
@@ -611,7 +618,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   setIsMenuOpen(false);
                   setIsProfileOpen(false);
                 }}
-                className={`h-9 sm:h-10 px-3.5 sm:px-4 rounded-full flex items-center gap-1.5 font-bold text-xs shadow-md active:scale-95 transition-all cursor-pointer ${
+                className={`h-9 sm:h-10 px-3 sm:px-4 rounded-full flex items-center gap-1.5 font-bold text-xs shadow-md active:scale-95 transition-all cursor-pointer ${
                   isSosOpen
                     ? 'bg-red-900 text-white shadow-lg ring-2 ring-red-950'
                     : 'bg-red-900 hover:bg-red-800 text-white ring-2 ring-red-900/30'
@@ -1311,6 +1318,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </div>
           </div>
         </div>
+
+      {/* Phones: resident sections as a strip of text tabs; the page swipes between them */}
+      {isCitizen && setActiveTab && (
+        <ResidentTopTabs activeTab={activeTab || 'overview'} setActiveTab={setActiveTab} />
+      )}
 
       {/* "View All Notifications" Modal for Admin */}
       {isAllNotificationsModalOpen && (
