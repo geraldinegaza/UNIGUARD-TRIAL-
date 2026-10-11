@@ -66,14 +66,14 @@ export const ResidentTopTabs: React.FC<ResidentTopTabsProps> = ({ activeTab, set
               type="button"
               onClick={() => setActiveTab(item.id)}
               aria-current={active ? 'page' : undefined}
-              className={`relative shrink-0 h-12 px-3 text-[15px] whitespace-nowrap cursor-pointer transition-colors ${
+              className={`relative shrink-0 h-10 px-3 text-[15px] whitespace-nowrap cursor-pointer transition-colors ${
                 active ? 'font-extrabold text-neutral-900' : 'font-semibold text-neutral-400'
               }`}
             >
               {item.label}
               <span
                 aria-hidden="true"
-                className={`absolute left-1/2 -translate-x-1/2 bottom-1.5 h-[3px] rounded-full bg-[#991B1B] transition-all duration-200 ${
+                className={`absolute left-1/2 -translate-x-1/2 bottom-1 h-[3px] rounded-full bg-[#991B1B] transition-all duration-200 ${
                   active ? 'w-6 opacity-100' : 'w-0 opacity-0'
                 }`}
               />
@@ -179,7 +179,7 @@ export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab,
           return slot(item, active, () => go(item.id), { 'aria-current': active ? 'page' : undefined });
         })}
 
-        {/* SOS: always raised, in the middle where either thumb reaches it */}
+        {/* SOS: in the middle where either thumb reaches it, lifted on a bump that is part of the bar */}
         <button
           type="button"
           data-sos-trigger
@@ -188,12 +188,16 @@ export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab,
             onSos();
           }}
           aria-label="Emergency SOS"
-          className="flex-1 min-w-0 h-[62px] flex flex-col items-center justify-end pb-[9px] cursor-pointer select-none"
+          className="group relative flex-1 min-w-0 h-[62px] flex flex-col items-center justify-end pb-[9px] cursor-pointer select-none"
         >
-          <span className="w-[58px] h-[58px] -translate-y-2 rounded-full flex items-center justify-center text-white bg-gradient-to-br from-red-700 via-[#991B1B] to-red-950 ring-[6px] ring-[#FFF9F9] shadow-lg shadow-red-900/40 active:scale-95 transition-transform">
-            <AlertTriangle className="w-6 h-6" strokeWidth={2.3} />
+          <span
+            aria-hidden="true"
+            className="absolute left-1/2 -translate-x-1/2 -top-[20px] w-[72px] h-[21px] rounded-t-[22px] bg-white border border-b-0 border-red-100"
+          />
+          <span className="absolute left-1/2 -translate-x-1/2 -top-[14px] w-[52px] h-[52px] rounded-full flex items-center justify-center text-white bg-gradient-to-b from-[#B4232A] to-[#7F1D1D] shadow-[0_6px_14px_-4px_rgba(127,29,29,0.55)] group-active:scale-95 transition-transform">
+            <AlertTriangle className="w-[22px] h-[22px]" strokeWidth={2.3} />
           </span>
-          <span className="-mt-1 text-[11px] leading-none font-extrabold tracking-wide text-[#991B1B]">SOS</span>
+          <span className="relative text-[11px] leading-none font-extrabold tracking-wide text-[#991B1B]">SOS</span>
         </button>
 
         {BAR_RIGHT.map((item) => {

@@ -419,7 +419,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       : `${selectedBarangayObj?.name || selectedBarangay} Selected`;
 
   return (
-    <header className={`px-3.5 sm:px-6 lg:px-8 py-1.5 md:py-5 flex flex-row flex-nowrap items-center justify-between gap-2 md:gap-4 sticky top-0 z-15 w-full ${
+    <header className={`px-3.5 sm:px-6 lg:px-8 py-1 md:py-5 flex flex-row flex-nowrap items-center justify-between gap-2 md:gap-4 sticky top-0 z-15 w-full ${
       isResident ? 'border-b border-neutral-100 bg-white/95 backdrop-blur-md' : 'border-b border-neutral-200/60 bg-[#f4f4f6]/90 backdrop-blur-md'
     }`}>
       {/* Brand Lockup */}
@@ -447,7 +447,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               <UniGuardLockup
                 layout="compact"
                 portal={portal}
-                size={32}
+                size={28}
                 context={{ barangayName: currentUser?.barangay_name }}
                 wordmarkClassName="hidden md:inline"
                 tagClassName="max-md:!hidden"
