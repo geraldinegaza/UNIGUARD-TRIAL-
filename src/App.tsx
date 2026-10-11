@@ -212,7 +212,7 @@ export default function App() {
   const isLgu = currentUser.role === 'lgu_admin';
 
   return (
-    <div className={`h-screen h-[100dvh] w-full overflow-hidden p-0 sm:p-2 md:p-3 lg:p-4 flex flex-col items-center justify-center font-sans antialiased ${
+    <div className={`h-full w-full overflow-hidden p-0 sm:p-2 md:p-3 lg:p-4 flex flex-col items-center justify-center font-sans antialiased ${
       currentUser.role === 'citizen'
         ? 'bg-[#f0f2f7] text-slate-800 selection:bg-[#991B1B] selection:text-white'
         : currentUser.role === 'barangay'
@@ -264,7 +264,7 @@ export default function App() {
 
         {/* Mobile Slide-Out Drawer Navigation Sidebar */}
         {isMobileSidebarOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden flex">
+          <div className="fixed inset-0 z-50 lg:hidden flex pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
             {/* Backdrop */}
             <div
               className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"

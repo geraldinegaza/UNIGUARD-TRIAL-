@@ -170,9 +170,9 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
       </div>
 
       {/* 2. Three KPI Metric Cards with icons, bold labels, and tabular figures (Matching Home Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 w-full">
         {/* Card 1: Delivered Today (Signature Hero Dark Red Card) */}
-        <div className="bg-gradient-to-br from-red-800 via-red-900 to-red-950 text-white rounded-3xl p-6 sm:p-7 shadow-xl hover:shadow-2xl border border-red-900/40 flex flex-col justify-between min-w-0 w-full relative overflow-hidden group transition-all duration-300">
+        <div className="bg-gradient-to-br from-red-800 via-red-900 to-red-950 text-white col-span-2 lg:col-span-1 rounded-3xl p-5 sm:p-7 shadow-xl hover:shadow-2xl border border-red-900/40 flex flex-col justify-between min-w-0 w-full relative overflow-hidden group transition-all duration-300">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-red-100/80">
@@ -193,21 +193,21 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
         </div>
 
         {/* Card 2: Unread Bulletins (Clean White Floating Card) */}
-        <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-xl hover:shadow-2xl border border-neutral-100/80 transition-all duration-300 flex flex-col justify-between group min-w-0 w-full">
+        <div className="bg-white rounded-3xl p-4 sm:p-7 shadow-xl hover:shadow-2xl border border-neutral-100/80 transition-all duration-300 flex flex-col justify-between group min-w-0 w-full">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
                 Unread Alerts
               </p>
-              <p className="text-4xl sm:text-5xl font-extrabold text-neutral-900 group-hover:text-red-900 transition-colors tracking-tight font-mono tabular-nums mt-2">
+              <p className="text-3xl sm:text-5xl font-extrabold text-neutral-900 group-hover:text-red-900 transition-colors tracking-tight font-mono tabular-nums mt-2">
                 {unreadCount}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-900 border border-red-100/60 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform shrink-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-50 text-red-900 border border-red-100/60 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform shrink-0">
               <AlertTriangle className="w-6 h-6" />
             </div>
           </div>
-          <div className="mt-6 pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
+          <div className="mt-4 pt-3 sm:mt-6 sm:pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
             <span className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${unreadCount > 0 ? 'bg-red-900' : 'bg-emerald-600'}`} />
               <span>{unreadCount > 0 ? 'Pending acknowledgement' : 'All alerts acknowledged'}</span>
@@ -219,7 +219,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
         </div>
 
         {/* Card 3: Delivery Channel (Clean White Floating Card) */}
-        <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-xl hover:shadow-2xl border border-neutral-100/80 transition-all duration-300 flex flex-col justify-between group min-w-0 w-full sm:col-span-2 lg:col-span-1">
+        <div className="bg-white rounded-3xl p-4 sm:p-7 shadow-xl hover:shadow-2xl border border-neutral-100/80 transition-all duration-300 flex flex-col justify-between group min-w-0 w-full">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
@@ -229,11 +229,11 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
                 Push + Inbox
               </p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-900 border border-red-100/60 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform shrink-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-50 text-red-900 border border-red-100/60 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform shrink-0">
               <Radio className="w-6 h-6" />
             </div>
           </div>
-          <div className="mt-6 pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
+          <div className="mt-4 pt-3 sm:mt-6 sm:pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-900" />
               <span>Offline queue verified</span>
@@ -550,7 +550,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
 
       {/* Toast Feedback */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-neutral-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/20 text-xs font-bold flex items-center gap-2 animate-in slide-in-from-bottom-2">
+        <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 sm:right-6 max-w-[calc(100vw-2rem)] z-50 bg-neutral-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/20 text-xs font-bold flex items-center gap-2 animate-in slide-in-from-bottom-2">
           <CheckCheck className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>

@@ -460,9 +460,9 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
       </div>
 
       {/* 2. Top Metric Cards (4 KPI Cards strictly scoped to Barangay) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 w-full">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5 w-full">
         {/* Card 1: ACTIVE INCIDENTS */}
-        <div className="bg-[#052659] text-white rounded-[22px] p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border border-[#011025]/30">
+        <div className="bg-[#052659] text-white rounded-[22px] p-4 sm:p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border border-[#011025]/30">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-medium tracking-normal text-[#C2E8FF] uppercase">
@@ -473,22 +473,22 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
               </p>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 text-white flex items-center justify-center">
                 <AlertTriangle className="w-4 h-4 text-white" />
               </div>
-              <span className="w-6 h-6 rounded-full border border-white/20 text-[#C2E8FF] flex items-center justify-center text-[11px]">
+              <span className="hidden sm:flex w-6 h-6 rounded-full border border-white/20 text-[#C2E8FF] items-center justify-center text-[11px]">
                 ↗
               </span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-white/15 flex items-center gap-2 text-xs text-[#C2E8FF] font-normal">
+          <div className="mt-3 pt-2.5 sm:mt-4 sm:pt-3 border-t border-white/15 flex items-center gap-2 text-xs text-[#C2E8FF] font-normal">
             <span className="w-1.5 h-1.5 rounded-full bg-[#7EA0C5]" />
             <span>Live in Barangay {barangayName}</span>
           </div>
         </div>
 
         {/* Card 2: UNITS DEPLOYED */}
-        <div className="bg-[#052659] text-white rounded-[22px] p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border border-[#011025]/30">
+        <div className="bg-[#052659] text-white rounded-[22px] p-4 sm:p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border border-[#011025]/30">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-medium tracking-normal text-[#C2E8FF] uppercase">
@@ -499,22 +499,22 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
               </p>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 text-white flex items-center justify-center">
                 <Users className="w-4 h-4 text-white" />
               </div>
-              <span className="w-6 h-6 rounded-full border border-white/20 text-[#C2E8FF] flex items-center justify-center text-[11px]">
+              <span className="hidden sm:flex w-6 h-6 rounded-full border border-white/20 text-[#C2E8FF] items-center justify-center text-[11px]">
                 ↗
               </span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-white/15 flex items-center gap-2 text-xs text-[#C2E8FF] font-normal">
+          <div className="mt-3 pt-2.5 sm:mt-4 sm:pt-3 border-t border-white/15 flex items-center gap-2 text-xs text-[#C2E8FF] font-normal">
             <span className="w-1.5 h-1.5 rounded-full bg-[#7EA0C5]" />
             <span>Barangay responders assigned</span>
           </div>
         </div>
 
         {/* Card 3: CRITICAL AREAS */}
-        <div className="bg-[#052659] text-white rounded-[22px] p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border border-[#011025]/30">
+        <div className="bg-[#052659] text-white rounded-[22px] p-4 sm:p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border border-[#011025]/30">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-medium tracking-normal text-[#C2E8FF] uppercase">
@@ -525,22 +525,22 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
               </p>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 text-white flex items-center justify-center">
                 <ShieldAlert className="w-4 h-4 text-white" />
               </div>
-              <span className="w-6 h-6 rounded-full border border-white/20 text-[#C2E8FF] flex items-center justify-center text-[11px]">
+              <span className="hidden sm:flex w-6 h-6 rounded-full border border-white/20 text-[#C2E8FF] items-center justify-center text-[11px]">
                 ↗
               </span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-white/15 flex items-center gap-2 text-xs text-[#C2E8FF] font-normal">
+          <div className="mt-3 pt-2.5 sm:mt-4 sm:pt-3 border-t border-white/15 flex items-center gap-2 text-xs text-[#C2E8FF] font-normal">
             <span className="w-1.5 h-1.5 rounded-full bg-[#7EA0C5]" />
             <span>Emergency severity in {barangayName}</span>
           </div>
         </div>
 
         {/* Card 4: SYSTEM STATUS */}
-        <div className="bg-[#052659] text-white rounded-[22px] p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border border-[#011025]/30">
+        <div className="bg-[#052659] text-white rounded-[22px] p-4 sm:p-5 shadow-sm min-w-0 w-full flex flex-col justify-between relative group border border-[#011025]/30">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-medium tracking-normal text-[#C2E8FF] uppercase">
@@ -554,15 +554,15 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 text-white flex items-center justify-center">
                 <Radio className="w-4 h-4 text-white" />
               </div>
-              <span className="w-6 h-6 rounded-full border border-white/20 text-[#C2E8FF] flex items-center justify-center text-[11px]">
+              <span className="hidden sm:flex w-6 h-6 rounded-full border border-white/20 text-[#C2E8FF] items-center justify-center text-[11px]">
                 ↗
               </span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-white/15 flex items-center gap-2 text-xs text-[#C2E8FF] font-normal">
+          <div className="mt-3 pt-2.5 sm:mt-4 sm:pt-3 border-t border-white/15 flex items-center gap-2 text-xs text-[#C2E8FF] font-normal">
             <span className="w-1.5 h-1.5 rounded-full bg-[#7EA0C5]" />
             <span>{isRealtimeActive ? 'BDRRMC relay connected' : 'Serving cached data'}</span>
           </div>

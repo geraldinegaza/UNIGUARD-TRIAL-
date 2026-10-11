@@ -267,7 +267,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           : 'bg-[#f4f4f6]/95 border-b border-gray-200/70'
       }`}>
         {/* Brand/Logo (Left): Style the brand name container as a thin, outlined pill */}
-        <div className={`rounded-full px-4 py-1.5 flex items-center gap-2 shrink-0 transition-all ${
+        <div className={`rounded-full px-3 sm:px-4 py-1.5 flex items-center gap-2 min-w-0 shrink max-w-[calc(100%-8rem)] sm:max-w-none transition-all ${
           isBarangay
             ? 'border border-[#7EA0C5]/40 bg-white/70 shadow-2xs'
             : 'border border-gray-300 bg-transparent'
@@ -421,9 +421,10 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                 : 'bg-white text-neutral-700 border border-gray-200/90'
             }`}
             title="Live feed"
+            aria-label="Live feed"
           >
             <Waves className={`w-3.5 h-3.5 shrink-0 ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`} />
-            <span className="whitespace-nowrap">Live feed</span>
+            <span className="whitespace-nowrap hidden sm:inline">Live feed</span>
           </div>
 
           {/* Notifications Button with Badge 4 */}

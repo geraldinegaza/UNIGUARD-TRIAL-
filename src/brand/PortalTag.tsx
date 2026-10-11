@@ -32,10 +32,13 @@ export function PortalTag({ portal, variant = 'light', children, dotColor, size 
         color: chip.text,
         border: `1px solid ${chip.border}`,
         whiteSpace: 'nowrap',
+        minWidth: 0,
+        maxWidth: '100%',
       }}
     >
-      {dotColor && <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: dotColor }} />}
-      {children}
+      {dotColor && <span aria-hidden="true" style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 999, background: dotColor }} />}
+      {/* long barangay names shorten with an ellipsis when the header runs out of room */}
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{children}</span>
     </span>
   );
 }

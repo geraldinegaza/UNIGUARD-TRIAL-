@@ -681,7 +681,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
                 <div className="col-span-2">STATUS</div>
                 <div className="col-span-4">HAZARD / DESCRIPTION</div>
                 <div className="col-span-2">BARANGAY</div>
-                <div className="col-span-1 text-center">CORROBORATION</div>
+                <div className="col-span-1 text-center" title="Corroboration">CONFIRMS</div>
                 <div className="col-span-1">AGE</div>
                 <div className="col-span-1 text-center">SEVERITY</div>
                 <div className="col-span-1 text-right">ACTION</div>

@@ -10,7 +10,40 @@
     padding: 0;
     overflow: hidden;
     overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+/* Installed app (PWA): keep the interface clear of the notch, rounded corners
+   and home indicator. The strips behind them take the portal's colors, which
+   useBrandThemeColor keeps in --ug-bar and --ug-surface. */
+body {
+  background: linear-gradient(to bottom, var(--ug-bar, #0E2243) 50%, var(--ug-surface, #FFFFFF) 50%);
+}
+#root {
+  box-sizing: border-box;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* Touch devices */
+@media (pointer: coarse) {
+  /* iOS zooms the page when a focused field's text is under 16px */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  /* no double-tap zoom delay on controls */
+  a, button, [role='button'], input, select, textarea, label {
+    touch-action: manipulation;
+  }
+  /* Text pills and chips sized only by their padding come out under 30px tall,
+     too small for a thumb. Buttons with an explicit height (icon buttons,
+     toggles) are left alone. */
+  button:not([class*=' h-']):not([class^='h-']):not([class*=':h-']) {
+    min-height: 36px;
   }
 }
 
