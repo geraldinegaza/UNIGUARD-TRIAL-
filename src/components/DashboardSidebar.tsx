@@ -32,7 +32,6 @@ import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { relTime } from '../lib/util';
 import { TriadEmblem, UniGuardLockup, portalForRole } from '../brand';
-import { StaffTopTabs } from './StaffMobileNav';
 
 export interface DashboardSidebarProps {
   activeTab: string;
@@ -283,9 +282,6 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           />
         </div>
 
-        {/* Phones: the sections that are not in the bottom bar, as a swipeable text strip */}
-        <StaffTopTabs activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} />
-
         {/* Navigation Links: Visibly organized container with horizontal scroll and dynamic fade masks */}
         <div className={`relative hidden md:block flex-1 min-w-0 order-last lg:order-none basis-full lg:basis-0 max-w-full lg:max-w-[640px] xl:max-w-[720px] shrink rounded-full backdrop-blur-xs shadow-2xs p-1 overflow-hidden mx-0 lg:mx-2.5 ${
           isBarangay
@@ -531,8 +527,8 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             )}
           </div>
 
-          {/* Menu Button (LayoutGrid) */}
-          <div className="relative">
+          {/* Menu Button (LayoutGrid). On phones the menu lives in the bottom bar instead. */}
+          <div className="relative hidden md:block">
             <button
               onClick={() => {
                 setIsMenuOpen((prev) => !prev);
