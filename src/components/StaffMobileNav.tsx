@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Home,
   AlertTriangle,
@@ -17,13 +17,15 @@ import {
   FileText,
   Download,
   LogOut,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 
 // Phone navigation for the barangay and LDRRMO portals: four main sections in
-// a bottom bar, and everything else in the Menu at its far right.
+// a bottom bar, and everything else in the Menu at its far right, which opens
+// a drawer that slides in from the right edge.
 
 interface NavItem {
   id: string;
@@ -40,18 +42,36 @@ const BAR_TABS: NavItem[] = [
   { id: 'shelters', label: 'Shelters', icon: Building2 },
 ];
 
-const MENU_TABS: NavItem[] = [
-  { id: 'sos_log', label: 'SOS Log', icon: ShieldAlert },
-  { id: 'relief', label: 'Relief', icon: Package },
-  { id: 'road_work', label: 'Road Work', icon: Construction },
-  { id: 'hotlines', label: 'Hotlines', icon: PhoneCall },
-  { id: 'analytics', label: 'Analytics', icon: Layers },
-  { id: 'guides', label: 'Preparedness Guides', icon: BookOpen },
-  { id: 'faqs', label: 'FAQs', icon: HelpCircle },
-  { id: 'others_review', label: 'Others Review', icon: UserCheck, lguOnly: true },
-  { id: 'users', label: 'Users', icon: Users, lguOnly: true },
-  { id: 'audit_log', label: 'Audit Log', icon: FileText, lguOnly: true },
-  { id: 'offline_sync', label: 'Offline Sync', icon: Download },
+const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: 'Operations',
+    items: [
+      { id: 'sos_log', label: 'SOS Log', icon: ShieldAlert },
+      { id: 'relief', label: 'Relief', icon: Package },
+      { id: 'road_work', label: 'Road Work', icon: Construction },
+      { id: 'hotlines', label: 'Hotlines', icon: PhoneCall },
+      { id: 'analytics', label: 'Analytics', icon: Layers },
+    ],
+  },
+  {
+    title: 'Resources',
+    items: [
+      { id: 'guides', label: 'Preparedness Guides', icon: BookOpen },
+      { id: 'faqs', label: 'FAQs', icon: HelpCircle },
+    ],
+  },
+  {
+    title: 'Administration',
+    items: [
+      { id: 'others_review', label: 'Others Review', icon: UserCheck, lguOnly: true },
+      { id: 'users', label: 'Users', icon: Users, lguOnly: true },
+      { id: 'audit_log', label: 'Audit Log', icon: FileText, lguOnly: true },
+    ],
+  },
+  {
+    title: 'This device',
+    items: [{ id: 'offline_sync', label: 'Offline Sync', icon: Download }],
+  },
 ];
 
 const isBarActive = (id: string, activeTab: string) =>
@@ -77,7 +97,10 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setAc
     advisories: data.advisories.filter((a) => a.severity !== 'low').length,
     shelters: data.centers.filter((c) => c.status === 'open').length,
   };
-  const menuItems = MENU_TABS.filter((item) => !item.lguOnly || isLgu);
+  const menuGroups = MENU_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.lguOnly || isLgu),
+  })).filter((group) => group.items.length > 0);
   // Menu is the current slot for every section that is not in the bar itself
   const inMenuSection = !BAR_TABS.some((item) => isBarActive(item.id, activeTab));
 
@@ -87,6 +110,20 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setAc
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [isMenuOpen]);
+
+  // dragging the drawer back towards the right edge closes it
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const onDrawerTouchStart = (e: React.TouchEvent) => {
+    dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onDrawerTouchEnd = (e: React.TouchEvent) => {
+    const from = dragStart.current;
+    dragStart.current = null;
+    if (!from) return;
+    const dx = e.changedTouches[0].clientX - from.x;
+    const dy = e.changedTouches[0].clientY - from.y;
+    if (dx > 60 && dx > Math.abs(dy) * 1.5) setIsMenuOpen(false);
+  };
 
   const go = (tab: string) => {
     setIsMenuOpen(false);
@@ -143,100 +180,6 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setAc
 
   return (
     <nav aria-label="Main sections" className="md:hidden shrink-0 relative z-30 px-2 pb-2 pt-6 -mt-6 pointer-events-none">
-      {isMenuOpen && (
-        <>
-          {/* Dimmed backdrop: a tap outside the panel closes it */}
-          <div
-            className="pointer-events-auto fixed inset-0 bg-[#011025]/35 backdrop-blur-[2px] animate-in fade-in duration-150"
-            onClick={() => setIsMenuOpen(false)}
-            aria-hidden="true"
-          />
-
-          {/* Menu panel, rising from just above the bar */}
-          <div
-            id="staff-mobile-menu"
-            role="dialog"
-            aria-label="Menu"
-            className={`pointer-events-auto absolute left-2 right-2 bottom-full -mb-1 max-h-[min(72vh,34rem)] overflow-y-auto rounded-[26px] bg-white p-3 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200 ${
-              isBarangay ? 'border border-[#7EA0C5]/40' : 'border border-neutral-200'
-            }`}
-          >
-            {/* Who is signed in */}
-            <div
-              className={`flex items-center gap-3 rounded-2xl p-3 ${
-                isBarangay ? 'bg-[#C2E8FF]/20 border border-[#7EA0C5]/30' : 'bg-neutral-50 border border-neutral-200/80'
-              }`}
-            >
-              <div
-                className={`w-11 h-11 shrink-0 rounded-full flex items-center justify-center font-black text-lg text-white ring-4 ${
-                  isBarangay ? 'bg-[#052659] ring-[#C2E8FF]/70' : 'bg-[#18181b] ring-neutral-200/80'
-                }`}
-              >
-                {currentUser.full_name ? currentUser.full_name.trim().charAt(0).toUpperCase() : isBarangay ? 'B' : 'L'}
-              </div>
-              <div className="min-w-0">
-                <p className={`text-sm font-black truncate ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-                  {currentUser.full_name || (isBarangay ? 'Barangay Official' : 'LDRRMO Officer')}
-                </p>
-                <span
-                  className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                    isBarangay
-                      ? 'bg-[#C2E8FF]/60 text-[#052659] border border-[#7EA0C5]/50'
-                      : 'bg-neutral-100 text-neutral-800 border border-neutral-300'
-                  }`}
-                >
-                  {isBarangay ? 'BARANGAY' : 'LDRRMO'}
-                </span>
-              </div>
-            </div>
-
-            {/* Every section that is not in the bar */}
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                const active = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => go(item.id)}
-                    aria-current={active ? 'page' : undefined}
-                    className={`h-12 min-w-0 px-3 rounded-2xl flex items-center gap-2.5 text-left text-xs font-semibold cursor-pointer transition-colors ${
-                      active
-                        ? isBarangay ? 'bg-[#052659] text-white' : 'bg-[#18181B] text-white'
-                        : isBarangay
-                        ? 'bg-[#F4F7FB] text-[#011025] border border-[#7EA0C5]/25 active:bg-[#C2E8FF]/40'
-                        : 'bg-neutral-50 text-neutral-800 border border-neutral-200/70 active:bg-neutral-100'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`} />
-                    <span className="min-w-0 leading-tight line-clamp-2">{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {onSignOut && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  onSignOut();
-                }}
-                className={`mt-3 w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold cursor-pointer transition-colors ${
-                  isBarangay
-                    ? 'text-[#052659] border border-[#7EA0C5]/40 active:bg-[#C2E8FF]/30'
-                    : 'text-neutral-800 border border-neutral-200 active:bg-neutral-100'
-                }`}
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Sign Out</span>
-              </button>
-            )}
-          </div>
-        </>
-      )}
-
       <div
         className={`pointer-events-auto relative flex items-stretch rounded-[26px] bg-white px-1 shadow-[0_8px_28px_-10px_rgba(1,16,37,0.28)] ${
           isBarangay ? 'border border-[#7EA0C5]/40' : 'border border-neutral-200'
@@ -251,6 +194,115 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setAc
           isMenuOpen || inMenuSection,
           () => setIsMenuOpen((open) => !open),
           { 'aria-expanded': isMenuOpen, 'aria-haspopup': 'dialog', 'aria-controls': 'staff-mobile-menu' }
+        )}
+      </div>
+
+      {/* Dimmed page beside the drawer: a tap on it closes the menu */}
+      <div
+        className={`fixed inset-0 bg-[#011025]/45 transition-opacity duration-300 ${
+          isMenuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={() => setIsMenuOpen(false)}
+        aria-hidden="true"
+      />
+
+      {/* Menu drawer, sliding in from the right edge over the page */}
+      <div
+        id="staff-mobile-menu"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        inert={!isMenuOpen}
+        onTouchStart={onDrawerTouchStart}
+        onTouchEnd={onDrawerTouchEnd}
+        className={`fixed inset-y-0 right-0 w-[86%] max-w-sm flex flex-col bg-white shadow-2xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] transition-[translate,visibility] duration-300 ease-out ${
+          isMenuOpen ? 'pointer-events-auto translate-x-0 visible' : 'pointer-events-none translate-x-full invisible'
+        } ${isBarangay ? 'border-l border-[#7EA0C5]/40' : 'border-l border-neutral-200'}`}
+      >
+        {/* Who is signed in, and the close button */}
+        <div className={`shrink-0 flex items-center gap-3 px-4 py-4 border-b ${isBarangay ? 'border-[#7EA0C5]/25' : 'border-neutral-100'}`}>
+          <div
+            className={`w-11 h-11 shrink-0 rounded-full flex items-center justify-center font-black text-lg text-white ring-4 ${
+              isBarangay ? 'bg-[#052659] ring-[#C2E8FF]/70' : 'bg-[#18181b] ring-neutral-200/80'
+            }`}
+          >
+            {currentUser.full_name ? currentUser.full_name.trim().charAt(0).toUpperCase() : isBarangay ? 'B' : 'L'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-black truncate ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
+              {currentUser.full_name || (isBarangay ? 'Barangay Official' : 'LDRRMO Officer')}
+            </p>
+            <span
+              className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                isBarangay
+                  ? 'bg-[#C2E8FF]/60 text-[#052659] border border-[#7EA0C5]/50'
+                  : 'bg-neutral-100 text-neutral-800 border border-neutral-300'
+              }`}
+            >
+              {isBarangay ? 'BARANGAY' : 'LDRRMO'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen(false)}
+            aria-label="Close menu"
+            className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center cursor-pointer ${
+              isBarangay ? 'text-[#052659] bg-[#C2E8FF]/30 active:bg-[#C2E8FF]/60' : 'text-neutral-700 bg-neutral-100 active:bg-neutral-200'
+            }`}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Every section that is not in the bar */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 py-2">
+          {menuGroups.map((group) => (
+            <div key={group.title} className="pb-2">
+              <p className={`px-3 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-400'}`}>
+                {group.title}
+              </p>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => go(item.id)}
+                    aria-current={active ? 'page' : undefined}
+                    className={`w-full h-12 px-3 rounded-2xl flex items-center gap-3.5 text-left text-[15px] cursor-pointer transition-colors ${
+                      active
+                        ? `font-bold ${isBarangay ? 'bg-[#052659] text-white' : 'bg-[#18181B] text-white'}`
+                        : `font-medium ${isBarangay ? 'text-[#011025] active:bg-[#C2E8FF]/40' : 'text-neutral-800 active:bg-neutral-100'}`
+                    }`}
+                  >
+                    <Icon className={`w-[22px] h-[22px] shrink-0 ${active ? 'text-white' : isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`} strokeWidth={1.8} />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {onSignOut && (
+          <div className={`shrink-0 p-3 border-t ${isBarangay ? 'border-[#7EA0C5]/25' : 'border-neutral-100'}`}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsMenuOpen(false);
+                onSignOut();
+              }}
+              className={`w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold cursor-pointer transition-colors ${
+                isBarangay
+                  ? 'text-[#052659] bg-[#C2E8FF]/25 border border-[#7EA0C5]/40 active:bg-[#C2E8FF]/50'
+                  : 'text-neutral-800 bg-neutral-50 border border-neutral-200 active:bg-neutral-100'
+              }`}
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
+          </div>
         )}
       </div>
     </nav>
