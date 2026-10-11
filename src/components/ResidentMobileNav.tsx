@@ -1,13 +1,26 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Home,
+  Building2,
+  PhoneCall,
+  AlertTriangle,
+  LayoutGrid,
+  Bell,
+  Download,
+  LogOut,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
+import { User } from '../types';
+import { PortalTag } from '../brand';
 
-// Phone navigation for the resident portal: a strip of text tabs under the
-// header. Tap a tab, or swipe the page left and right to move between them.
+// Phone navigation for the resident portal. What a resident reaches for in an
+// emergency sits in the bottom bar: Home, Shelters, SOS, Hotlines and the Menu.
+// The other sections are text tabs in the header row; tap one, or swipe the
+// page left and right to move between them.
 
 export const RESIDENT_TOP_TABS: { id: string; label: string }[] = [
-  { id: 'overview', label: 'Home' },
   { id: 'relief', label: 'Relief' },
-  { id: 'shelters', label: 'Shelters' },
-  { id: 'hotlines', label: 'Hotlines' },
   { id: 'guides', label: 'Guides' },
   { id: 'faqs', label: 'FAQs' },
 ];
@@ -16,8 +29,7 @@ export const RESIDENT_TOP_TABS: { id: string; label: string }[] = [
 export const RESIDENT_PHONE_QUERY = '(max-width: 767px)';
 
 /** Position of a section in the strip, or -1 for screens that are not in it. */
-export const residentTabIndex = (tab: string) =>
-  RESIDENT_TOP_TABS.findIndex((t) => t.id === (tab === 'home' ? 'overview' : tab));
+export const residentTabIndex = (tab: string) => RESIDENT_TOP_TABS.findIndex((t) => t.id === tab);
 
 interface ResidentTopTabsProps {
   activeTab: string;
@@ -42,33 +54,247 @@ export const ResidentTopTabs: React.FC<ResidentTopTabsProps> = ({ activeTab, set
       ref={stripRef}
       role="navigation"
       aria-label="Sections"
-      className="md:hidden order-last basis-full min-w-0 flex items-stretch gap-1 overflow-x-auto no-scrollbar -mx-3.5 px-2 -mb-2.5"
+      className="md:hidden flex-1 min-w-0 flex overflow-x-auto no-scrollbar"
     >
-      {RESIDENT_TOP_TABS.map((item, index) => {
-        const active = index === activeIndex;
-        return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setActiveTab(item.id)}
-            aria-current={active ? 'page' : undefined}
-            className={`relative shrink-0 h-11 px-3 text-[15px] whitespace-nowrap cursor-pointer transition-colors ${
-              active ? 'font-extrabold text-neutral-900' : 'font-semibold text-neutral-400'
-            }`}
-          >
-            {item.label}
-            <span
-              aria-hidden="true"
-              className={`absolute left-1/2 -translate-x-1/2 bottom-1 h-[3px] rounded-full bg-[#991B1B] transition-all duration-200 ${
-                active ? 'w-6 opacity-100' : 'w-0 opacity-0'
+      {/* centred between the emblem and the buttons; scrolls if a phone is too narrow */}
+      <div className="mx-auto flex items-stretch">
+        {RESIDENT_TOP_TABS.map((item, index) => {
+          const active = index === activeIndex;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setActiveTab(item.id)}
+              aria-current={active ? 'page' : undefined}
+              className={`relative shrink-0 h-12 px-3 text-[15px] whitespace-nowrap cursor-pointer transition-colors ${
+                active ? 'font-extrabold text-neutral-900' : 'font-semibold text-neutral-400'
               }`}
-            />
-          </button>
-        );
-      })}
+            >
+              {item.label}
+              <span
+                aria-hidden="true"
+                className={`absolute left-1/2 -translate-x-1/2 bottom-1.5 h-[3px] rounded-full bg-[#991B1B] transition-all duration-200 ${
+                  active ? 'w-6 opacity-100' : 'w-0 opacity-0'
+                }`}
+              />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };
+
+/* ------------------------------------------------------------ bottom bar */
+
+const BAR_LEFT: { id: string; label: string; icon: LucideIcon }[] = [
+  { id: 'overview', label: 'Home', icon: Home },
+  { id: 'shelters', label: 'Shelters', icon: Building2 },
+];
+const BAR_RIGHT: { id: string; label: string; icon: LucideIcon }[] = [{ id: 'hotlines', label: 'Hotlines', icon: PhoneCall }];
+
+const MENU_ITEMS: { id: string; label: string; icon: LucideIcon }[] = [
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'offline_sync', label: 'Offline Sync', icon: Download },
+];
+
+interface ResidentBottomNavProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  currentUser: User;
+  /** opens or closes the SOS panel */
+  onSos: () => void;
+  onSignOut?: () => void;
+}
+
+export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab, setActiveTab, currentUser, onSos, onSignOut }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isActive = (id: string) => activeTab === id || (id === 'overview' && activeTab === 'home');
+  const inMenuSection = MENU_ITEMS.some((item) => item.id === activeTab);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setIsMenuOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isMenuOpen]);
+
+  // dragging the drawer back towards the right edge closes it
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const onDrawerTouchStart = (e: React.TouchEvent) => {
+    dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onDrawerTouchEnd = (e: React.TouchEvent) => {
+    const from = dragStart.current;
+    dragStart.current = null;
+    if (!from) return;
+    const dx = e.changedTouches[0].clientX - from.x;
+    const dy = e.changedTouches[0].clientY - from.y;
+    if (dx > 60 && dx > Math.abs(dy) * 1.5) setIsMenuOpen(false);
+  };
+
+  const go = (tab: string) => {
+    setIsMenuOpen(false);
+    setActiveTab(tab);
+  };
+
+  const slot = (
+    item: { id: string; label: string; icon: LucideIcon },
+    active: boolean,
+    onClick: () => void,
+    extra?: React.ButtonHTMLAttributes<HTMLButtonElement>
+  ) => {
+    const Icon = item.icon;
+    return (
+      <button
+        key={item.id}
+        type="button"
+        onClick={onClick}
+        className="flex-1 min-w-0 h-[62px] flex flex-col items-center justify-center gap-1 cursor-pointer select-none"
+        {...extra}
+      >
+        <span
+          className={`w-12 h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
+            active ? 'bg-red-50 text-[#991B1B]' : 'text-neutral-400'
+          }`}
+        >
+          <Icon className="w-[22px] h-[22px]" strokeWidth={active ? 2.3 : 1.8} />
+        </span>
+        <span
+          className={`max-w-full truncate text-[10px] min-[360px]:text-[11px] leading-none ${
+            active ? 'font-extrabold text-[#991B1B]' : 'font-medium text-neutral-500'
+          }`}
+        >
+          {item.label}
+        </span>
+      </button>
+    );
+  };
+
+  return (
+    <nav aria-label="Emergency essentials" className="md:hidden shrink-0 relative z-30 px-2 pb-2 pt-7 -mt-7 pointer-events-none">
+      <div className="pointer-events-auto relative flex items-stretch rounded-[26px] bg-white px-1 border border-red-100 shadow-[0_8px_28px_-10px_rgba(74,13,18,0.3)]">
+        {BAR_LEFT.map((item) => {
+          const active = !isMenuOpen && isActive(item.id);
+          return slot(item, active, () => go(item.id), { 'aria-current': active ? 'page' : undefined });
+        })}
+
+        {/* SOS: always raised, in the middle where either thumb reaches it */}
+        <button
+          type="button"
+          data-sos-trigger
+          onClick={() => {
+            setIsMenuOpen(false);
+            onSos();
+          }}
+          aria-label="Emergency SOS"
+          className="flex-1 min-w-0 h-[62px] flex flex-col items-center justify-end pb-[9px] cursor-pointer select-none"
+        >
+          <span className="w-[58px] h-[58px] -translate-y-2 rounded-full flex items-center justify-center text-white bg-gradient-to-br from-red-700 via-[#991B1B] to-red-950 ring-[6px] ring-[#FFF9F9] shadow-lg shadow-red-900/40 active:scale-95 transition-transform">
+            <AlertTriangle className="w-6 h-6" strokeWidth={2.3} />
+          </span>
+          <span className="-mt-1 text-[11px] leading-none font-extrabold tracking-wide text-[#991B1B]">SOS</span>
+        </button>
+
+        {BAR_RIGHT.map((item) => {
+          const active = !isMenuOpen && isActive(item.id);
+          return slot(item, active, () => go(item.id), { 'aria-current': active ? 'page' : undefined });
+        })}
+        {slot(
+          { id: 'menu', label: 'Menu', icon: LayoutGrid },
+          isMenuOpen || inMenuSection,
+          () => setIsMenuOpen((open) => !open),
+          { 'aria-expanded': isMenuOpen, 'aria-haspopup': 'dialog', 'aria-controls': 'resident-mobile-menu' }
+        )}
+      </div>
+
+      {/* Dimmed page beside the drawer: a tap on it closes the menu */}
+      <div
+        className={`fixed inset-0 bg-[#2A0A0E]/45 transition-opacity duration-300 ${
+          isMenuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={() => setIsMenuOpen(false)}
+        aria-hidden="true"
+      />
+
+      {/* Menu drawer, sliding in from the right edge over the page */}
+      <div
+        id="resident-mobile-menu"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        inert={!isMenuOpen}
+        onTouchStart={onDrawerTouchStart}
+        onTouchEnd={onDrawerTouchEnd}
+        className={`fixed inset-y-0 right-0 w-[86%] max-w-sm flex flex-col bg-white border-l border-red-100 shadow-2xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] transition-[translate,visibility] duration-300 ease-out ${
+          isMenuOpen ? 'pointer-events-auto translate-x-0 visible' : 'pointer-events-none translate-x-full invisible'
+        }`}
+      >
+        {/* Who is signed in, and the close button */}
+        <div className="shrink-0 flex items-center gap-3 px-4 py-4 border-b border-neutral-100">
+          <div className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center font-black text-lg text-white bg-[#991B1B] ring-4 ring-red-100">
+            {currentUser.full_name ? currentUser.full_name.trim().charAt(0).toUpperCase() : 'R'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-black truncate text-neutral-900">{currentUser.full_name || 'Resident'}</p>
+            <div className="mt-1 flex">
+              <PortalTag portal="resident">
+                {currentUser.barangay_name ? `Brgy. ${currentUser.barangay_name}` : 'Resident · Lingayen'}
+              </PortalTag>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen(false)}
+            aria-label="Close menu"
+            className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center cursor-pointer text-[#991B1B] bg-red-50 active:bg-red-100"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 py-3">
+          {MENU_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => go(item.id)}
+                aria-current={active ? 'page' : undefined}
+                className={`w-full h-12 px-3 rounded-2xl flex items-center gap-3.5 text-left text-[15px] cursor-pointer transition-colors ${
+                  active ? 'font-bold bg-[#991B1B] text-white' : 'font-medium text-neutral-800 active:bg-red-50'
+                }`}
+              >
+                <Icon className={`w-[22px] h-[22px] shrink-0 ${active ? 'text-white' : 'text-[#991B1B]'}`} strokeWidth={1.8} />
+                <span className="truncate">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {onSignOut && (
+          <div className="shrink-0 p-3 border-t border-neutral-100">
+            <button
+              type="button"
+              onClick={() => {
+                setIsMenuOpen(false);
+                onSignOut();
+              }}
+              className="w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold cursor-pointer text-[#991B1B] bg-red-50 border border-red-100 active:bg-red-100"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </nav>
+  );
+};
+
+/* ------------------------------------------------------------------ swipe */
 
 /**
  * What a touch began on: 'blocked' for maps and form fields, which keep every

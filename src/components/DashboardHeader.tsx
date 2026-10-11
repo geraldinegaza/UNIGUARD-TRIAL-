@@ -79,6 +79,8 @@ export interface DashboardHeaderProps {
   currentUser?: User;
   onSignOut?: () => void;
   setActiveTab?: (tab: string) => void;
+  /** changes each time the SOS button outside this header is tapped */
+  sosToggleSignal?: number;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
@@ -96,6 +98,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   currentUser,
   onSignOut,
   setActiveTab,
+  sosToggleSignal,
 }) => {
   const isResident = currentUser?.role === 'citizen' || currentUser?.role === 'barangay';
 
@@ -362,6 +365,15 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     return barangays.filter((b) => b.name.toLowerCase().includes(q));
   }, [barangays, searchCommandQuery]);
 
+  // The bottom bar's SOS button on phones toggles the same SOS panel
+  useEffect(() => {
+    if (!sosToggleSignal) return;
+    setIsSosOpen((prev) => !prev);
+    setIsNotificationsOpen(false);
+    setIsMenuOpen(false);
+    setIsProfileOpen(false);
+  }, [sosToggleSignal]);
+
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -371,6 +383,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       if (searchCommandRef.current && !searchCommandRef.current.contains(event.target as Node)) {
         setIsSearchCommandOpen(false);
       }
+      // the bottom bar's SOS button opens and closes the SOS panel itself
+      if (event.target instanceof Element && event.target.closest('[data-sos-trigger]')) return;
       if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
         setIsNotificationsOpen(false);
@@ -405,11 +419,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       : `${selectedBarangayObj?.name || selectedBarangay} Selected`;
 
   return (
-    <header className={`px-3.5 sm:px-6 lg:px-8 py-2.5 md:py-5 flex flex-row flex-wrap md:flex-nowrap items-center justify-between gap-x-2 gap-y-1.5 md:gap-4 sticky top-0 z-15 w-full ${
+    <header className={`px-3.5 sm:px-6 lg:px-8 py-1.5 md:py-5 flex flex-row flex-nowrap items-center justify-between gap-2 md:gap-4 sticky top-0 z-15 w-full ${
       isResident ? 'border-b border-neutral-100 bg-white/95 backdrop-blur-md' : 'border-b border-neutral-200/60 bg-[#f4f4f6]/90 backdrop-blur-md'
     }`}>
       {/* Brand Lockup */}
-      <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
+      <div className="flex items-center justify-between gap-2 min-w-0 shrink-0 md:shrink md:flex-1">
         <div className="flex items-center gap-3 min-w-0">
           {/* Mobile Menu Toggle Button */}
           {onToggleMobileSidebar && (
@@ -436,7 +450,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 size={32}
                 context={{ barangayName: currentUser?.barangay_name }}
                 wordmarkClassName="hidden md:inline"
-                tagClassName="max-[359px]:!hidden"
+                tagClassName="max-md:!hidden"
                 tag={
                   currentUser?.barangay_name ? (
                     <>
@@ -463,6 +477,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Phones: the sections that are not in the bottom bar, in line with the emblem and buttons */}
+      {isCitizen && setActiveTab && (
+        <ResidentTopTabs activeTab={activeTab || 'overview'} setActiveTab={setActiveTab} />
+      )}
 
       {/* Right Controls */}
       <div className="flex flex-wrap items-center shrink-0 gap-2 sm:gap-3">
@@ -618,7 +637,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   setIsMenuOpen(false);
                   setIsProfileOpen(false);
                 }}
-                className={`h-9 sm:h-10 px-3 sm:px-4 rounded-full flex items-center gap-1.5 font-bold text-xs shadow-md active:scale-95 transition-all cursor-pointer ${
+                className={`${isCitizen ? 'max-md:hidden' : ''} h-9 sm:h-10 px-3 sm:px-4 rounded-full flex items-center gap-1.5 font-bold text-xs shadow-md active:scale-95 transition-all cursor-pointer ${
                   isSosOpen
                     ? 'bg-red-900 text-white shadow-lg ring-2 ring-red-950'
                     : 'bg-red-900 hover:bg-red-800 text-white ring-2 ring-red-900/30'
@@ -1095,8 +1114,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               </div>
             )}
 
-            {/* 3. Menu (Rightmost) with Profile inside */}
-            <div className="relative group">
+            {/* 3. Menu (Rightmost) with Profile inside. On resident phones the menu lives in the bottom bar. */}
+            <div className={`relative group ${isCitizen ? 'max-md:hidden' : ''}`}>
               <button
                 onClick={() => {
                   setIsMenuOpen((prev) => !prev);
@@ -1318,11 +1337,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </div>
           </div>
         </div>
-
-      {/* Phones: resident sections as a strip of text tabs; the page swipes between them */}
-      {isCitizen && setActiveTab && (
-        <ResidentTopTabs activeTab={activeTab || 'overview'} setActiveTab={setActiveTab} />
-      )}
 
       {/* "View All Notifications" Modal for Admin */}
       {isAllNotificationsModalOpen && (
