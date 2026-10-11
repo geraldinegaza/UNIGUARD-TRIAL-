@@ -33,7 +33,7 @@ import { ResidentNotificationsView } from './components/ResidentNotificationsVie
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
 import { ResidentHomeDraftView } from './components/ResidentHomeDraftView';
 import { StaffBottomNav } from './components/StaffMobileNav';
-import { residentTabIndex, useResidentSwipeTabs } from './components/ResidentMobileNav';
+import { ResidentBottomNav, residentTabIndex, useResidentSwipeTabs } from './components/ResidentMobileNav';
 import { BrandLoader, TriadEmblem, portalForRole, useBrandThemeColor } from './brand';
 
 // The emergency alerts already acknowledged on this device, so a refresh does
@@ -164,6 +164,8 @@ export default function App() {
   // Resident phone navigation: moving between the sections of the top strip,
   // by swipe or tap, slides the page in from that side
   const contentRef = useRef<HTMLDivElement>(null);
+  // the bottom bar's SOS button toggles the SOS panel that lives in the header
+  const [sosToggleSignal, setSosToggleSignal] = useState<number>(0);
   const [slide, setSlide] = useState<{ tab: string; from: 'left' | 'right' } | null>(null);
   const changeResidentTab = (tab: string) => {
     const from = residentTabIndex(activeTab);
@@ -338,6 +340,7 @@ export default function App() {
                 currentUser={currentUser}
                 onSignOut={handleSignOut}
                   setActiveTab={changeResidentTab}
+                  sosToggleSignal={sosToggleSignal}
               />
             )}
 
@@ -643,8 +646,16 @@ export default function App() {
         </div>
       </div>
 
-        {/* Phone bottom navigation for barangay and LDRRMO, with the menu at its far right */}
-        {currentUser.role !== 'citizen' && (
+        {/* Phone bottom navigation: emergency essentials for residents, main sections for staff */}
+        {currentUser.role === 'citizen' ? (
+          <ResidentBottomNav
+            activeTab={activeTab}
+            setActiveTab={changeResidentTab}
+            currentUser={currentUser}
+            onSos={() => setSosToggleSignal((n) => n + 1)}
+            onSignOut={handleSignOut}
+          />
+        ) : (
           <StaffBottomNav activeTab={activeTab} setActiveTab={changeStaffTab} currentUser={currentUser} onSignOut={handleSignOut} />
         )}
     </div>
