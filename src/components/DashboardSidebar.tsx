@@ -25,7 +25,8 @@ import {
   Waves,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  Truck
 } from 'lucide-react';
 import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
@@ -637,6 +638,20 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                 )}
 
                 {/* Users and the Activity Log are Super Admin screens, in the Super Admin console */}
+
+                {/* Dispatch Units (LGU) */}
+                {isLgu && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('dispatch_units');
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full px-3 py-2 text-left text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer text-neutral-700 hover:bg-neutral-100"
+                  >
+                    <Truck className="w-4 h-4 text-neutral-800" />
+                    <span>Dispatch Units</span>
+                  </button>
+                )}
 
                 {/* Offline Sync */}
                 <button

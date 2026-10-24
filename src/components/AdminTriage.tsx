@@ -117,6 +117,12 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
   const [dispatchModalReport, setDispatchModalReport] = useState<IncidentReport | null>(null);
   const [assignedTeam, setAssignedTeam] = useState('');
   const [dispatchNotes, setDispatchNotes] = useState('');
+  // a dispatch is a team, plus for BFP / PNP / Rescue / Ambulance a unit of the
+  // matching type, an ETA and instructions (dispatch_report_v2 checks all of it)
+  const [dispatchTeamName, setDispatchTeamName] = useState('Barangay Response Team');
+  const [dispatchUnitId, setDispatchUnitId] = useState('');
+  const [dispatchEtaMin, setDispatchEtaMin] = useState(15);
+  const [isDispatching, setIsDispatching] = useState(false);
   
   const [resolveModalReport, setResolveModalReport] = useState<IncidentReport | null>(null);
   const [resolutionNotes, setResolutionNotes] = useState('');
@@ -127,13 +133,27 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   // Responder roster for the dispatch modal, and the latest status note of the open report
-  const { responders, audit: auditLogs } = useRepo();
+  const { responders, audit: auditLogs, units } = useRepo();
+  const TEAM_UNIT_TYPE: Record<string, string | null> = {
+    'Barangay Response Team': null,
+    BFP: 'BFP',
+    PNP: 'PNP',
+    'Rescue Unit': 'Rescue',
+    'MDRRMO Rescue': 'Rescue',
+    Ambulance: 'Hospital',
+  };
+  const teamUnitType = TEAM_UNIT_TYPE[dispatchTeamName];
+  const teamUnits = units.filter((u) => u.active && u.unit_type === teamUnitType);
   const [latestNote, setLatestNote] = useState('');
 
   useEffect(() => {
     if (dispatchModalReport) {
       setAssignedTeam('');
+      setDispatchTeamName('Barangay Response Team');
+      setDispatchUnitId('');
+      setDispatchEtaMin(15);
       repo.loadResponders();
+      repo.loadDispatchUnits().catch(() => undefined);
     }
   }, [dispatchModalReport]);
 
@@ -289,19 +309,39 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
 
   const handleDispatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dispatchModalReport) return;
-
-    try {
-      if (assignedTeam) await repo.assignResponder(dispatchModalReport.id, assignedTeam);
-    } catch (err: any) {
-      setActionNotice(err.message || 'Could not assign the responder unit.');
+    if (!dispatchModalReport || isDispatching) return;
+    if (!dispatchNotes.trim()) {
+      setActionNotice('Write what the responders are supposed to do.');
       setTimeout(() => setActionNotice(null), 4000);
       return;
     }
-    const ok = await runStatusChange(dispatchModalReport, 'dispatched', dispatchNotes.trim(), 'Status updated to dispatched');
-    if (ok) {
+    if (teamUnitType && !dispatchUnitId) {
+      setActionNotice('Pick the unit to send.');
+      setTimeout(() => setActionNotice(null), 4000);
+      return;
+    }
+    setIsDispatching(true);
+    try {
+      // the barangay's own responder, when one is picked for its Response Team
+      if (!teamUnitType && assignedTeam) await repo.assignResponder(dispatchModalReport.id, assignedTeam);
+      const targetBarangayUuid = barangays.find((b) => b.id === dispatchModalReport.barangay_id)?.uuid || null;
+      await repo.dispatchReport({
+        reportId: dispatchModalReport.id,
+        team: dispatchTeamName,
+        instructions: dispatchNotes.trim(),
+        eta: new Date(Date.now() + dispatchEtaMin * 60000).toISOString(),
+        unitId: teamUnitType ? dispatchUnitId : null,
+        targetBarangayId: teamUnitType ? null : targetBarangayUuid,
+      });
+      setActionNotice(`${dispatchTeamName} dispatched`);
+      onReportsUpdated?.();
       setDispatchModalReport(null);
       setDispatchNotes('');
+    } catch (err: any) {
+      setActionNotice(err.message || 'Could not dispatch the response.');
+    } finally {
+      setIsDispatching(false);
+      setTimeout(() => setActionNotice(null), 4000);
     }
   };
 
@@ -1248,29 +1288,78 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
             </p>
 
             <form onSubmit={handleDispatchSubmit} className="space-y-4">
-              <div>
-                <label className={`block text-xs font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-700'} mb-1`}>
-                  Assign Response Unit
-                </label>
-                <select
-                  value={assignedTeam}
-                  onChange={(e) => setAssignedTeam(e.target.value)}
-                  className={`w-full text-xs font-medium ${
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <div>
+                  <label className={`block text-xs font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-700'} mb-1`}>Team</label>
+                  <select
+                    value={dispatchTeamName}
+                    onChange={(e) => {
+                      setDispatchTeamName(e.target.value);
+                      setDispatchUnitId('');
+                    }}
+                    className={`w-full text-xs font-medium ${
                     isBarangay
                       ? 'bg-white border-[#7EA0C5]/40 text-[#011025] focus:border-[#5482B4] focus:ring-1 focus:ring-[#5482B4]/50'
                       : 'bg-neutral-50/70 border-neutral-200 text-neutral-800 focus:bg-white focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400/50'
                   } border rounded-xl p-2.5 outline-hidden transition-all`}
-                >
-                  <option value="">
-                    {responders.length ? 'Select a unit' : 'No responder units configured yet'}
-                  </option>
-                  {responders.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}{r.unit ? ` · ${r.unit}` : ''}
-                    </option>
-                  ))}
-                </select>
+                  >
+                    <option value="Barangay Response Team">Barangay Response Team</option>
+                    <option value="BFP">BFP (fire)</option>
+                    <option value="PNP">PNP (police)</option>
+                    <option value="Rescue Unit">Rescue unit</option>
+                    <option value="Ambulance">Ambulance (hospital)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block text-xs font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-700'} mb-1`}>ETA</label>
+                  <select value={dispatchEtaMin} onChange={(e) => setDispatchEtaMin(Number(e.target.value))} className={`w-full text-xs font-medium ${
+                    isBarangay
+                      ? 'bg-white border-[#7EA0C5]/40 text-[#011025] focus:border-[#5482B4] focus:ring-1 focus:ring-[#5482B4]/50'
+                      : 'bg-neutral-50/70 border-neutral-200 text-neutral-800 focus:bg-white focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400/50'
+                  } border rounded-xl p-2.5 outline-hidden transition-all`}>
+                    {[5, 10, 15, 30, 45, 60].map((m) => (
+                      <option key={m} value={m}>
+                        {m} min
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              {teamUnitType ? (
+                <div>
+                  <label className={`block text-xs font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-700'} mb-1`}>Unit</label>
+                  <select value={dispatchUnitId} onChange={(e) => setDispatchUnitId(e.target.value)} className={`w-full text-xs font-medium ${
+                    isBarangay
+                      ? 'bg-white border-[#7EA0C5]/40 text-[#011025] focus:border-[#5482B4] focus:ring-1 focus:ring-[#5482B4]/50'
+                      : 'bg-neutral-50/70 border-neutral-200 text-neutral-800 focus:bg-white focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400/50'
+                  } border rounded-xl p-2.5 outline-hidden transition-all`}>
+                    <option value="">{teamUnits.length ? 'Select a unit' : 'No active unit of this type yet'}</option>
+                    {teamUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className={`block text-xs font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-700'} mb-1`}>Responder (optional)</label>
+                  <select value={assignedTeam} onChange={(e) => setAssignedTeam(e.target.value)} className={`w-full text-xs font-medium ${
+                    isBarangay
+                      ? 'bg-white border-[#7EA0C5]/40 text-[#011025] focus:border-[#5482B4] focus:ring-1 focus:ring-[#5482B4]/50'
+                      : 'bg-neutral-50/70 border-neutral-200 text-neutral-800 focus:bg-white focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400/50'
+                  } border rounded-xl p-2.5 outline-hidden transition-all`}>
+                    <option value="">{responders.length ? 'The barangay team as a whole' : 'No responders listed yet'}</option>
+                    {responders.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                        {r.unit ? ` · ${r.unit}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className={`block text-xs font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-700'} mb-1`}>
@@ -1306,7 +1395,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
                   } rounded-full shadow-xs flex items-center gap-1.5 cursor-pointer transition-all`}
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>Confirm Dispatch</span>
+                  <span>{isDispatching ? 'Dispatching…' : 'Confirm Dispatch'}</span>
                 </button>
               </div>
             </form>

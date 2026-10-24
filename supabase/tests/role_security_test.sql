@@ -163,5 +163,8 @@ select public.dispatch_report_v2((select pob_verified from t_rep), 'BFP', 'Proce
                                  (select unit from t_unit), null, null);
 select pg_temp.as_user((select member from t_unit));
 select pg_temp.ok((select count(*) from public.report_dispatches) = 1, 'dispatch sees the dispatch addressed to its unit');
+select pg_temp.ok((select count(*) from public.reports) = 1
+                  and (select id from public.reports) = (select pob_verified from t_rep),
+                  'dispatch reads only the report dispatched to its unit');
 
 rollback;

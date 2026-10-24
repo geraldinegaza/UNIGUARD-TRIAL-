@@ -32,6 +32,7 @@ import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
 import { ResidentHomeDraftView } from './components/ResidentHomeDraftView';
 import { DispatchPortal } from './components/DispatchPortal';
 import { SuperAdminPortal } from './components/SuperAdminPortal';
+import { DispatchUnitsView } from './components/DispatchUnitsView';
 import { StaffBottomNav } from './components/StaffMobileNav';
 import { ResidentBottomNav, residentTabIndex, useResidentSwipeTabs } from './components/ResidentMobileNav';
 import { BrandLoader, TriadEmblem, portalForRole, useBrandThemeColor } from './brand';
@@ -252,9 +253,9 @@ export default function App() {
           <SuperAdminPortal
             currentUser={currentUser}
             onSignOut={handleSignOut}
-            onOpenOperations={() => {
+            onOpenOperations={(tab) => {
               setSuperOps(true);
-              setActiveTab('overview');
+              setActiveTab(tab || 'overview');
               setTopView('Overview');
             }}
           />
@@ -596,6 +597,9 @@ export default function App() {
             )}
 
             {/* Users and the Activity Log moved to the Super Admin console */}
+
+            {/* Dispatch units: BFP, PNP, Rescue, Hospital */}
+            {activeTab === 'dispatch_units' && isLgu && <DispatchUnitsView canManageAccounts={inSuperOps} />}
 
             {/* View 9: Analytics Full View */}
             {activeTab === 'analytics' && (

@@ -93,7 +93,7 @@ interface SuperAdminPortalProps {
   currentUser: User;
   onSignOut: () => void;
   /** opens the operations console (incidents, map, shelters, road work, hotlines, analytics) */
-  onOpenOperations?: () => void;
+  onOpenOperations?: (tab?: string) => void;
 }
 
 export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser, onSignOut, onOpenOperations }) => {
@@ -788,10 +788,20 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                   {onOpenOperations && (
                     <button
                       type="button"
-                      onClick={onOpenOperations}
+                      onClick={() => onOpenOperations()}
                       className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
                     >
                       Operations
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {onOpenOperations && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenOperations('dispatch_units')}
+                      className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
+                    >
+                      Dispatch units
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -839,7 +849,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                       {onOpenOperations && (
                         <button
                           type="button"
-                          onClick={onOpenOperations}
+                          onClick={() => onOpenOperations()}
                           className="h-10 px-5 rounded-full bg-white/80 text-[#5C3A0A] text-[13px] font-bold shadow-sm cursor-pointer inline-flex items-center gap-1.5"
                         >
                           Open operations

@@ -6,6 +6,7 @@ import {
   Building2,
   ShieldAlert,
   LayoutGrid,
+  Truck,
   Package,
   Construction,
   PhoneCall,
@@ -51,6 +52,7 @@ const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
       { id: 'road_work', label: 'Road Work', icon: Construction },
       { id: 'hotlines', label: 'Hotlines', icon: PhoneCall },
       { id: 'analytics', label: 'Analytics', icon: Layers },
+      { id: 'dispatch_units', label: 'Dispatch Units', icon: Truck, lguOnly: true },
     ],
   },
   {

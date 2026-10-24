@@ -289,3 +289,84 @@ export interface QueuedReport {
   accuracy?: number | null;
   photo?: Blob | null; // compressed photo, uploaded when the queue flushes
 }
+
+/* ------------------------------------------------------------- dispatch units */
+export type UnitType = 'BFP' | 'PNP' | 'Rescue' | 'Hospital';
+export type DispatchStage = 'sent' | 'acknowledged' | 'en_route' | 'on_scene' | 'done';
+
+export interface DispatchUnit {
+  id: string;
+  name: string;
+  unit_type: UnitType;
+  contact_number: string;
+  address: string;
+  status: 'available' | 'on_duty' | 'off_duty';
+  active: boolean;
+  created_at: string;
+}
+
+/** A dispatch: a team (and for BFP / PNP / Rescue, a unit) sent to a verified report */
+export interface Dispatch {
+  id: string;
+  report_id: string;
+  team: string;
+  instructions: string;
+  eta: string | null;
+  dispatched_by_name: string;
+  dispatched_at: string;
+  unit_id: string | null;
+  dispatch_status: DispatchStage;
+  ack_at: string | null;
+  en_route_at: string | null;
+  on_scene_at: string | null;
+  done_at: string | null;
+  after_action: string;
+  report: {
+    code: string;
+    hazard_type: string;
+    description: string;
+    barangay: string;
+    severity: string;
+    status: string;
+    lat: number | null;
+    lng: number | null;
+    created_at: string;
+  } | null;
+}
+
+export interface UnitPersonnel {
+  id: string;
+  unit_id: string;
+  name: string;
+  role: string;
+  phone: string;
+  on_duty: boolean;
+}
+
+export interface UnitEquipment {
+  id: string;
+  label: string;
+  identifier: string;
+  status: 'available' | 'deployed' | 'maintenance' | 'unavailable';
+  condition: string;
+  last_checked_at: string | null;
+  notes: string;
+}
+
+export interface UnitRequest {
+  id: string;
+  unit_id: string;
+  kind: string;
+  details: string;
+  status: 'pending' | 'approved' | 'declined' | 'done';
+  created_at: string;
+  decided_at: string | null;
+}
+
+export interface HospitalCapacity {
+  er_beds: number;
+  icu_beds: number;
+  available: number;
+  accepting: boolean;
+  updated_at: string | null;
+}

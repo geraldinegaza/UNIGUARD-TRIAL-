@@ -32,6 +32,13 @@ import {
   Responder,
   RoadCondition,
   ChangeRequest,
+  DispatchUnit,
+  Dispatch,
+  UnitPersonnel,
+  UnitEquipment,
+  UnitRequest,
+  HospitalCapacity,
+  UnitType,
   RoadStatus,
   RoadWork,
   SosEntry,
@@ -71,6 +78,15 @@ export interface RepoState {
   audit: SystemAuditLog[];
   responders: Responder[];
   changeRequests: ChangeRequest[];
+  // dispatch units (LGU / Super Admin see every unit; a dispatch account its own)
+  units: DispatchUnit[];
+  unitMembers: User[];
+  unitRequests: UnitRequest[];
+  myUnit: DispatchUnit | null;
+  dispatches: Dispatch[];
+  personnel: UnitPersonnel[];
+  equipment: UnitEquipment[];
+  capacity: HospitalCapacity | null;
 }
 
 const fallbackBarangays = (): Barangay[] =>
@@ -103,6 +119,14 @@ let state: RepoState = {
   audit: [],
   responders: [],
   changeRequests: [],
+  units: [],
+  unitMembers: [],
+  unitRequests: [],
+  myUnit: null,
+  dispatches: [],
+  personnel: [],
+  equipment: [],
+  capacity: null,
 };
 
 const listeners = new Set<() => void>();
@@ -1384,4 +1408,256 @@ export function start() {
   setInterval(() => {
     if (state.online && state.queue.length) flushQueue();
   }, CONFIG.SYNC_RETRY_MS);
+}
+
+
+/* ---------------------------------------------------------- dispatch units */
+// Every write goes through the security-definer RPCs from migrations 139/140,
+// which re-check role, unit and barangay on the server.
+const toUnit = (u: Row): DispatchUnit => ({
+  id: u.id,
+  name: u.name || '',
+  unit_type: u.unit_type,
+  contact_number: u.contact_number || '',
+  address: u.address || '',
+  status: u.status || 'available',
+  active: u.active !== false,
+  created_at: u.created_at,
+});
+
+const toDispatch = (d: Row): Dispatch => ({
+  id: d.id,
+  report_id: d.report_id,
+  team: d.team || '',
+  instructions: d.instructions || '',
+  eta: d.eta || null,
+  dispatched_by_name: d.dispatched_by_name || '',
+  dispatched_at: d.dispatched_at,
+  unit_id: d.unit_id || null,
+  dispatch_status: d.dispatch_status || 'sent',
+  ack_at: d.ack_at || null,
+  en_route_at: d.en_route_at || null,
+  on_scene_at: d.on_scene_at || null,
+  done_at: d.done_at || null,
+  after_action: d.after_action || '',
+  report: d.report
+    ? {
+        code: d.report.code || '',
+        hazard_type: hazardDisplayLabel(d.report.hazard_type, d.report.hazard_other_text),
+        description: d.report.description || '',
+        barangay: d.report.barangay || '',
+        severity: d.report.severity || 'advisory',
+        status: d.report.status === 'reported' ? 'unverified' : d.report.status || '',
+        lat: num(d.report.lat),
+        lng: num(d.report.lng),
+        created_at: d.report.created_at,
+      }
+    : null,
+});
+
+const toRequest = (r: Row): UnitRequest => ({
+  id: r.id,
+  unit_id: r.unit_id,
+  kind: r.kind || '',
+  details: r.details || '',
+  status: r.status || 'pending',
+  created_at: r.created_at,
+  decided_at: r.decided_at || null,
+});
+
+const rpcOrFail = async (name: string, args: Record<string, unknown>) => {
+  const { data, error } = await client().rpc(name, args);
+  if (error) fail(error);
+  return data;
+};
+
+/** LGU / Super Admin: every unit, its members, and support requests. */
+export async function loadDispatchUnits(): Promise<void> {
+  if (!supabase) return;
+  const c = supabase;
+  const [units, requests] = await Promise.all([
+    c.from('dispatch_units').select('*').order('unit_type').order('name'),
+    c.from('unit_requests').select('*').order('created_at', { ascending: false }).limit(100),
+  ]);
+  if (units.error) fail(units.error);
+  const patch: Partial<RepoState> = {
+    units: (units.data || []).map(toUnit),
+    unitRequests: requests.error ? [] : (requests.data || []).map(toRequest),
+  };
+  // members are profile rows; only the Super Admin can read other people's profiles
+  const members = await c.from('profiles').select('*').eq('role', 'dispatch_team').order('full_name');
+  patch.unitMembers = members.error ? [] : (members.data || []).map((p: Row) => toUser(p));
+  set(patch);
+}
+
+export async function createDispatchUnit(input: { name: string; unit_type: UnitType; contact_number: string; address: string }): Promise<void> {
+  await rpcOrFail('create_dispatch_unit', {
+    p_name: input.name.trim(),
+    p_unit_type: input.unit_type,
+    p_contact_number: input.contact_number.trim(),
+    p_address: input.address.trim(),
+    p_lat: null,
+    p_lng: null,
+  });
+  await loadDispatchUnits();
+}
+
+export async function updateDispatchUnit(id: string, patch: { name?: string; contact_number?: string; address?: string; active?: boolean }): Promise<void> {
+  await rpcOrFail('update_dispatch_unit', {
+    p_unit_id: id,
+    p_name: patch.name ?? null,
+    p_contact_number: patch.contact_number ?? null,
+    p_address: patch.address ?? null,
+    p_active: patch.active ?? null,
+  });
+  await loadDispatchUnits();
+}
+
+/** Super Admin invites a unit admin or member; a unit admin invites members of their own unit. */
+export async function inviteUnitMember(unitId: string, email: string, unitRole: 'unit_admin' | 'member', asUnitAdmin = false): Promise<void> {
+  const body = asUnitAdmin
+    ? { action: 'unit-invite', email: email.trim(), unitId, redirectUrl: window.location.origin }
+    : { action: 'create', email: email.trim(), role: 'dispatch_team', unitId, unitRole, redirectUrl: window.location.origin };
+  const { error } = await client().functions.invoke('admin-users', { body });
+  if (error) {
+    let msg = error.message;
+    try {
+      const b = await (error as any).context.json();
+      if (b && b.error) msg = b.error;
+    } catch {}
+    throw new Error(msg);
+  }
+  if (asUnitAdmin) await loadMyUnit();
+  else await loadDispatchUnits();
+}
+
+export async function decideUnitRequest(id: string, decision: 'approved' | 'declined' | 'done', note = ''): Promise<void> {
+  await rpcOrFail('decide_unit_request', { p_request_id: id, p_decision: decision, p_note: note });
+  await loadDispatchUnits();
+}
+
+/** Officials and LGU send a team (and for BFP / PNP / Rescue, a unit) to a verified report. */
+export async function dispatchReport(input: {
+  reportId: string;
+  team: string;
+  instructions: string;
+  eta: string;
+  unitId: string | null;
+  targetBarangayId: string | null;
+}): Promise<void> {
+  await rpcOrFail('dispatch_report_v2', {
+    p_report_id: input.reportId,
+    p_team: input.team,
+    p_instructions: input.instructions,
+    p_eta: input.eta,
+    p_unit_id: input.unitId,
+    p_target_barangay_id: input.targetBarangayId,
+    p_equipment_ids: null,
+  });
+  await loadAll();
+}
+
+/** A dispatch account: its unit, the dispatches addressed to it, crew, equipment and hospital data. */
+export async function loadMyUnit(): Promise<void> {
+  if (!supabase || !state.user || !state.user.dispatch_unit_id) return;
+  const c = supabase;
+  const unitId = state.user.dispatch_unit_id;
+  const [unit, dispatches, personnel, equipment, requests, capacity] = await Promise.all([
+    c.from('dispatch_units').select('*').eq('id', unitId).maybeSingle(),
+    c.from('report_dispatches').select('*, report:reports(*)').eq('unit_id', unitId).order('dispatched_at', { ascending: false }).limit(60),
+    c.from('unit_personnel').select('*').eq('unit_id', unitId).order('name'),
+    c.from('dispatch_equipment').select('*').eq('owner_unit_id', unitId).order('created_at', { ascending: false }),
+    c.from('unit_requests').select('*').eq('unit_id', unitId).order('created_at', { ascending: false }),
+    c.from('hospital_capacity').select('*').eq('unit_id', unitId).maybeSingle(),
+  ]);
+  if (unit.error) fail(unit.error);
+  set({
+    myUnit: unit.data ? toUnit(unit.data) : null,
+    dispatches: dispatches.error ? [] : (dispatches.data || []).map(toDispatch),
+    personnel: personnel.error
+      ? []
+      : (personnel.data || []).map((p: Row) => ({ id: p.id, unit_id: p.unit_id, name: p.name || '', role: p.role || '', phone: p.phone || '', on_duty: !!p.on_duty })),
+    equipment: equipment.error
+      ? []
+      : (equipment.data || []).map((e: Row) => ({
+          id: e.id,
+          label: e.custom_label || 'Equipment',
+          identifier: e.identifier || '',
+          status: e.status || 'available',
+          condition: e.condition || '',
+          last_checked_at: e.last_checked_at || null,
+          notes: e.notes || '',
+        })),
+    unitRequests: requests.error ? [] : (requests.data || []).map(toRequest),
+    capacity: capacity.data
+      ? {
+          er_beds: capacity.data.er_beds || 0,
+          icu_beds: capacity.data.icu_beds || 0,
+          available: capacity.data.available || 0,
+          accepting: capacity.data.accepting !== false,
+          updated_at: capacity.data.updated_at || null,
+        }
+      : null,
+  });
+}
+
+export async function respondToDispatch(dispatchId: string, action: 'acknowledged' | 'en_route' | 'on_scene' | 'done', note = ''): Promise<void> {
+  await rpcOrFail('dispatch_respond', { p_dispatch_id: dispatchId, p_action: action, p_note: note });
+  await loadMyUnit();
+}
+
+export async function submitAfterAction(dispatchId: string, text: string): Promise<void> {
+  await rpcOrFail('submit_after_action', { p_dispatch_id: dispatchId, p_text: text, p_meta: {} });
+  await loadMyUnit();
+}
+
+export async function setPersonnelDuty(personnelId: string, onDuty: boolean): Promise<void> {
+  await rpcOrFail('set_personnel_duty', { p_personnel_id: personnelId, p_on_duty: onDuty });
+  await loadMyUnit();
+}
+
+export async function addPersonnel(input: { name: string; role: string; phone: string }): Promise<void> {
+  if (!state.user || !state.user.dispatch_unit_id) return;
+  const { error } = await client()
+    .from('unit_personnel')
+    .insert({ unit_id: state.user.dispatch_unit_id, name: input.name.trim(), role: input.role.trim(), phone: input.phone.trim() });
+  if (error) fail(error);
+  await loadMyUnit();
+}
+
+export async function addEquipment(input: { label: string; identifier: string }): Promise<void> {
+  if (!state.user || !state.user.dispatch_unit_id) return;
+  const { error } = await client()
+    .from('dispatch_equipment')
+    .insert({ owner_unit_id: state.user.dispatch_unit_id, custom_label: input.label.trim(), identifier: input.identifier.trim() });
+  if (error) fail(error);
+  await loadMyUnit();
+}
+
+export async function setEquipmentStatus(equipmentId: string, status: UnitEquipment['status'], note = ''): Promise<void> {
+  await rpcOrFail('set_equipment_status', { p_equipment_id: equipmentId, p_status: status, p_condition: null, p_notes: note });
+  await loadMyUnit();
+}
+
+export async function recordEquipmentCheck(equipmentId: string, condition: string, notes = ''): Promise<void> {
+  await rpcOrFail('record_equipment_check', { p_equipment_id: equipmentId, p_condition: condition, p_level: '', p_notes: notes });
+  await loadMyUnit();
+}
+
+export async function createUnitRequest(kind: string, details: string): Promise<void> {
+  if (!state.user || !state.user.dispatch_unit_id) return;
+  await rpcOrFail('create_unit_request', { p_unit_id: state.user.dispatch_unit_id, p_kind: kind, p_details: details });
+  await loadMyUnit();
+}
+
+export async function setHospitalCapacity(input: HospitalCapacity): Promise<void> {
+  if (!state.user || !state.user.dispatch_unit_id) return;
+  await rpcOrFail('set_hospital_capacity', {
+    p_unit_id: state.user.dispatch_unit_id,
+    p_er_beds: input.er_beds,
+    p_icu_beds: input.icu_beds,
+    p_available: input.available,
+    p_accepting: input.accepting,
+  });
+  await loadMyUnit();
 }
