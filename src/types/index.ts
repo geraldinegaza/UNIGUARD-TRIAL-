@@ -303,6 +303,8 @@ export interface QueuedReport {
   lng: number | null;
   accuracy?: number | null;
   photo?: Blob | null; // compressed photo, uploaded when the queue flushes
+  /** the account that saved it; it is only ever sent as that account */
+  user_id?: string;
   /** times the server refused this row; after 5 it is marked failed */
   attempts?: number;
   failed?: boolean;

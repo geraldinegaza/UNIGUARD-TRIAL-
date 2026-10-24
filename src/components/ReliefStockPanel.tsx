@@ -178,7 +178,7 @@ export const ReliefStockPanel: React.FC<{ currentUser: User; barangays: Barangay
       {notice && <div className={`px-5 sm:px-6 py-2.5 text-xs font-medium border-b ${t.border} ${t.ink}`}>{notice}</div>}
       {loadError && (
         <div className="px-5 sm:px-6 py-3 text-xs text-amber-900 bg-amber-50 border-b border-amber-200">
-          {loadError}. The relief tables come with the upgrade (migrations 141 and 151).
+          {loadError.replace(/\.$/, "")}. The relief tables come with the upgrade (migrations 141 and 151).
         </div>
       )}
 

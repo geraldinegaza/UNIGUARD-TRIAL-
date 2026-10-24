@@ -145,6 +145,8 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setAc
         key={item.id}
         type="button"
         onClick={onClick}
+        aria-label={badge ? `${item.label}, ${badge} new` : item.label}
+        aria-current={active ? 'page' : undefined}
         className="relative flex-1 min-w-0 h-[62px] flex flex-col items-center justify-end pb-2 cursor-pointer select-none"
         {...extra}
       >
@@ -162,6 +164,7 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setAc
           <Icon className={active ? 'w-5 h-5' : 'w-[22px] h-[22px]'} strokeWidth={active ? 2.2 : 1.8} />
           {!!badge && (
             <span
+              aria-hidden="true"
               className={`absolute -top-1 -right-1.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center ${
                 active
                   ? isBarangay ? 'bg-[#C2E8FF] text-[#052659]' : 'bg-white text-[#18181B] border border-neutral-200'

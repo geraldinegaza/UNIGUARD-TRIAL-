@@ -98,7 +98,16 @@ export function updateQueueRow(row: QueuedReport): Promise<void> {
 // queued one with the fresher position instead of adding another.
 export async function upsertQueuedSos(item: Omit<QueuedReport, 'id' | 'queued_at'>): Promise<void> {
   const rows = await listQueue();
-  const recent = rows.find((r) => r.kind === 'sos' && !r.failed && Date.now() - Date.parse(r.queued_at) < 10 * 60000);
+  const recent = rows.find(
+    (r) => r.kind === 'sos' && !r.failed && r.user_id === item.user_id && Date.now() - Date.parse(r.queued_at) < 10 * 60000
+  );
   if (recent) return updateQueueRow({ ...recent, ...item, id: recent.id, queued_at: new Date().toISOString() });
   return enqueue(item);
+}
+
+// The cached snapshot belongs to the account that saved it; erase it on sign out.
+export function clearSnapshot(): Promise<void> {
+  return tx(STORE_SNAPSHOT, 'readwrite', (s) => s.delete('data'))
+    .then(() => undefined)
+    .catch(() => undefined);
 }

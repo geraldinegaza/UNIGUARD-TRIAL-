@@ -16,6 +16,7 @@ export const TemplatePicker: React.FC<{
   const [id, setId] = useState('');
   const [lang, setLang] = useState<'en' | 'fil'>('en');
   const [values, setValues] = useState<Record<string, string>>({});
+  const [missing, setMissing] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open || list) return;
@@ -51,6 +52,10 @@ export const TemplatePicker: React.FC<{
   const apply = () => {
     if (!tpl) return;
     const v = { ...defaults, ...values };
+    // never publish an advisory with a literal {placeholder} left in it
+    const empty = keys.filter((k) => !(v[k] || '').trim());
+    setMissing(empty);
+    if (empty.length) return;
     const title = lang === 'fil' && tpl.title_fil ? tpl.title_fil : tpl.title_en;
     const body = lang === 'fil' && tpl.body_fil ? tpl.body_fil : tpl.body_en;
     onApply(repo.fillTemplate(title, v), repo.fillTemplate(body, v), tpl.category);
@@ -113,6 +118,11 @@ export const TemplatePicker: React.FC<{
               {tpl && (
                 <p className={`text-[11px] leading-relaxed ${cls.muted}`}>
                   {repo.fillTemplate(lang === 'fil' && tpl.body_fil ? tpl.body_fil : tpl.body_en, { ...defaults, ...values })}
+                </p>
+              )}
+              {missing.length > 0 && (
+                <p className="text-xs font-medium text-amber-800" role="alert">
+                  Fill in {missing.join(', ')} first.
                 </p>
               )}
               <button type="button" onClick={apply} className={`px-4 py-2 rounded-full text-xs font-semibold cursor-pointer ${cls.btn}`}>

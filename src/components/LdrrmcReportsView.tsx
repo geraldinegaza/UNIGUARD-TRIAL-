@@ -184,7 +184,7 @@ export const LdrrmcReportsView: React.FC<Props> = ({ currentUser, barangays, rep
       {notice && <div className={`p-3.5 rounded-2xl border text-xs font-medium ${isBarangay ? 'bg-[#C2E8FF]/30 border-[#7EA0C5]/40 text-[#011025]' : 'bg-neutral-100/90 border-neutral-200/80 text-neutral-800'}`}>{notice}</div>}
       {loadError && (
         <div className="p-3.5 rounded-2xl border border-amber-200 bg-amber-50 text-xs text-amber-900">
-          {loadError}. The documentation tables come with the upgrade (migration 144).
+          {loadError.replace(/\.$/, "")}. The documentation tables come with the upgrade (migration 144).
         </div>
       )}
 

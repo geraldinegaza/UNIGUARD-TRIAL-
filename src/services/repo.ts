@@ -626,10 +626,17 @@ function unsubscribeRealtime() {
 /* ----------------------------------------------------------------- session */
 export function setUser(user: User | null) {
   set({ user });
+  // the waiting list shows only this account's saved reports and SOS
+  refreshQueue();
   if (!user) {
     unsubscribeRealtime();
+    // nothing the last account could read stays in memory or on the device
+    offline.clearSnapshot();
     set({
       reports: [], notifications: [], beneficiaries: [], sosLog: [], othersReview: [], users: [], audit: [], responders: [],
+      changeRequests: [], units: [], unitMembers: [], unitRequests: [], myUnit: null, dispatches: [], personnel: [],
+      equipment: [], capacity: null, inventory: [], distributionLog: [], assessments: [], sitreps: [], overdue: [],
+      shelterTrend: [],
     });
   }
 }
@@ -684,6 +691,7 @@ async function insertReport(input: ReportInput, folder: string): Promise<Row> {
 export async function createReport(input: ReportInput): Promise<{ queued: boolean; code: string | null }> {
   const queueIt = async () => {
     await offline.enqueue({
+      user_id: state.user ? state.user.id : undefined,
       kind: 'report',
       hazard_type: input.hazard_type,
       hazard_other_text: input.hazard_other_text || '',
@@ -1184,7 +1192,7 @@ export interface SosResult {
 // through the submit_sos RPC, which is rate limited to 5 calls per 10 minutes.
 export async function submitSos(pos: { lat: number | null; lng: number | null; accuracy: number | null }, note = ''): Promise<SosResult> {
   const queue = async (): Promise<SosResult> => {
-    await offline.upsertQueuedSos({ kind: 'sos', lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, description: note });
+    await offline.upsertQueuedSos({ user_id: state.user ? state.user.id : undefined, kind: 'sos', lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, description: note });
     await refreshQueue();
     requestBackgroundSync();
     return { id: null, reach: null, queued: true };
@@ -1373,8 +1381,12 @@ function describeAudit(a: Row): string {
 }
 
 /* ----------------------------------------------------------- offline queue */
+// Queued rows belong to the account that saved them (older rows carry no
+// owner and count as the current account's).
+const mine = (r: QueuedReport) => !r.user_id || (!!state.user && r.user_id === state.user.id);
+
 async function refreshQueue() {
-  set({ queue: await offline.listQueue() });
+  set({ queue: (await offline.listQueue()).filter(mine) });
 }
 
 // Called on reconnect and on a timer while the app is open.
@@ -1386,7 +1398,7 @@ export async function flushQueue(): Promise<number> {
   try {
     // SOS first; rows the server already refused five times wait for the user
     const rows = (await offline.listQueue())
-      .filter((r) => !r.failed)
+      .filter((r) => !r.failed && mine(r))
       .sort((a, b) => (a.kind === 'sos' ? 0 : 1) - (b.kind === 'sos' ? 0 : 1));
     for (const row of rows) {
       try {
@@ -1483,13 +1495,18 @@ const pushSupported = () =>
 // be called from a user gesture; it is silent when push is unavailable, already
 // set up, or the resident has declined.
 let pushAttempted = false;
-export async function enablePush(): Promise<boolean> {
+// `force` is a tap on "Turn on alerts": always try again instead of trusting
+// the result of an earlier automatic attempt.
+export async function enablePush(force = false): Promise<boolean> {
   if (!pushSupported() || !supabase || !state.user || Notification.permission === 'denied') return false;
-  if (pushAttempted) return Notification.permission === 'granted';
+  if (pushAttempted && !force) return Notification.permission === 'granted';
   pushAttempted = true;
   try {
     const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
-    if (permission !== 'granted') return false;
+    if (permission !== 'granted') {
+      pushAttempted = false;
+      return false;
+    }
     const reg = await navigator.serviceWorker.ready;
     const sub =
       (await reg.pushManager.getSubscription()) ||
@@ -2020,8 +2037,9 @@ export async function dispatchLog(opts: { from?: string; to?: string; reportId?:
     .order('dispatched_at', { ascending: false })
     .limit(500);
   if (opts.reportId) q = q.eq('report_id', opts.reportId);
-  if (opts.from) q = q.gte('dispatched_at', `${opts.from}T00:00:00`);
-  if (opts.to) q = q.lte('dispatched_at', `${opts.to}T23:59:59`);
+  // the dates are local days; send the exact instants so the server (UTC) agrees
+  if (opts.from) q = q.gte('dispatched_at', new Date(`${opts.from}T00:00:00`).toISOString());
+  if (opts.to) q = q.lte('dispatched_at', new Date(`${opts.to}T23:59:59.999`).toISOString());
   const { data, error } = await q;
   if (error) return [];
   return (data || []).map((d: Row) => {

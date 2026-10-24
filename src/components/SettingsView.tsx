@@ -177,7 +177,7 @@ const AlertsTab: React.FC<{ ui: UI; isLgu: boolean }> = ({ ui, isLgu }) => {
 
   const turnOn = async () => {
     setBusy(true);
-    const ok = await repo.enablePush();
+    const ok = await repo.enablePush(true);
     const next = await repo.pushStatus();
     setStatus(next);
     setNote(
