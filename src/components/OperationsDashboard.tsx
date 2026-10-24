@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { corroborationText } from '../lib/util';
 import L from 'leaflet';
+import { MapFocus, showFocus } from '../lib/mapFocus';
 import {
   AlertTriangle,
   Users,
@@ -35,6 +36,8 @@ import { BrandLoader, portalForRole } from '../brand';
 import { CENTER } from '../lib/geo';
 
 interface OperationsDashboardProps {
+  /** a place another screen asked to show on the map */
+  focus?: MapFocus | null;
   reports: IncidentReport[];
   barangays: Barangay[];
   evacuationCenters: EvacuationCenter[];
@@ -64,6 +67,7 @@ function formatRelativeTime(dateString: string): string {
 }
 
 export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
+  focus,
   reports,
   barangays,
   evacuationCenters,
@@ -91,6 +95,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
   // Live module data and connection state from the store
   const store = useRepo();
   const isRealtimeActive = store.source === 'supabase' && store.online;
+  const [isRefreshingMap, setIsRefreshingMap] = useState(false);
 
   // Layer Visibility
   const [layers, setLayers] = useState({
@@ -136,6 +141,13 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
       };
     }
   }, []);
+
+  // "Show on map" from another screen: fly there, pin it, select its report
+  useEffect(() => {
+    if (!focus || !mapInstanceRef.current) return;
+    if (focus.reportId) setSelectedIncidentId(focus.reportId);
+    return showFocus(mapInstanceRef.current, focus, mapContainerRef.current);
+  }, [focus?.key]);
 
   // Zoom controls for the map
   const handleZoomIn = () => {
@@ -572,7 +584,18 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
             {/* Controls: Realtime button + Layers toggle */}
             <div className="flex items-center gap-2 relative">
               <button
-                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border cursor-pointer ${
+                type="button"
+                onClick={async () => {
+                  setIsRefreshingMap(true);
+                  try {
+                    await repo.loadAll();
+                  } finally {
+                    setIsRefreshingMap(false);
+                  }
+                }}
+                disabled={isRefreshingMap}
+                title={isRealtimeActive ? 'Live updates are on. Tap to reload now.' : 'Showing saved data. Tap to reload from the server.'}
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border cursor-pointer disabled:opacity-70 ${
                   isRealtimeActive
                     ? 'bg-[#18181b] text-white border-neutral-900 shadow-2xs'
                     : 'bg-white text-neutral-600 border-neutral-200 hover:bg-neutral-50'
@@ -583,7 +606,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
                     isRealtimeActive ? 'bg-white animate-pulse' : 'bg-neutral-300'
                   }`}
                 />
-                <span>Realtime</span>
+                <span>{isRefreshingMap ? 'Reloading…' : isRealtimeActive ? 'Realtime' : 'Reload'}</span>
               </button>
 
               <div className="relative">

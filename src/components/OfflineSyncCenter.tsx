@@ -175,6 +175,9 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
         {/* Right Actions: Live Feed Button & Network Status */}
         <div className="flex items-center gap-2.5 self-end md:self-auto">
           <button
+            type="button"
+            onClick={handleCheckConnection}
+            title={isLiveFeedActive ? t('Live updates are on. Tap to sync now.') : t('Tap to try connecting again.')}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-all border cursor-pointer ${
               isLiveFeedActive
                 ? (isBarangay ? 'bg-[#052659] text-white border-[#011025] shadow-xs' : 'bg-[#18181b] text-white border-neutral-800 shadow-xs')

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { corroborationText } from '../lib/util';
 import L from 'leaflet';
+import { MapFocus, showFocus } from '../lib/mapFocus';
 import {
   AlertTriangle,
   Users,
@@ -36,6 +37,8 @@ import { BrandLoader, portalForRole } from '../brand';
 import { CENTER } from '../lib/geo';
 
 export interface BarangayOfficialPortalProps {
+  /** a place another screen asked to show on the map */
+  focus?: MapFocus | null;
   reports: IncidentReport[];
   barangays: Barangay[];
   evacuationCenters: EvacuationCenter[];
@@ -65,6 +68,7 @@ function formatRelativeTime(dateString: string): string {
 }
 
 export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
+  focus,
   reports,
   barangays,
   evacuationCenters,
@@ -83,6 +87,7 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
 
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const isRealtimeActive = store.source === 'supabase' && store.online;
+  const [isRefreshingMap, setIsRefreshingMap] = useState(false);
   const [showLayersDropdown, setShowLayersDropdown] = useState(false);
   const [isDeclareEmergencyModalOpen, setIsDeclareEmergencyModalOpen] = useState(false);
 
@@ -245,6 +250,13 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
       mapInstanceRef.current.setView([currentBarangay.latitude, currentBarangay.longitude], 15);
     }
   }, [mapCenter]);
+
+  // "Show on map" from another screen: fly there, pin it, select its report
+  useEffect(() => {
+    if (!focus || !mapInstanceRef.current) return;
+    if (focus.reportId) setSelectedIncidentId(focus.reportId);
+    return showFocus(mapInstanceRef.current, focus, mapContainerRef.current);
+  }, [focus?.key]);
 
   // Zoom controls for the map
   const handleZoomIn = () => {
@@ -588,7 +600,18 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
             {/* Controls: Realtime button + Layers toggle */}
             <div className="flex items-center gap-2 relative">
               <button
-                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border cursor-pointer ${
+                type="button"
+                onClick={async () => {
+                  setIsRefreshingMap(true);
+                  try {
+                    await repo.loadAll();
+                  } finally {
+                    setIsRefreshingMap(false);
+                  }
+                }}
+                disabled={isRefreshingMap}
+                title={isRealtimeActive ? 'Live updates are on. Tap to reload now.' : 'Showing saved data. Tap to reload from the server.'}
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border cursor-pointer disabled:opacity-70 ${
                   isRealtimeActive
                     ? 'bg-[#052659] text-white border-[#011025] shadow-2xs'
                     : 'bg-white text-[#5482B4] border-[#7EA0C5]/40 hover:bg-[#C2E8FF]/20'
@@ -599,7 +622,7 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
                     isRealtimeActive ? 'bg-white animate-pulse' : 'bg-[#7EA0C5]'
                   }`}
                 />
-                <span>Realtime</span>
+                <span>{isRefreshingMap ? 'Reloading…' : isRealtimeActive ? 'Realtime' : 'Reload'}</span>
               </button>
 
               <div className="relative">

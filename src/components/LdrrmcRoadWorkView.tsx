@@ -351,7 +351,7 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handlePublishSubmit} className="p-6 space-y-4">
+        <form id="road-work-form" onSubmit={handlePublishSubmit} className="p-6 space-y-4">
           {/* TITLE */}
           <div>
             <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
@@ -711,7 +711,13 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
             {/* + Add Road Status Button */}
             <button
               onClick={() => {
-                window.scrollTo({ top: 120, behavior: 'smooth' });
+                // the page scrolls inside the console, not the window: bring the form into view
+                const form = document.getElementById('road-work-form');
+                if (form) {
+                  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  const first = form.querySelector('input');
+                  if (first) setTimeout(() => (first as HTMLInputElement).focus({ preventScroll: true }), 400);
+                }
               }}
               className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-full shadow-2xs transition-colors cursor-pointer ${
                 isBarangay

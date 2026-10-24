@@ -69,7 +69,31 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
   const [isPublishing, setIsPublishing] = useState(false);
 
   // Advisories fan out to subscribed devices server side while the console is online
-  const { online: isPushEnabled, subscribedDevices } = useRepo();
+  const { subscribedDevices } = useRepo();
+  // whether THIS device receives push alerts; tapping the chip turns them on
+  const [pushState, setPushState] = useState<repo.PushStatus | null>(null);
+  useEffect(() => {
+    repo.pushStatus().then(setPushState);
+  }, []);
+  const isPushEnabled = pushState === 'on';
+  const turnOnPush = async () => {
+    if (isPushEnabled) return;
+    await repo.enablePush(true);
+    const next = await repo.pushStatus();
+    setPushState(next);
+    if (next !== 'on') {
+      setActionSuccessNotice(
+        next === 'blocked'
+          ? 'Push is blocked for this site. Allow notifications in the browser settings.'
+          : next === 'unsupported'
+          ? 'This browser cannot receive push alerts.'
+          : next === 'unconfigured'
+          ? 'Push is not set up yet: the push key (VITE_VAPID_PUBLIC_KEY) is missing from this deployment.'
+          : 'Push could not be turned on. Try again.'
+      );
+      setTimeout(() => setActionSuccessNotice(null), 4500);
+    }
+  };
 
   // Resident Filter State: 'All' | 'Emergency' | 'Warning' | 'Advisory' | 'Preparedness'
   const [residentFilter, setResidentFilter] = useState<'All' | 'Emergency' | 'Warning' | 'Advisory' | 'Preparedness'>('All');
@@ -587,7 +611,9 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
 
               <button
                 type="button"
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-default ${
+                onClick={turnOnPush}
+                title={isPushEnabled ? 'This device receives push alerts' : 'Turn on push alerts for this device'}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${isPushEnabled ? 'cursor-default' : 'cursor-pointer'} ${
                   isPushEnabled
                     ? isBarangay
                       ? 'bg-[#C2E8FF] text-[#052659] border-[#7EA0C5]/60 hover:bg-[#C2E8FF]/80'
@@ -598,7 +624,7 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
                 }`}
               >
                 <Bell className={`w-3.5 h-3.5 ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`} />
-                <span>{isPushEnabled ? 'Push enabled' : 'Push disabled'}</span>
+                <span>{isPushEnabled ? 'Push on for this device' : pushState === 'blocked' ? 'Push blocked' : 'Turn on push'}</span>
               </button>
             </div>
 

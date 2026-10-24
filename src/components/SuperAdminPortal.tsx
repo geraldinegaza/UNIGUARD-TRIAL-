@@ -15,11 +15,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
+  UserPlus,
+  X,
 } from 'lucide-react';
 import { User, UserRole, ChangeRequest } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { relTime, download, toCSV } from '../lib/util';
+import { exportPdf, fileStamp } from '../lib/pdf';
 import { TriadEmblem } from '../brand';
 
 // Super Admin console. Initial draft of the layout: a light sidebar with the
@@ -235,6 +238,76 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   const [editBarangay, setEditBarangay] = useState<string>('');
   const [savingAccount, setSavingAccount] = useState(false);
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
+  // New staff account: the admin-users function emails an invitation
+  const [newAcct, setNewAcct] = useState<{ fullName: string; email: string; role: 'barangay_official' | 'lgu_ldrrmc'; barangayId: string } | null>(null);
+  const [newAcctBusy, setNewAcctBusy] = useState(false);
+  const [newAcctNote, setNewAcctNote] = useState<string | null>(null);
+  const createAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAcct || newAcctBusy) return;
+    if (!newAcct.fullName.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newAcct.email.trim())) {
+      setNewAcctNote("Enter the person's name and a valid email address.");
+      return;
+    }
+    if (newAcct.role === 'barangay_official' && !newAcct.barangayId) {
+      setNewAcctNote('Choose the barangay this official will manage.');
+      return;
+    }
+    setNewAcctBusy(true);
+    try {
+      await repo.adminUsers({
+        action: 'create',
+        email: newAcct.email.trim(),
+        fullName: newAcct.fullName.trim(),
+        role: newAcct.role,
+        barangayId: newAcct.role === 'barangay_official' ? newAcct.barangayId : null,
+        redirectUrl: window.location.origin,
+      });
+      setNewAcctNote(`Invitation sent to ${newAcct.email.trim()}. They set a password from the email.`);
+      setNewAcct(null);
+      repo.loadUsers().catch(() => {});
+    } catch (err: any) {
+      setNewAcctNote(err.message || 'Could not create the account.');
+    } finally {
+      setNewAcctBusy(false);
+    }
+  };
+
+  // System report: a PDF of accounts, incident load, pending requests and recent activity
+  const systemReport = () =>
+    exportPdf({
+      title: 'UniGuard System Report',
+      subtitle: data.org.office,
+      filename: `uniguard-system-report-${fileStamp()}.pdf`,
+      signer: currentUser.full_name,
+      sections: [
+        {
+          title: 'Accounts by role',
+          head: ['Role', 'Accounts'],
+          rows: [
+            ...ROLES.map((r) => [r.label, roleCounts[r.role] || 0] as (string | number)[]),
+            ['Disabled accounts', disabled],
+            ['Total', totalAccounts],
+          ],
+        },
+        {
+          title: 'Incident reports',
+          head: ['Status', 'Reports'],
+          rows: (['unverified', 'verified', 'dispatched', 'resolved', 'rejected'] as const).map((st) => [st, data.reports.filter((r) => r.status === st).length]),
+        },
+        {
+          title: 'Pending hotline change requests',
+          head: ['Requested', 'Action', 'Reason'],
+          rows: pending.map((c) => [new Date(c.created_at).toLocaleString(), c.action, c.reason || '']),
+        },
+        {
+          title: 'Recent activity',
+          head: ['When', 'Who', 'What'],
+          rows: data.audit.slice(0, 60).map((a) => [new Date(a.timestamp).toLocaleString(), a.actor_name, a.description || a.event_type]),
+        },
+      ],
+    }).catch(() => {});
+
   const openAccount = (u: User) => {
     setEditing(u);
     setEditRole(u.role);
@@ -463,7 +536,19 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
     <div className="px-4 sm:px-8 pt-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-[20px] font-bold text-neutral-800">All accounts</h2>
-        <label className="h-10 w-full sm:w-72 flex items-center gap-2 px-4 rounded-full bg-white shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <button
+          type="button"
+          onClick={() => {
+            setNewAcct({ fullName: '', email: '', role: 'barangay_official', barangayId: '' });
+            setNewAcctNote(null);
+          }}
+          className="h-10 px-4 rounded-full bg-[#F28C0F] text-white text-[12px] font-bold inline-flex items-center gap-2 shadow-md cursor-pointer"
+        >
+          <UserPlus className="w-4 h-4" />
+          New account
+        </button>
+        <label className="h-10 flex-1 sm:flex-none w-full sm:w-72 flex items-center gap-2 px-4 rounded-full bg-white shadow-sm">
           <Search className="w-4 h-4 text-neutral-400 shrink-0" />
           <input
             value={query}
@@ -472,7 +557,61 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
             className="flex-1 min-w-0 bg-transparent text-[13px] focus:outline-none"
           />
         </label>
+        </div>
       </div>
+      {newAcctNote && !newAcct && <p className="mb-3 px-1 text-[12px] font-semibold text-[#8A5A00]">{newAcctNote}</p>}
+      {newAcct && (
+        <form onSubmit={createAccount} className="mb-4 bg-white rounded-[22px] p-4 sm:p-5 shadow-[0_20px_40px_-28px_rgba(58,42,8,0.4)] space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-[15px] font-bold text-neutral-800">New staff account</h3>
+            <button type="button" onClick={() => setNewAcct(null)} className="text-neutral-400 cursor-pointer" aria-label="Close">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-[12px] text-neutral-500">
+            The person gets an email to set their password. Residents sign up by themselves; dispatch accounts are created from Dispatch units.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block">
+              <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Full name</span>
+              <input className="w-full h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] outline-none focus:border-[#C98A0B]" value={newAcct.fullName} onChange={(e) => setNewAcct({ ...newAcct, fullName: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Email</span>
+              <input type="email" className="w-full h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] outline-none focus:border-[#C98A0B]" value={newAcct.email} onChange={(e) => setNewAcct({ ...newAcct, email: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Role</span>
+              <select className="w-full h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] outline-none focus:border-[#C98A0B]" value={newAcct.role} onChange={(e) => setNewAcct({ ...newAcct, role: e.target.value as 'barangay_official' | 'lgu_ldrrmc' })}>
+                <option value="barangay_official">Barangay official</option>
+                <option value="lgu_ldrrmc">LDRRMO staff</option>
+              </select>
+            </label>
+            {newAcct.role === 'barangay_official' && (
+              <label className="block">
+                <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Barangay</span>
+                <select className="w-full h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] outline-none focus:border-[#C98A0B]" value={newAcct.barangayId} onChange={(e) => setNewAcct({ ...newAcct, barangayId: e.target.value })}>
+                  <option value="">Choose a barangay</option>
+                  {data.barangays.filter((b) => b.uuid).map((b) => (
+                    <option key={b.id} value={b.uuid as string}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          {newAcctNote && <p className="text-[12px] font-semibold text-red-700">{newAcctNote}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setNewAcct(null)} className="h-10 px-4 rounded-full bg-white border border-neutral-200 text-[12px] font-bold cursor-pointer">
+              Cancel
+            </button>
+            <button type="submit" disabled={newAcctBusy} className="h-10 px-5 rounded-full bg-[#F28C0F] text-white text-[12px] font-bold cursor-pointer disabled:opacity-60">
+              {newAcctBusy ? 'Sending…' : 'Send invitation'}
+            </button>
+          </div>
+        </form>
+      )}
       <div className="bg-white rounded-[22px] overflow-hidden shadow-[0_20px_40px_-28px_rgba(58,42,8,0.4)]">
         <div className="hidden md:grid grid-cols-[1.6fr_1fr_1.1fr_0.7fr] gap-4 px-6 py-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 border-b border-neutral-100">
           <span>Account</span>
@@ -997,7 +1136,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                 </span>
                 <button
                   type="button"
-                  onClick={() => setView('accounts')}
+                  onClick={() => systemReport()}
                   className="hidden sm:flex h-9 px-4 rounded-full bg-[#F28C0F] text-white text-[12px] font-bold items-center gap-2 shadow-md cursor-pointer shrink-0"
                 >
                   <Download className="w-3.5 h-3.5" /> System report

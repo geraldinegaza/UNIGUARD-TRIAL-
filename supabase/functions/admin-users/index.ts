@@ -135,7 +135,8 @@ Deno.serve(async (req: Request) => {
         if (invited?.user) {
           const patch: Record<string, unknown> = {
             id: invited.user.id, email, role,
-            full_name: email.split('@')[0],
+            // the name the Super Admin typed; the email prefix only as a fallback
+            full_name: String(payload.fullName || '').trim() || email.split('@')[0],
             updated_at: new Date().toISOString()
           };
           if (role === 'barangay_official' || role === 'lgu_ldrrmc') {

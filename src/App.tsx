@@ -29,6 +29,7 @@ import { LdrrmcAnalyticsView } from './components/LdrrmcAnalyticsView';
 import { LdrrmcReportsView } from './components/LdrrmcReportsView';
 import { SettingsView } from './components/SettingsView';
 import { LINK_RETURN, cleanLinkFromUrl } from './lib/emailLink';
+import { MapFocus } from './lib/mapFocus';
 import { t, useT } from './lib/i18n';
 import { LdrrmcOthersReviewView } from './components/LdrrmcOthersReviewView';
 import { ResidentNotificationsView } from './components/ResidentNotificationsView';
@@ -108,6 +109,19 @@ export default function App() {
   });
 
   const [selectedIncidentForMap, setSelectedIncidentForMap] = useState<IncidentReport | null>(null);
+  // "Show on map" from any staff screen: the dashboard map flies to the place
+  const [mapFocus, setMapFocus] = useState<MapFocus | null>(null);
+  const showOnMap = (lat: number | null | undefined, lng: number | null | undefined, label: string, reportId?: string) => {
+    if (typeof lat === 'number' && typeof lng === 'number' && isFinite(lat) && isFinite(lng)) {
+      setMapFocus({ lat, lng, label, reportId, key: Date.now() });
+    }
+    setTopView('Overview');
+    setActiveTab('overview');
+  };
+  // the drill-down's Dispatch opens the incident queue's dispatch form
+  const [pendingDispatchId, setPendingDispatchId] = useState<string | null>(null);
+  // Others Review opens the incident queue searched for a description
+  const [triageSearch, setTriageSearch] = useState<string | null>(null);
   const [selectedAdvisoryId, setSelectedAdvisoryId] = useState<string | null>(null);
 
   // Core Data State
@@ -210,6 +224,7 @@ export default function App() {
 
   const changeStaffTab = (tab: string) => {
     setActiveTab(tab);
+    setTriageSearch(null); // a search seeded by Others Review ends when the person navigates
     if (tab === 'overview') setTopView('Overview');
   };
 
@@ -229,6 +244,11 @@ export default function App() {
 
   // Open drill-down modal helper
   const handleOpenDrillDown = (filterType: string, filterValue: string) => {
+    // the shelters card is about shelters, not reports: open the shelter list
+    if (filterType === 'shelters_capacity') {
+      setActiveTab('shelters');
+      return;
+    }
     setDrillDownState({
       isOpen: true,
       filterType,
@@ -342,6 +362,7 @@ export default function App() {
               setActiveTab={changeStaffTab}
               currentUser={currentUser}
               isOnline={isOnline}
+              onShowOnMap={(lat, lng, label, reportId) => showOnMap(lat, lng, label, reportId)}
               pendingOutboxCount={outbox.length}
               onSignOut={handleSignOut}
               onOpenReportModal={() => setIsReportModalOpen(true)}
@@ -463,6 +484,7 @@ export default function App() {
                     onOpenReportModal={() => setIsReportModalOpen(true)}
                     onNavigateTab={(tab) => setActiveTab(tab)}
                     onNavigateView={(view) => setTopView(view)}
+                    focus={mapFocus}
                     onDataChanged={refreshData}
                   />
                 ) : (
@@ -478,6 +500,7 @@ export default function App() {
                         onOpenReportModal={() => setIsReportModalOpen(true)}
                         onNavigateTab={(tab) => setActiveTab(tab)}
                         onNavigateView={(view) => setTopView(view)}
+                        focus={mapFocus}
                         onDataChanged={refreshData}
                       />
                     )}
@@ -497,8 +520,12 @@ export default function App() {
                   onNavigateTab={(tab) => setActiveTab(tab)}
                   onSelectReport={(rep) => {
                     setSelectedIncidentForMap(rep);
-                    setActiveTab('overview');
+                    showOnMap(rep.has_location ? rep.latitude : null, rep.has_location ? rep.longitude : null, rep.code || 'Incident', rep.id);
                   }}
+                  key={triageSearch || 'queue'}
+                  initialSearch={triageSearch}
+                  openDispatchFor={pendingDispatchId}
+                  onDispatchOpened={() => setPendingDispatchId(null)}
                   canVerify={!inSuperOps}
                 />
               </div>
@@ -530,9 +557,7 @@ export default function App() {
                   onSelectOnMap={
                     currentUser.role === 'citizen'
                       ? undefined
-                      : () => {
-                          setActiveTab('overview');
-                        }
+                      : (center) => showOnMap(center.has_location ? center.latitude : null, center.has_location ? center.longitude : null, center.name)
                   }
                 />
               </div>
@@ -654,10 +679,7 @@ export default function App() {
                 barangays={barangays}
                 currentUser={currentUser}
                 onNavigateTab={setActiveTab}
-                onSelectOnMap={(post) => {
-                  setSelectedIncidentForMap(null);
-                  setActiveTab('overview');
-                }}
+                onSelectOnMap={(post) => showOnMap(post.latitude, post.longitude, post.roadName || post.title)}
               />
             )}
 
@@ -666,10 +688,7 @@ export default function App() {
               <LdrrmcSosLogView
                 currentUser={currentUser}
                 onNavigateTab={setActiveTab}
-                onSelectOnMap={(coords) => {
-                  setSelectedIncidentForMap(null);
-                  setActiveTab('overview');
-                }}
+                onSelectOnMap={(coords) => showOnMap(coords.latitude, coords.longitude, coords.label)}
               />
             )}
 
@@ -680,11 +699,12 @@ export default function App() {
                 barangays={barangays}
                 currentUser={currentUser}
                 onUpdateReportStatus={(id, status) => repo.advanceStatus(id, status)}
-                onSelectOnMap={(coords) => {
-                  setSelectedIncidentForMap(null);
-                  setActiveTab('overview');
-                }}
+                onSelectOnMap={(coords) => showOnMap(coords.latitude, coords.longitude, coords.label)}
                 onNavigateTab={setActiveTab}
+                onOpenMatching={(text) => {
+                  setTriageSearch(text);
+                  setActiveTab('incidents');
+                }}
               />
             )}
           </main>
@@ -762,6 +782,12 @@ export default function App() {
         barangays={barangays}
         onReportUpdated={refreshData}
         canVerify={!inSuperOps}
+        isLgu={currentUser.role === 'lgu_admin'}
+        onDispatch={(rep) => {
+          setDrillDownState({ ...drillDownState, isOpen: false });
+          setPendingDispatchId(rep.id);
+          setActiveTab('incidents');
+        }}
       />
 
       {/* Ground Report Submission Modal */}

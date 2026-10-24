@@ -173,6 +173,7 @@ const AlertsTab: React.FC<{ ui: UI; isLgu: boolean }> = ({ ui, isLgu }) => {
     off: 'Off',
     blocked: 'Blocked in browser settings',
     unsupported: 'Not supported on this browser',
+    unconfigured: 'Not set up yet',
   };
 
   const turnOn = async () => {
@@ -206,13 +207,18 @@ const AlertsTab: React.FC<{ ui: UI; isLgu: boolean }> = ({ ui, isLgu }) => {
           >
             {status ? t(STATUS_TEXT[status]) : '…'}
           </span>
-          {status !== 'on' && status !== 'unsupported' && (
+          {status !== 'on' && status !== 'unsupported' && status !== 'unconfigured' && (
             <button onClick={turnOn} disabled={busy} className={ui.primary}>
               <Bell className="w-3.5 h-3.5" />
               {t('Turn on alerts')}
             </button>
           )}
         </div>
+        {status === 'unconfigured' && (
+          <p className="text-xs text-amber-900">
+            {t('Push alerts are not set up for UniGuard yet. Alerts still appear in the app. The MDRRMO system administrator turns push on.')}
+          </p>
+        )}
         {note && <p className={`text-xs font-medium ${ui.ink}`}>{note}</p>}
         <p className={`text-[11px] ${ui.muted}`}>{t('Emergency alerts may also be sent by text message to your registered mobile number.')}</p>
         {isLgu && (

@@ -852,7 +852,7 @@ export async function declareEmergency(title?: string, body?: string): Promise<{
 // Logs that this resident saw an emergency alert (alert_acknowledgments).
 export function acknowledgeAlert(advisoryId: string) {
   if (!supabase) return;
-  supabase.from('alert_acknowledgments').insert({ advisory_id: advisoryId }).then(() => {}, () => {});
+  supabase.from('alert_acknowledgments').insert({ advisory_id: advisoryId, user_id: state.user ? state.user.id : undefined }).then(() => {}, () => {});
 }
 
 /* ----------------------------------------------------------------- centres */
@@ -1258,7 +1258,7 @@ export async function loadUsers(): Promise<void> {
 }
 
 type AdminAction =
-  | { action: 'create'; email: string; fullName: string; role: 'barangay_official' | 'lgu_ldrrmc'; barangayId?: string | null }
+  | { action: 'create'; email: string; fullName: string; role: 'barangay_official' | 'lgu_ldrrmc'; barangayId?: string | null; redirectUrl?: string }
   | { action: 'set-role'; userId: string; role: string }
   | { action: 'set-barangay'; userId: string; barangayId: string | null }
   | { action: 'set-disabled'; userId: string; disabled: boolean };
@@ -1515,15 +1515,31 @@ export async function enablePush(force = false): Promise<boolean> {
         applicationServerKey: urlBase64ToUint8Array(CONFIG.VAPID_PUBLIC_KEY) as BufferSource,
       }));
     const json = sub.toJSON();
-    await supabase.from('push_subscriptions').upsert(
-      {
-        endpoint: json.endpoint,
-        p256dh: json.keys ? json.keys.p256dh : '',
-        auth: json.keys ? json.keys.auth : '',
-        user_agent: navigator.userAgent.slice(0, 200),
-      },
-      { onConflict: 'endpoint' }
-    );
+    // save_push_subscription (migration 153) stores it for whoever is signed
+    // in, even if another account used this phone before
+    const saved = await supabase.rpc('save_push_subscription', {
+      p_endpoint: json.endpoint,
+      p_p256dh: json.keys ? json.keys.p256dh : '',
+      p_auth: json.keys ? json.keys.auth : '',
+      p_user_agent: navigator.userAgent.slice(0, 200),
+    });
+    if (saved.error) {
+      // database without migration 153: write the row directly, with its owner
+      const { error } = await supabase.from('push_subscriptions').upsert(
+        {
+          user_id: state.user.id,
+          endpoint: json.endpoint,
+          p256dh: json.keys ? json.keys.p256dh : '',
+          auth: json.keys ? json.keys.auth : '',
+          user_agent: navigator.userAgent.slice(0, 200),
+        },
+        { onConflict: 'endpoint' }
+      );
+      if (error) {
+        pushAttempted = false;
+        return false;
+      }
+    }
     return true;
   } catch {
     pushAttempted = false;
@@ -2080,8 +2096,10 @@ export async function loadOrgProfile(): Promise<void> {
 }
 
 /* ---------------------------------------------- alerts on this phone (push) */
-export type PushStatus = 'on' | 'off' | 'blocked' | 'unsupported';
+export type PushStatus = 'on' | 'off' | 'blocked' | 'unsupported' | 'unconfigured';
 export async function pushStatus(): Promise<PushStatus> {
+  // the browser can do push, but this deployment has no push key yet
+  if (!CONFIG.VAPID_PUBLIC_KEY && typeof window !== 'undefined' && 'PushManager' in window) return 'unconfigured';
   if (!pushSupported()) return 'unsupported';
   if (Notification.permission === 'denied') return 'blocked';
   if (Notification.permission !== 'granted') return 'off';

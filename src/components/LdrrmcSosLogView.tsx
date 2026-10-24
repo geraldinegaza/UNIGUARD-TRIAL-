@@ -338,6 +338,22 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
                           </button>
                         )}
 
+                        {/* Show this SOS on the dashboard map */}
+                        {onSelectOnMap && event.latitude != null && event.longitude != null && (
+                          <button
+                            onClick={() => onSelectOnMap({ latitude: event.latitude!, longitude: event.longitude!, label: `SOS · ${event.citizenName || 'Resident'}` })}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer shadow-2xs shrink-0 ${
+                              isBarangay
+                                ? 'bg-[#C2E8FF]/30 hover:bg-[#C2E8FF]/60 text-[#052659] border border-[#7EA0C5]/40'
+                                : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-200'
+                            }`}
+                            title="Show on map"
+                            aria-label="Show on map"
+                          >
+                            <MapPin className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
                         {/* SOS Right Pill - Equal width/height container */}
                         <span className={`w-20 h-8 rounded-full inline-flex items-center justify-center text-center text-xs font-medium tracking-wide shadow-2xs shrink-0 ${
                           isBarangay

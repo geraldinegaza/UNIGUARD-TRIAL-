@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { IncidentReport, Barangay } from '../types';
 import * as repo from '../services/repo';
+import { CONFIG } from '../lib/config';
 
 export interface DrillDownModalProps {
   isOpen: boolean;
@@ -27,7 +28,23 @@ export interface DrillDownModalProps {
   onReportUpdated?: () => void;
   /** false for the Super Admin, who may not verify reports */
   canVerify?: boolean;
+  /** LDRRMO staff verify through lgu_verify_report (records who verified) */
+  isLgu?: boolean;
+  /** opens the incident queue's dispatch form for this report */
+  onDispatch?: (report: IncidentReport) => void;
 }
+
+const FILTER_TITLE: Record<string, string> = {
+  active_incidents: 'Reports this week',
+  verified_share: 'Verified reports',
+  corroboration_rate: 'Reached three confirmations',
+  open_incidents: 'Open incidents',
+  hazard: 'Hazard',
+  barangay: 'Barangay',
+  urgency: 'Urgency',
+  active_hazards: 'Active hazards',
+  verified_reports: 'Verified reports',
+};
 
 export const DrillDownModal: React.FC<DrillDownModalProps> = ({
   isOpen,
@@ -38,6 +55,8 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
   barangays,
   onReportUpdated,
   canVerify = true,
+  isLgu = false,
+  onDispatch,
 }) => {
   const [selectedIncident, setSelectedIncident] = useState<IncidentReport | null>(null);
 
@@ -52,8 +71,14 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Filter reports
+  // Filter reports. The analytics cards open it with a filter type and the
+  // value 'all', so the type decides; a value narrows further.
+  const weekAgo = Date.now() - 7 * 86400000;
   const filteredReports = reports.filter((r) => {
+    if (filterType === 'active_incidents') return Date.parse(r.created_at) >= weekAgo;
+    if (filterType === 'verified_share') return r.status === 'verified' || r.status === 'dispatched' || r.status === 'resolved';
+    if (filterType === 'corroboration_rate') return r.corroboration_count >= CONFIG.CORROBORATION_THRESHOLD;
+    if (filterType === 'open_incidents') return r.status !== 'resolved' && r.status !== 'rejected';
     if (!filterValue || filterValue === 'all') return true;
     if (filterType === 'hazard') {
       return r.hazard_type.toLowerCase().includes(filterValue.toLowerCase());
@@ -84,7 +109,8 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
 
   const handleUpdateStatus = async (reportId: string, status: 'verified' | 'dispatched' | 'resolved') => {
     try {
-      await repo.advanceStatus(reportId, status, 'Updated from the drill-down panel');
+      if (status === 'verified' && isLgu) await repo.lguVerify(reportId, 'Verified from the drill-down panel');
+      else await repo.advanceStatus(reportId, status, 'Updated from the drill-down panel');
       if (onReportUpdated) onReportUpdated();
       if (activeRecord && activeRecord.id === reportId) {
         setSelectedIncident({ ...activeRecord, status });
@@ -114,7 +140,8 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
                   Detailed Incident Inspection & Triage
                 </h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-[#991B1B] uppercase">
-                  {filterType}: {filterValue}
+                  {FILTER_TITLE[filterType] || filterType}
+                  {filterValue && filterValue !== 'all' ? `: ${filterValue}` : ''}
                 </span>
               </div>
               <p className="text-xs text-slate-500">
@@ -155,7 +182,7 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
                   >
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span className="font-extrabold text-[#991B1B] tracking-tight">
-                        UG-2026-{String(idx + 1).padStart(4, '0')}
+                        {report.code || 'Pending code'}
                       </span>
                       <span
                         className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
@@ -212,7 +239,7 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
                 ) : (
                   <div className="rounded-2xl h-24 w-full bg-rose-50/70 border border-rose-100 flex items-center justify-center text-rose-700 gap-2">
                     <AlertTriangle className="w-5 h-5 text-[#991B1B]" />
-                    <span className="text-xs font-bold">Field Hazard Observation Record</span>
+                    <span className="text-xs font-bold">No photo attached to this report</span>
                   </div>
                 )}
 
@@ -250,10 +277,12 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
                     <p className="text-[10px] text-slate-400 uppercase font-bold">Crowd Corroboration</p>
                     <p className="font-bold text-slate-800 mt-0.5 flex items-center gap-1.5">
                       <ShieldCheck className="w-3.5 h-3.5 text-slate-700" />
-                      <span>{activeRecord.corroboration_count || 1} Witnesses</span>
+                      <span>{corroborationText(activeRecord.corroboration_count || 0)}</span>
                     </p>
                     <p className="text-[10px] text-slate-600 font-semibold">
-                      Threshold Met &middot; High Confidence
+                      {(activeRecord.corroboration_count || 0) >= CONFIG.CORROBORATION_THRESHOLD
+                        ? 'Confirmation threshold reached'
+                        : `${CONFIG.CORROBORATION_THRESHOLD - (activeRecord.corroboration_count || 0)} more needed to reach the threshold`}
                     </p>
                   </div>
                 </div>
@@ -278,8 +307,8 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
                     </button>
 
                     <button
-                      onClick={() => handleUpdateStatus(activeRecord.id, 'dispatched')}
-                      disabled={NEXT_STATUS[activeRecord.status] !== 'dispatched'}
+                      onClick={() => onDispatch && onDispatch(activeRecord)}
+                      disabled={NEXT_STATUS[activeRecord.status] !== 'dispatched' || !onDispatch}
                       title={NEXT_STATUS[activeRecord.status] === 'dispatched' ? undefined : 'Status moves one step at a time'}
                       className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 ${
                         activeRecord.status === 'dispatched'

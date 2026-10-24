@@ -49,6 +49,11 @@ interface AdminTriageProps {
   onSelectReport?: (report: IncidentReport) => void;
   /** false for the Super Admin, who may edit records but never verify them */
   canVerify?: boolean;
+  /** open the dispatch form for this report (from the drill-down) */
+  openDispatchFor?: string | null;
+  /** start the queue searched for this text (from Others Review) */
+  initialSearch?: string | null;
+  onDispatchOpened?: () => void;
 }
 
 // Format relative time (e.g., "12m ago", "1h ago", "2d ago")
@@ -105,11 +110,14 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
   onNavigateTab,
   onSelectReport,
   canVerify = true,
+  openDispatchFor,
+  initialSearch,
+  onDispatchOpened,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'queue' | 'audit'>('queue');
   // Status filter tabs matching initial draft: All | Pending | Verified | In Progress | Resolved | Rejected
   const [statusFilter, setStatusFilter] = useState<'all' | 'unverified' | 'verified' | 'dispatched' | 'resolved' | 'rejected'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearch || '');
   const [isPrioritySort, setIsPrioritySort] = useState(false);
   const [isCommandView, setIsCommandView] = useState(false);
   const [selectedIncidentDetail, setSelectedIncidentDetail] = useState<IncidentReport | null>(null);
@@ -174,6 +182,15 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const isLgu = currentUser.role === 'lgu_admin';
+  useEffect(() => {
+    if (!openDispatchFor) return;
+    const rep = reports.find((r) => r.id === openDispatchFor);
+    if (rep && rep.status === 'verified') {
+      setDispatchModalReport(rep);
+      setDispatchNotes('');
+    }
+    onDispatchOpened?.();
+  }, [openDispatchFor]);
   const isBarangay = currentUser.role === 'barangay';
 
   // Keyboard shortcut ⌘K / Ctrl+K to focus search bar
@@ -182,6 +199,12 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         searchInputRef.current?.focus();
+      }
+      // Escape closes whichever dialog is open
+      if (e.key === 'Escape') {
+        setDispatchModalReport(null);
+        setResolveModalReport(null);
+        setRejectModalReport(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -233,7 +256,8 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
         const hazard = r.hazard_type.toLowerCase();
         const desc = r.description.toLowerCase();
         const brgy = getBarangayName(r.barangay_id).toLowerCase();
-        return code.includes(q) || hazard.includes(q) || desc.includes(q) || brgy.includes(q);
+        const other = (r.hazard_other_text || '').toLowerCase();
+        return code.includes(q) || hazard.includes(q) || desc.includes(q) || brgy.includes(q) || other.includes(q);
       });
     }
 
@@ -476,6 +500,27 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
           </div>
 
           {isLgu && <OverdueQueuePanel canVerify={canVerify} onVerified={onReportsUpdated} />}
+
+          {/* Search the queue by code, hazard, description, "Others" text or barangay */}
+          <div className={`flex items-center gap-2 px-3.5 h-10 rounded-full border w-full sm:max-w-md ${
+            isBarangay ? 'bg-white border-[#7EA0C5]/40 focus-within:border-[#052659]' : 'bg-white border-neutral-200 focus-within:border-neutral-400'
+          }`}>
+            <Search className={`w-4 h-4 shrink-0 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-400'}`} />
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search this queue: code, hazard, description, barangay"
+              aria-label="Search the incident queue"
+              className={`flex-1 min-w-0 bg-transparent text-xs focus:outline-none ${isBarangay ? 'text-[#011025] placeholder:text-[#7EA0C5]' : 'text-neutral-800 placeholder:text-neutral-400'}`}
+            />
+            {searchQuery && (
+              <button type="button" onClick={() => setSearchQuery('')} className={`text-[11px] font-semibold cursor-pointer shrink-0 ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`}>
+                Clear
+              </button>
+            )}
+          </div>
 
           {/* Status Filter Bar Matching Reference Image Capsule Tabs: All, Pending, Verified, In Progress, Resolved, Rejected */}
           <div className={`flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none p-1.5 rounded-full border w-fit max-w-full ${

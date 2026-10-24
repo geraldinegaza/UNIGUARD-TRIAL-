@@ -407,4 +407,8 @@ export const FIL: Record<string, string> = {
   "Email": "Email",
   "1 item is waiting to send from this phone.": "May 1 hinihintay maipadala mula sa teleponong ito.",
   "{n} items are waiting to send from this phone.": "May {n} hinihintay maipadala mula sa teleponong ito.",
+  "Not set up yet": "Hindi pa naka-set up",
+  "Push alerts are not set up for UniGuard yet. Alerts still appear in the app. The MDRRMO system administrator turns push on.": "Hindi pa naka-set up ang push alerts ng UniGuard. Lumalabas pa rin ang mga alerto sa loob ng app. Ang system administrator ng MDRRMO ang magbubukas nito.",
+  "Live updates are on. Tap to sync now.": "Naka-on ang live updates. I-tap para mag-sync ngayon.",
+  "Tap to try connecting again.": "I-tap para subukang kumonekta muli.",
 };

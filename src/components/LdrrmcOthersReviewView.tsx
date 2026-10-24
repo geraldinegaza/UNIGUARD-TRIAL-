@@ -24,6 +24,8 @@ export interface LdrrmcOthersReviewViewProps {
   barangays: Barangay[];
   currentUser: User;
   onUpdateReportStatus?: (reportId: string, status: any) => void;
+  /** open the incident queue searched for this text */
+  onOpenMatching?: (text: string) => void;
   onSelectOnMap?: (coords: { latitude: number; longitude: number; label: string }) => void;
   onNavigateTab?: (tab: string) => void;
 }
@@ -33,6 +35,7 @@ export const LdrrmcOthersReviewView: React.FC<LdrrmcOthersReviewViewProps> = ({
   barangays = [],
   currentUser,
   onUpdateReportStatus,
+  onOpenMatching,
   onSelectOnMap,
   onNavigateTab,
 }) => {
@@ -157,6 +160,17 @@ export const LdrrmcOthersReviewView: React.FC<LdrrmcOthersReviewViewProps> = ({
                       </span>
                     </div>
                   </div>
+                  {onOpenMatching && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenMatching(report.description)}
+                      className={`self-start shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[36px] rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                        isBarangay ? 'bg-[#052659] hover:bg-[#031c42] text-white' : 'bg-[#18181b] hover:bg-neutral-800 text-white'
+                      }`}
+                    >
+                      Show these reports
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

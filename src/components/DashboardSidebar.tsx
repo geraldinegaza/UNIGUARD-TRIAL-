@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   AlertTriangle,
   Building2,
@@ -46,6 +46,8 @@ export interface DashboardSidebarProps {
   onOpenReportModal?: () => void;
   /** set while a Super Admin is in the operations console; returns to the admin console */
   onExitOps?: () => void;
+  /** search results that have a place open there on the dashboard map */
+  onShowOnMap?: (lat: number | null, lng: number | null, label: string, reportId?: string) => void;
 }
 
 export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
@@ -57,6 +59,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   onSignOut,
   onOpenReportModal,
   onExitOps,
+  onShowOnMap,
 }) => {
   const isResident = currentUser.role === 'citizen';
 
@@ -123,6 +126,66 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
   // Live notifications and nav counts from the data store
   const data = useRepo();
+
+  // Search across what this account can see: incidents, shelters, hotlines,
+  // advisories and roads. Up to 8 results; Enter opens the first one.
+  type Hit = { key: string; kind: string; title: string; detail: string; open: () => void };
+  const searchHits = useMemo<Hit[]>(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const has = (...v: (string | null | undefined)[]) => v.some((x) => (x || '').toLowerCase().includes(q));
+    const go = (tab: string) => () => {
+      setActiveTab(tab);
+      setSearchQuery('');
+    };
+    const hits: Hit[] = [];
+    data.reports
+      .filter((r) => has(r.code, r.description, r.barangay_name, r.hazard_type, r.hazard_other_text))
+      .slice(0, 4)
+      .forEach((r) =>
+        hits.push({
+          key: 'r' + r.id,
+          kind: 'Incident',
+          title: `${r.code || 'Report'} · ${r.hazard_type}`,
+          detail: `${r.barangay_name} · ${r.status}`,
+          open: () => {
+            if (onShowOnMap) onShowOnMap(r.has_location ? r.latitude : null, r.has_location ? r.longitude : null, r.code || 'Incident', r.id);
+            else setActiveTab('incidents');
+            setSearchQuery('');
+          },
+        })
+      );
+    data.centers
+      .filter((c) => has(c.name, c.barangay_name, c.address))
+      .slice(0, 2)
+      .forEach((c) =>
+        hits.push({
+          key: 'c' + c.id,
+          kind: 'Shelter',
+          title: c.name,
+          detail: `${c.barangay_name} · ${c.current_occupancy}/${c.capacity} · ${c.status}`,
+          open: () => {
+            if (onShowOnMap && c.has_location) onShowOnMap(c.latitude, c.longitude, c.name);
+            else setActiveTab('shelters');
+            setSearchQuery('');
+          },
+        })
+      );
+    data.hotlines
+      .filter((h) => has(h.agency_name, h.contact_number, h.scope))
+      .slice(0, 2)
+      .forEach((h) => hits.push({ key: 'h' + h.id, kind: 'Hotline', title: h.agency_name, detail: h.contact_number, open: go('hotlines') }));
+    data.advisories
+      .filter((a) => has(a.title, a.content, a.affected_area))
+      .slice(0, 2)
+      .forEach((a) => hits.push({ key: 'a' + a.id, kind: 'Advisory', title: a.title, detail: a.affected_area, open: go('advisories') }));
+    data.roadStatus
+      .filter((r) => has(r.road_name, r.barangay, r.note))
+      .slice(0, 2)
+      .forEach((r) => hits.push({ key: 'rs' + r.id, kind: 'Road', title: r.road_name, detail: `${r.barangay || 'Municipality-wide'} · ${r.status}`, open: go('road_work') }));
+    return hits.slice(0, 8);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, data.reports, data.centers, data.hotlines, data.advisories, data.roadStatus]);
   const unreadCount = data.notifications.filter((n) => n.unread).length;
   const ldrrmoNotifications = data.notifications.slice(0, 8).map((n) => ({
     id: n.id,
@@ -407,6 +470,11 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchHits[0]) searchHits[0].open();
+                  if (e.key === 'Escape') setSearchQuery('');
+                }}
+                aria-label="Search incidents, shelters, hotlines, advisories and roads"
                 placeholder={
                   windowWidth < 640
                     ? 'Search...'
@@ -436,6 +504,41 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                 </kbd>
               )}
             </div>
+            {searchQuery.trim().length >= 2 && (
+              <div
+                role="listbox"
+                className={`absolute top-full right-0 mt-2 w-80 max-w-[90vw] rounded-2xl bg-white shadow-xl border z-50 overflow-hidden ${
+                  isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200'
+                }`}
+              >
+                {searchHits.length === 0 ? (
+                  <p className={`px-4 py-3 text-xs ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>Nothing matches “{searchQuery.trim()}”.</p>
+                ) : (
+                  searchHits.map((h) => (
+                    <button
+                      key={h.key}
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      onClick={h.open}
+                      className={`w-full text-left px-4 py-2.5 flex items-start gap-3 cursor-pointer ${isBarangay ? 'hover:bg-[#C2E8FF]/25' : 'hover:bg-neutral-50'}`}
+                    >
+                      <span
+                        className={`mt-0.5 shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider ${
+                          isBarangay ? 'bg-[#C2E8FF]/60 text-[#052659]' : 'bg-neutral-100 text-neutral-600'
+                        }`}
+                      >
+                        {h.kind}
+                      </span>
+                      <span className="min-w-0">
+                        <span className={`block text-xs font-semibold truncate ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>{h.title}</span>
+                        <span className={`block text-[11px] truncate ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>{h.detail}</span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           {/* Live Feed Indicator (Beside Notifications Bell, non-clickable, compact organized pill) */}

@@ -1,5 +1,5 @@
 -- ============================================================================
---  UniGuard · per-role security test (after migrations 026 + 122-152)
+--  UniGuard · per-role security test (after migrations 026 + 122-153)
 --
 --  Impersonates each role and asserts what it can and cannot do. Everything
 --  runs inside one transaction that is rolled back, so nothing is written.
@@ -249,5 +249,26 @@ select pg_temp.as_user((select superadmin from t_ids));
 select pg_temp.ok(pg_temp.rows_changed($$update public.app_settings set value = jsonb_set(value, '{org,contact}', '"(075) 000-0000"') where key = 'main'$$) = 1,
                   'the Super Admin changes the organisation profile');
 select pg_temp.ok((public.org_profile() ->> 'contact') = '(075) 000-0000', 'the new hotline is what residents see');
+
+-- ------------------------------------------------- status workflow (migration 153)
+select pg_temp.as_user((select citizen from t_ids));
+insert into public.reports (reporter_id, hazard_type, description, barangay, severity, urgency, lat, lng)
+select auth.uid(), 'Flood', 'Workflow test report', 'Poblacion', 'warning', 'normal', g.centroid_lat, g.centroid_lng
+  from public.barangay_geoms g join public.barangays b on b.id = g.barangay_id where b.name = 'Poblacion';
+select pg_temp.as_backend();
+update public.reports set status = 'verified' where description = 'Workflow test report';
+create temp table t_wf as select id from public.reports where description = 'Workflow test report';
+grant select on t_wf to authenticated;
+select pg_temp.as_user((select lgu from t_ids));
+select pg_temp.must_fail($$select public.advance_report_status((select id from t_wf), 'dispatched', '')$$,
+                         'a report cannot be marked dispatched without a team being sent');
+select public.advance_report_status((select id from t_wf), 'rejected', 'Duplicate');
+select pg_temp.must_fail($$select public.advance_report_status((select id from t_wf), 'verified', '')$$,
+                         'a rejected report cannot be reopened as verified');
+select pg_temp.as_backend();
+update public.profiles set disabled = true where id = (select official from t_ids);
+select pg_temp.as_user((select official from t_ids));
+select pg_temp.must_fail($$select public.advance_report_status((select pob_pending from t_rep), 'rejected', '')$$,
+                         'a disabled official cannot change a status');
 
 rollback;
