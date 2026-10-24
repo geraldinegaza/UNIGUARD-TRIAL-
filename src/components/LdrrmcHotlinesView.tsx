@@ -22,12 +22,15 @@ interface LdrrmcHotlinesViewProps {
   hotlines: EmergencyHotline[];
   currentUser: User;
   onHotlinesUpdated?: () => void;
+  /** the Super Admin manages the directory directly; everyone else sends requests */
+  directEdit?: boolean;
 }
 
 export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
   hotlines,
   currentUser,
   onHotlinesUpdated,
+  directEdit = false,
 }) => {
 
   // Add Form state matching bottom card from screenshot
@@ -66,12 +69,18 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
     if (!newAgency.trim() || !newContactNumber.trim()) return;
 
     try {
-      await repo.submitHotlineRequest('add', null, {
+      const proposed = {
         agency_name: newAgency.trim(),
         contact_number: newContactNumber.trim(),
         scope: newScope.trim() || 'Municipality-wide',
-      });
-      showNotice(`Request sent: ${newAgency.trim()} will be added once the Super Admin approves it`);
+      };
+      if (directEdit) {
+        await repo.createHotline(proposed);
+        showNotice(`Added ${proposed.agency_name} to the directory`);
+      } else {
+        await repo.submitHotlineRequest('add', null, proposed);
+        showNotice(`Request sent: ${proposed.agency_name} will be added once the Super Admin approves it`);
+      }
 
       // Reset Form
       setNewAgency('');
@@ -98,14 +107,16 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
     if (!editingHotline) return;
 
     try {
-      await repo.submitHotlineRequest(
-        'edit',
-        editingHotline,
-        { agency_name: editAgency.trim(), contact_number: editNumber.trim(), scope: editScope.trim() },
-        editReason.trim()
-      );
-      setEditingHotline(null);
-      showNotice(`Change request sent for ${editAgency.trim()}. It applies once the Super Admin approves it.`);
+      const proposed = { agency_name: editAgency.trim(), contact_number: editNumber.trim(), scope: editScope.trim() };
+      if (directEdit) {
+        await repo.updateHotline(editingHotline.id, proposed);
+        setEditingHotline(null);
+        showNotice(`Updated ${proposed.agency_name}`);
+      } else {
+        await repo.submitHotlineRequest('edit', editingHotline, proposed, editReason.trim());
+        setEditingHotline(null);
+        showNotice(`Change request sent for ${proposed.agency_name}. It applies once the Super Admin approves it.`);
+      }
       if (onHotlinesUpdated) onHotlinesUpdated();
     } catch (err: any) {
       showNotice(err.message || 'Could not send the request.');
@@ -116,8 +127,13 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
   const handleVerify = async (id: string, name: string) => {
     const hotline = hotlines.find((h) => h.id === id) || null;
     try {
-      await repo.submitHotlineRequest('edit', hotline, { active: true }, 'Line confirmed working');
-      showNotice(`Request sent to mark ${name} as verified`);
+      if (directEdit) {
+        await repo.updateHotline(id, { active: true });
+        showNotice(`Verified line active: ${name}`);
+      } else {
+        await repo.submitHotlineRequest('edit', hotline, { active: true }, 'Line confirmed working');
+        showNotice(`Request sent to mark ${name} as verified`);
+      }
     } catch (err: any) {
       showNotice(err.message || 'Could not send the request.');
     }
@@ -126,11 +142,19 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
   // Ask the Super Admin to remove a line from the directory
   const handleRequestRemoval = async () => {
     if (!editingHotline) return;
-    if (!window.confirm(`Ask the Super Admin to remove ${editingHotline.agency_name} from the directory?`)) return;
+    const question = directEdit
+      ? `Remove ${editingHotline.agency_name} from the directory? Residents will no longer see it.`
+      : `Ask the Super Admin to remove ${editingHotline.agency_name} from the directory?`;
+    if (!window.confirm(question)) return;
     try {
-      await repo.submitHotlineRequest('delete', editingHotline, {}, editReason.trim());
+      if (directEdit) {
+        await repo.deleteHotline(editingHotline.id);
+        showNotice(`Removed ${editingHotline.agency_name}`);
+      } else {
+        await repo.submitHotlineRequest('delete', editingHotline, {}, editReason.trim());
+        showNotice(`Removal request sent for ${editingHotline.agency_name}`);
+      }
       setEditingHotline(null);
-      showNotice(`Removal request sent for ${editingHotline.agency_name}`);
     } catch (err: any) {
       showNotice(err.message || 'Could not send the request.');
     }
@@ -325,7 +349,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                           } text-xs font-medium rounded-full inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0 text-center`}
                         >
                           <Edit2 className={`w-3.5 h-3.5 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`} />
-                          <span>Request edit</span>
+                          <span>{directEdit ? 'Edit' : 'Request edit'}</span>
                         </button>
 
                         {/* Verify Button */}
@@ -355,10 +379,10 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
         {/* Card Header Bar */}
         <div className={`px-6 py-4.5 ${isBarangay ? 'bg-[#C2E8FF]/15 border-[#7EA0C5]/30' : 'bg-neutral-50/50 border-neutral-100'} border-b flex items-center justify-between`}>
           <h2 className={`text-sm font-semibold uppercase tracking-wide ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-            Request a New Hotline
+            {directEdit ? 'Add Hotline' : 'Request a New Hotline'}
           </h2>
           <span className={`text-[11px] font-medium ${isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'}`}>
-            Added once the Super Admin approves it
+            {directEdit ? 'Added to the directory immediately' : 'Added once the Super Admin approves it'}
           </span>
         </div>
 
@@ -432,7 +456,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                 } text-white rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs active:scale-95`}
               >
                 <Plus className="w-4 h-4" />
-                <span>Request</span>
+                <span>{directEdit ? 'Add' : 'Request'}</span>
               </button>
             </div>
           </div>
@@ -440,7 +464,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
       </div>
 
       {/* Requests this account has sent, with their outcome */}
-      {myRequests.length > 0 && (
+      {!directEdit && myRequests.length > 0 && (
         <div className={`bg-white rounded-[24px] border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/70'} shadow-xs overflow-hidden`}>
           <div className={`px-6 py-4 ${isBarangay ? 'bg-[#C2E8FF]/15 border-[#7EA0C5]/30' : 'bg-neutral-50/50 border-neutral-100'} border-b`}>
             <h2 className={`text-sm font-semibold uppercase tracking-wide ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
@@ -485,7 +509,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
           <div className={`bg-white rounded-[24px] max-w-md w-full p-6 shadow-2xl border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/80'} animate-in zoom-in-95 duration-200`}>
             <div className={`flex items-center justify-between pb-3.5 border-b ${isBarangay ? 'border-[#7EA0C5]/30' : 'border-neutral-100'}`}>
               <h3 className={`font-semibold text-base ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-                Request a Hotline Change
+                {directEdit ? 'Edit Emergency Hotline' : 'Request a Hotline Change'}
               </h3>
               <button
                 onClick={() => setEditingHotline(null)}
@@ -548,6 +572,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                 />
               </div>
 
+              {!directEdit && (
               <div>
                 <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
                   Reason (shown to the Super Admin)
@@ -564,6 +589,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                   }`}
                 />
               </div>
+              )}
 
               <div className={`flex items-center justify-between pt-3 border-t ${isBarangay ? 'border-[#7EA0C5]/30' : 'border-neutral-100'}`}>
                 <button
@@ -571,7 +597,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                   onClick={handleRequestRemoval}
                   className="px-3 py-2 text-xs font-medium rounded-full cursor-pointer text-red-700 hover:bg-red-50 transition-colors"
                 >
-                  Request removal
+                  {directEdit ? 'Remove line' : 'Request removal'}
                 </button>
 
                 <div className="flex items-center gap-2">
@@ -590,7 +616,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                       isBarangay ? 'bg-[#052659] hover:bg-[#5482B4] border border-[#011025]' : 'bg-[#18181b] hover:bg-neutral-800'
                     } rounded-full shadow-xs cursor-pointer transition-colors`}
                   >
-                    Send Request
+                    {directEdit ? 'Save Changes' : 'Send Request'}
                   </button>
                 </div>
               </div>

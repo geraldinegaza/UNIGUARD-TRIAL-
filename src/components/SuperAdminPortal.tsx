@@ -92,9 +92,11 @@ const HeroArt: React.FC = () => (
 interface SuperAdminPortalProps {
   currentUser: User;
   onSignOut: () => void;
+  /** opens the operations console (incidents, map, shelters, road work, hotlines, analytics) */
+  onOpenOperations?: () => void;
 }
 
-export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser, onSignOut }) => {
+export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser, onSignOut, onOpenOperations }) => {
   const data = useRepo();
   const [view, setView] = useState<View>('overview');
   const [range, setRange] = useState<7 | 14>(14);
@@ -783,6 +785,16 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                       )}
                     </button>
                   ))}
+                  {onOpenOperations && (
+                    <button
+                      type="button"
+                      onClick={onOpenOperations}
+                      className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
+                    >
+                      Operations
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </nav>
                 <span className="ml-auto hidden sm:flex w-9 h-9 rounded-full bg-white/35 text-[#3A2A08] font-bold items-center justify-center shrink-0">
                   {initial}
@@ -816,13 +828,25 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                       {totalAccounts} accounts across residents, barangays, LDRRMO and dispatch.
                       {disabled ? ` ${disabled} disabled.` : ''}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setView('accounts')}
-                      className="mt-5 h-10 px-5 rounded-full bg-[#F28C0F] text-white text-[13px] font-bold shadow-md cursor-pointer"
-                    >
-                      Manage accounts
-                    </button>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setView('accounts')}
+                        className="h-10 px-5 rounded-full bg-[#F28C0F] text-white text-[13px] font-bold shadow-md cursor-pointer"
+                      >
+                        Manage accounts
+                      </button>
+                      {onOpenOperations && (
+                        <button
+                          type="button"
+                          onClick={onOpenOperations}
+                          className="h-10 px-5 rounded-full bg-white/80 text-[#5C3A0A] text-[13px] font-bold shadow-sm cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          Open operations
+                          <ArrowUpRight className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="hidden md:block h-[230px] self-end">
                     <HeroArt />

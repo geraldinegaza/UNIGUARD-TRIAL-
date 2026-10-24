@@ -46,6 +46,8 @@ interface AdminTriageProps {
   onReportsUpdated: () => void;
   onNavigateTab?: (tab: string) => void;
   onSelectReport?: (report: IncidentReport) => void;
+  /** false for the Super Admin, who may edit records but never verify them */
+  canVerify?: boolean;
 }
 
 // Format relative time (e.g., "12m ago", "1h ago", "2d ago")
@@ -101,6 +103,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
   onReportsUpdated,
   onNavigateTab,
   onSelectReport,
+  canVerify = true,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'queue' | 'audit'>('queue');
   // Status filter tabs matching initial draft: All | Pending | Verified | In Progress | Resolved | Rejected
@@ -576,7 +579,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => handleVerifyManual(rep)}
-                            className={`px-3 py-1 ${isBarangay ? 'bg-[#052659] hover:bg-[#5482B4]' : 'bg-[#18181b] hover:bg-neutral-800'} text-white font-medium rounded-full cursor-pointer text-[11px] transition-all shadow-2xs`}
+                            className={`${canVerify ? '' : 'hidden '}px-3 py-1 ${isBarangay ? 'bg-[#052659] hover:bg-[#5482B4]' : 'bg-[#18181b] hover:bg-neutral-800'} text-white font-medium rounded-full cursor-pointer text-[11px] transition-all shadow-2xs`}
                           >
                             Verify
                           </button>
@@ -904,7 +907,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
                             {report.status === 'unverified' && (
                               <button
                                 onClick={() => handleVerifyManual(report)}
-                                className={`px-3.5 py-1 ${
+                                className={`${canVerify ? '' : 'hidden '}px-3.5 py-1 ${
                                   isBarangay
                                     ? 'bg-[#052659] hover:bg-[#5482B4] border border-[#011025]'
                                     : 'bg-[#18181b] hover:bg-neutral-800'
@@ -1039,7 +1042,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
                               <>
                                 <button
                                   onClick={() => handleVerifyManual(report)}
-                                  className={`px-3.5 py-1.5 ${
+                                  className={`${canVerify ? '' : 'hidden '}px-3.5 py-1.5 ${
                                     isBarangay ? 'bg-[#052659] hover:bg-[#5482B4] border border-[#011025]' : 'bg-[#18181b]'
                                   } text-white text-xs font-medium rounded-full cursor-pointer transition-colors`}
                                 >

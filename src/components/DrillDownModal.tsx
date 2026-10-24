@@ -24,6 +24,8 @@ export interface DrillDownModalProps {
   reports: IncidentReport[];
   barangays: Barangay[];
   onReportUpdated?: () => void;
+  /** false for the Super Admin, who may not verify reports */
+  canVerify?: boolean;
 }
 
 export const DrillDownModal: React.FC<DrillDownModalProps> = ({
@@ -34,6 +36,7 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
   reports,
   barangays,
   onReportUpdated,
+  canVerify = true,
 }) => {
   const [selectedIncident, setSelectedIncident] = useState<IncidentReport | null>(null);
 
@@ -262,7 +265,7 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => handleUpdateStatus(activeRecord.id, 'verified')}
-                      disabled={NEXT_STATUS[activeRecord.status] !== 'verified'}
+                      disabled={NEXT_STATUS[activeRecord.status] !== 'verified' || !canVerify}
                       title={NEXT_STATUS[activeRecord.status] === 'verified' ? undefined : 'Status moves one step at a time'}
                       className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 ${
                         activeRecord.status === 'verified'

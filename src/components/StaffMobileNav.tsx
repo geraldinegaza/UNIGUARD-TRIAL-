@@ -82,10 +82,12 @@ interface StaffBottomNavProps {
   setActiveTab: (tab: string) => void;
   currentUser: User;
   onSignOut?: () => void;
+  /** set while a Super Admin is in the operations console */
+  onExitOps?: () => void;
 }
 
 /** Bottom bar: the active section rises into a circle that dips into the bar. */
-export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setActiveTab, currentUser, onSignOut }) => {
+export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setActiveTab, currentUser, onSignOut, onExitOps }) => {
   const isBarangay = currentUser.role === 'barangay';
   const isLgu = currentUser.role === 'lgu_admin';
   const data = useRepo();
@@ -237,7 +239,7 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setAc
                   : 'bg-neutral-100 text-neutral-800 border border-neutral-300'
               }`}
             >
-              {isBarangay ? 'BARANGAY' : 'LDRRMO'}
+              {onExitOps ? 'SUPER ADMIN' : isBarangay ? 'BARANGAY' : 'LDRRMO'}
             </span>
           </div>
           <button
@@ -282,6 +284,21 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setAc
             </div>
           ))}
         </div>
+
+        {onExitOps && (
+          <div className="shrink-0 px-3 pt-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIsMenuOpen(false);
+                onExitOps();
+              }}
+              className="w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-white bg-gradient-to-r from-[#F6C445] to-[#F2A50F] cursor-pointer"
+            >
+              Back to Super Admin console
+            </button>
+          </div>
+        )}
 
         {onSignOut && (
           <div className={`shrink-0 p-3 border-t ${isBarangay ? 'border-[#7EA0C5]/25' : 'border-neutral-100'}`}>

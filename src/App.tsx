@@ -63,12 +63,21 @@ function markAlertAcked(id: string) {
 export default function App() {
   // Session and data come from the Supabase-backed store
   const data = useRepo();
-  const currentUser = data.user;
+  // A Super Admin can open the operations console. There it works with the
+  // LDRRMO screens (the server treats a Super Admin as LDRRMO staff too), with
+  // Super Admin rules on top: no verifying reports, direct hotline management.
+  const isSuperAdmin = data.user?.role === 'super_admin';
+  const [superOps, setSuperOps] = useState<boolean>(false);
+  const inSuperOps = isSuperAdmin && superOps;
+  const currentUser = useMemo(
+    () => (inSuperOps && data.user ? { ...data.user, role: 'lgu_admin' as const } : data.user),
+    [inSuperOps, data.user]
+  );
   const [authReady, setAuthReady] = useState<boolean>(false);
   const [recovery, setRecovery] = useState<boolean>(false);
   const isAuthenticated = !!currentUser && !recovery;
   // Which Triad Shield look this session gets; the status bar follows it
-  const portal = portalForRole(isAuthenticated ? currentUser?.role : null);
+  const portal = portalForRole(isAuthenticated ? data.user?.role : null);
   useBrandThemeColor(portal);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [topView, setTopView] = useState<'Overview' | 'Trends' | 'Analytics'>('Overview');
@@ -240,7 +249,15 @@ export default function App() {
         {currentUser.role === 'dispatch' ? (
           <DispatchPortal currentUser={currentUser} onSignOut={handleSignOut} />
         ) : (
-          <SuperAdminPortal currentUser={currentUser} onSignOut={handleSignOut} />
+          <SuperAdminPortal
+            currentUser={currentUser}
+            onSignOut={handleSignOut}
+            onOpenOperations={() => {
+              setSuperOps(true);
+              setActiveTab('overview');
+              setTopView('Overview');
+            }}
+          />
         )}
         <EmergencyAlertNotificationModal
           isOpen={isAlertNotificationOpen}
@@ -264,6 +281,8 @@ export default function App() {
 
   return (
     <div className={`h-full w-full overflow-hidden p-0 sm:p-2 md:p-3 lg:p-4 flex flex-col items-center justify-center font-sans antialiased ${
+      inSuperOps ? 'ug-admin-ops ' : ''
+    }${
       currentUser.role === 'citizen'
         ? 'bg-[#f0f2f7] text-slate-800 selection:bg-[#991B1B] selection:text-white'
         : currentUser.role === 'barangay'
@@ -306,6 +325,7 @@ export default function App() {
               pendingOutboxCount={outbox.length}
               onSignOut={handleSignOut}
               onOpenReportModal={() => setIsReportModalOpen(true)}
+              onExitOps={inSuperOps ? () => setSuperOps(false) : undefined}
             />
           </div>
         )}
@@ -459,6 +479,7 @@ export default function App() {
                     setSelectedIncidentForMap(rep);
                     setActiveTab('overview');
                   }}
+                  canVerify={!inSuperOps}
                 />
               </div>
             )}
@@ -511,6 +532,7 @@ export default function App() {
                     hotlines={hotlines}
                     currentUser={currentUser}
                     onHotlinesUpdated={refreshData}
+                    directEdit={inSuperOps}
                   />
                 )}
               </div>
@@ -674,7 +696,13 @@ export default function App() {
             onSignOut={handleSignOut}
           />
         ) : (
-          <StaffBottomNav activeTab={activeTab} setActiveTab={changeStaffTab} currentUser={currentUser} onSignOut={handleSignOut} />
+          <StaffBottomNav
+            activeTab={activeTab}
+            setActiveTab={changeStaffTab}
+            currentUser={currentUser}
+            onSignOut={handleSignOut}
+            onExitOps={inSuperOps ? () => setSuperOps(false) : undefined}
+          />
         )}
     </div>
 
@@ -687,6 +715,7 @@ export default function App() {
         reports={reports}
         barangays={barangays}
         onReportUpdated={refreshData}
+        canVerify={!inSuperOps}
       />
 
       {/* Ground Report Submission Modal */}

@@ -41,6 +41,8 @@ export interface DashboardSidebarProps {
   pendingOutboxCount: number;
   onSignOut?: () => void;
   onOpenReportModal?: () => void;
+  /** set while a Super Admin is in the operations console; returns to the admin console */
+  onExitOps?: () => void;
 }
 
 export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
@@ -51,6 +53,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   pendingOutboxCount,
   onSignOut,
   onOpenReportModal,
+  onExitOps,
 }) => {
   const isResident = currentUser.role === 'citizen';
 
@@ -275,11 +278,23 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           {/* Emblem and chip always show; the wordmark joins from sm up */}
           <UniGuardLockup
             layout="compact"
-            portal={isBarangay ? 'barangay' : 'command'}
+            portal={onExitOps ? 'admin' : isBarangay ? 'barangay' : 'command'}
             size={26}
             context={{ barangayName: currentUser.barangay_name }}
             wordmarkClassName="hidden sm:inline"
           />
+          {/* Super Admin in the operations console: the way back to the admin console */}
+          {onExitOps && (
+            <button
+              type="button"
+              onClick={onExitOps}
+              title="Back to the Super Admin console"
+              className="hidden md:inline-flex items-center gap-1 h-7 px-3 rounded-full text-[11px] font-bold text-white bg-gradient-to-r from-[#F6C445] to-[#F2A50F] shadow-2xs cursor-pointer shrink-0"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              Admin console
+            </button>
+          )}
         </div>
 
         {/* Navigation Links: Visibly organized container with horizontal scroll and dynamic fade masks */}
@@ -573,7 +588,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                       ? 'bg-[#C2E8FF]/60 text-[#052659] border border-[#7EA0C5]/50'
                       : 'bg-neutral-100 text-neutral-800 border border-neutral-300'
                   }`}>
-                    {isBarangay ? 'BARANGAY' : 'LDRRMO'}
+                    {onExitOps ? 'SUPER ADMIN' : isBarangay ? 'BARANGAY' : 'LDRRMO'}
                   </span>
                 </div>
 
