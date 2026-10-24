@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useState } from 'react';
 import { RefreshCw, CheckCircle2, ArrowUpCircle } from 'lucide-react';
 import * as repo from '../services/repo';
@@ -50,7 +51,9 @@ export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({
             <span>
               {!isOnline
                 ? `${offlineCopy.title} — ${offlineCopy.detail}.`
-                : `${pendingCount} incident report(s) queued offline on your device.`}
+                : pendingCount === 1
+                ? t('1 item is waiting to send from this phone.')
+                : t('{n} items are waiting to send from this phone.', { n: pendingCount })}
             </span>
           </>
         )}
@@ -62,7 +65,7 @@ export const OfflineSyncBanner: React.FC<OfflineSyncBannerProps> = ({
             onClick={onOpenOfflineCenter}
             className="text-red-300 hover:text-white underline text-xs font-semibold px-2 py-0.5 cursor-pointer"
           >
-            Offline Center
+            {t("Offline Center")}
           </button>
         )}
         {pendingCount > 0 && isOnline && (

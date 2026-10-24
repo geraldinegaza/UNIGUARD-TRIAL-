@@ -27,6 +27,9 @@ import { LdrrmcSosLogView } from './components/LdrrmcSosLogView';
 import { LdrrmcHotlinesView } from './components/LdrrmcHotlinesView';
 import { LdrrmcAnalyticsView } from './components/LdrrmcAnalyticsView';
 import { LdrrmcReportsView } from './components/LdrrmcReportsView';
+import { SettingsView } from './components/SettingsView';
+import { LINK_RETURN, cleanLinkFromUrl } from './lib/emailLink';
+import { t, useT } from './lib/i18n';
 import { LdrrmcOthersReviewView } from './components/LdrrmcOthersReviewView';
 import { ResidentNotificationsView } from './components/ResidentNotificationsView';
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
@@ -63,6 +66,8 @@ function markAlertAcked(id: string) {
 }
 
 export default function App() {
+  // re-render the whole app when the language changes (English / Filipino)
+  useT();
   // Session and data come from the Supabase-backed store
   const data = useRepo();
   // A Super Admin can open the operations console. There it works with the
@@ -115,12 +120,25 @@ export default function App() {
   };
 
   // Restore a persisted session once, and start the connectivity / offline queue wiring
+  const [linkToast, setLinkToast] = useState<string | null>(null);
   useEffect(() => {
     repo.start();
     auth
       .restore(() => setRecovery(true))
       .catch(() => null)
-      .finally(() => setAuthReady(true));
+      .finally(() => {
+        setAuthReady(true);
+        // a confirmation link that also signed the person in (Fix Pack F1)
+        if (LINK_RETURN && LINK_RETURN.kind === 'confirmed' && repo.getState().user) {
+          setLinkToast('Your email is confirmed. Welcome to UniGuard.');
+          setTimeout(() => setLinkToast(null), 5000);
+        }
+        cleanLinkFromUrl();
+      });
+    // back online: re-read the profile so a role change or a disabled account applies (F6)
+    const onOnline = () => auth.revalidate().catch(() => {});
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
   }, []);
 
   // Load everything for the signed in account, then send anything queued offline
@@ -616,6 +634,11 @@ export default function App() {
               </div>
             )}
 
+            {/* Settings: every role */}
+            {activeTab === 'settings' && (
+              <SettingsView currentUser={currentUser} isSuperAdmin={inSuperOps} onNavigateTab={(tab) => setActiveTab(tab)} />
+            )}
+
             {/* Reports & documentation */}
             {activeTab === 'reports' && currentUser.role !== 'citizen' && (
               <LdrrmcReportsView
@@ -699,6 +722,15 @@ export default function App() {
           )}
         </div>
       </div>
+
+        {linkToast && (
+          <div
+            role="status"
+            className="fixed top-[calc(0.75rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[70] max-w-[calc(100vw-2rem)] px-4 py-2.5 rounded-full bg-emerald-700 text-white text-xs font-semibold shadow-lg pointer-events-none"
+          >
+            {t(linkToast)}
+          </div>
+        )}
 
         {/* Phone bottom navigation: emergency essentials for residents, main sections for staff */}
         {currentUser.role === 'citizen' ? (

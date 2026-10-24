@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { corroborationText } from '../lib/util';
 import L from 'leaflet';
 import {
   AlertTriangle,
@@ -711,7 +712,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Shield className="w-3.5 h-3.5 text-neutral-700 shrink-0" />
-                    <span>{activeSelectedIncident.corroboration_count} corroborations</span>
+                    <span>{corroborationText(activeSelectedIncident.corroboration_count)}</span>
                   </div>
                 </div>
 
@@ -841,7 +842,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
                     <div className="mt-1.5 flex items-center justify-between text-[10px] text-neutral-400">
                       <span className="inline-flex items-center gap-1 font-mono">
                         <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-                        {report.corroboration_count} corroborations
+                        {corroborationText(report.corroboration_count)}
                       </span>
                       <span className="text-neutral-600 font-medium">Click to inspect map</span>
                     </div>

@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useState, useEffect } from 'react';
 import { Download, X, Smartphone, ShieldCheck } from 'lucide-react';
 
@@ -43,7 +44,7 @@ export const PWAInstallPrompt: React.FC = () => {
 
   return (
     <aside
-      aria-label="Install UniGuard Application"
+      aria-label={t("Install UniGuard Application")}
       className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 right-4 sm:right-auto z-40 max-w-sm bg-slate-900/95 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 backdrop-blur-xs flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4"
     >
       <div className="flex items-center gap-2.5">
@@ -51,7 +52,7 @@ export const PWAInstallPrompt: React.FC = () => {
           <Smartphone className="w-4 h-4" />
         </span>
         <div>
-          <h4 className="text-xs font-bold text-white">Install UniGuard PWA</h4>
+          <h4 className="text-xs font-bold text-white">{t("Install UniGuard PWA")}</h4>
           <p className="text-[11px] text-slate-300">
             {isIOS
               ? 'Tap Share ⎋ then "Add to Home Screen" for offline disaster access.'
@@ -66,7 +67,7 @@ export const PWAInstallPrompt: React.FC = () => {
             onClick={handleInstallClick}
             className="bg-[#b91c1c] hover:bg-[#991b1b] text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition cursor-pointer"
           >
-            Install
+            {t("Install")}
           </button>
         )}
         <button

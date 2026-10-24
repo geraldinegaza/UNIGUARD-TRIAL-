@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { CONFIG } from './config';
 
 export function relTime(value: string | number | Date | null | undefined): string {
@@ -71,17 +72,51 @@ export const telHref = (num: string) => 'tel:' + String(num || '').replace(/[^\d
 // Friendly text for the auth errors people actually hit.
 export function authError(message: string | undefined, status?: number): string {
   const m = String(message || '').toLowerCase();
-  if (/invalid login credentials|invalid grant/.test(m)) return 'That email and password do not match an account.';
-  if (/email not confirmed/.test(m)) return 'Confirm your email address first. Check your inbox for the link we sent.';
-  if (/user is banned|disabled|deactivated/.test(m)) return 'This account has been disabled. Contact your LGU administrator.';
-  if (/already registered|already exists/.test(m)) return 'An account already exists for that email. Try signing in instead.';
-  if (/rate limit|too many/.test(m)) return 'Too many attempts. Wait a minute and try again.';
+  if (/invalid login credentials|invalid grant/.test(m)) return t('That email and password do not match an account.');
+  if (/email not confirmed/.test(m)) return t('Confirm your email address first. Check your inbox for the link we sent.');
+  if (/user is banned|disabled|deactivated/.test(m)) return t('This account has been disabled. Contact your LGU administrator.');
+  if (/already registered|already exists/.test(m)) return t('An account already exists for that email. Try signing in instead.');
+  if (/rate limit|too many/.test(m)) return t('Too many attempts. Wait a minute and try again.');
   if (/failed to fetch|networkerror|network request failed/.test(m) || status === 0) {
-    return 'No connection to the server. Check your network and try again.';
+    return t('No connection to the server. Check your network and try again.');
   }
-  if (/password should be at least/.test(m)) return 'Use at least 8 characters for the password.';
-  return message || 'Something went wrong. Try again.';
+  if (/password should be at least/.test(m)) return t('Use at least 8 characters for the password.');
+  return message || t('Something went wrong. Try again.');
 }
+
+// True when an error means "no internet", not "the server said no".
+export function isNetworkError(err: unknown): boolean {
+  const m = String((err as { message?: string })?.message || err || '').toLowerCase();
+  return (
+    /failed to fetch|networkerror|network request failed|load failed|fetch failed|err_internet|err_network/.test(m) ||
+    (typeof navigator !== 'undefined' && navigator.onLine === false)
+  );
+}
+
+// Plain-language text for a server or network error (Fix Pack F5). Messages
+// our own database functions raise are already sentences and pass through.
+// The raw error always goes to the console for whoever is debugging.
+export function friendlyError(err: unknown): string {
+  const raw = String((err as { message?: string })?.message || err || '');
+  const m = raw.toLowerCase();
+  if (raw) console.error('[UniGuard]', raw);
+  if (isNetworkError(err)) return t('No internet connection. Check your signal and try again.');
+  if (/(jwt|token|session).*(expired|invalid)|(expired|invalid).*(jwt|token|session)/.test(m)) return t('Your session ended. Please sign in again.');
+  if (/row-level security|permission denied|42501/.test(m)) return t("You don't have permission to do that.");
+  if (/rate limit|too many/.test(m)) return t('Too many attempts. Please wait a few minutes and try again.');
+  if (/duplicate key|23505/.test(m)) return t('This record already exists.');
+  if (/schema cache|column .* does not exist|relation .* does not exist|could not find the .* (column|function|table)/.test(m)) {
+    return t('Something on our side needs an update. Please try again later or contact the MDRRMO.');
+  }
+  if (!raw || /typeerror|syntaxerror|referenceerror|violates|constraint|\bsqlstate\b|pgrst|undefined|null value/.test(m)) {
+    return t('Something went wrong. Please try again.');
+  }
+  return raw;
+}
+
+// "No corroborations yet", "1 corroboration", "3 corroborations" (Fix Pack F9)
+export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+export const corroborationText = (n: number) => (n > 0 ? `${n} ${n === 1 ? t('corroboration') : t('corroborations')}` : t('No corroborations yet'));
 
 // Downscale and re-encode before upload so a phone photo fits the 5 MB bucket.
 export function compressImage(file: File): Promise<Blob> {

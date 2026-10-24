@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { BOUNDS, CENTER } from '../lib/geo';
@@ -96,7 +97,7 @@ export const LocationPin: React.FC<LocationPinProps> = ({ lat, lng, onChange, on
       ref={boxRef}
       data-no-swipe
       role="application"
-      aria-label="Map: drag the pin or tap where the hazard is"
+      aria-label={t("Map: drag the pin or tap where the hazard is")}
       className={`relative z-0 w-full h-44 rounded-2xl overflow-hidden border border-neutral-200 ${className}`}
     />
   );

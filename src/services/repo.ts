@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabaseClient';
 import { CONFIG } from '../lib/config';
 import { BARANGAY_NAMES, CENTER, PLACE, barangaySlug, hasCoords } from '../lib/geo';
 import { classifyHazard, hazardDisplayLabel } from '../lib/hazards';
+import { friendlyError, isNetworkError } from '../lib/util';
 import * as offline from './offline';
 import {
   Advisory,
@@ -100,7 +101,24 @@ export interface RepoState {
   sitreps: SituationReport[];
   overdue: OverdueReport[];
   shelterTrend: ShelterTrendPoint[];
+  // the MDRRMO's name and hotline from the Super Admin's settings (org_profile)
+  org: OrgProfile;
 }
+
+export interface OrgProfile {
+  municipality: string;
+  province: string;
+  office: string;
+  contact: string;
+  email: string;
+}
+const DEFAULT_ORG: OrgProfile = {
+  municipality: 'Lingayen',
+  province: 'Pangasinan',
+  office: 'Municipal Disaster Risk Reduction and Management Office',
+  contact: '(075) 632-2222',
+  email: '',
+};
 
 const fallbackBarangays = (): Barangay[] =>
   BARANGAY_NAMES.map((name) => ({ id: barangaySlug(name), uuid: null, name, city: PLACE.town }));
@@ -146,6 +164,7 @@ let state: RepoState = {
   sitreps: [],
   overdue: [],
   shelterTrend: [],
+  org: DEFAULT_ORG,
 };
 
 const listeners = new Set<() => void>();
@@ -169,8 +188,13 @@ function client() {
   return supabase;
 }
 
+// Every failed request surfaces as a plain sentence (Fix Pack F5); the raw
+// text goes to the console. A network failure keeps a flag so callers can
+// queue the work instead of dropping it.
 function fail(error: { message?: string } | null): never {
-  throw new Error((error && error.message) || 'Request failed');
+  const e = new Error(friendlyError(error || 'Request failed')) as Error & { network?: boolean };
+  e.network = isNetworkError(error);
+  throw e;
 }
 
 /* ------------------------------------------------------- role adaptation */
@@ -554,6 +578,7 @@ export async function loadAll(): Promise<void> {
 // The barangay list is readable before sign in, so the sign up form can offer it.
 export async function loadBarangays(): Promise<void> {
   if (!supabase) return;
+  loadOrgProfile().catch(() => {});
   const { data, error } = await supabase.from('barangays').select('id,name,city').eq('active', true).order('name');
   if (error || !data || !data.length) return;
   set({
@@ -657,7 +682,7 @@ async function insertReport(input: ReportInput, folder: string): Promise<Row> {
 // Online: inserts the report. Offline: keeps it in the queue, which uploads
 // by itself when the connection returns (photos cannot be queued).
 export async function createReport(input: ReportInput): Promise<{ queued: boolean; code: string | null }> {
-  if (!isOnline()) {
+  const queueIt = async () => {
     await offline.enqueue({
       kind: 'report',
       hazard_type: input.hazard_type,
@@ -672,8 +697,16 @@ export async function createReport(input: ReportInput): Promise<{ queued: boolea
     await refreshQueue();
     requestBackgroundSync();
     return { queued: true, code: null };
+  };
+  if (!isOnline()) return queueIt();
+  let row: Row;
+  try {
+    row = await insertReport(input, 'draft');
+  } catch (e) {
+    // no signal although the phone says it is online: save it for later
+    if (isNetworkError(e) || (e as { network?: boolean }).network) return queueIt();
+    throw e;
   }
-  const row = await insertReport(input, 'draft');
   await loadAll();
   return { queued: false, code: row.code || null };
 }
@@ -1150,18 +1183,28 @@ export interface SosResult {
 // One tap sends GPS + the caller's profile snapshot to the LGU duty officers
 // through the submit_sos RPC, which is rate limited to 5 calls per 10 minutes.
 export async function submitSos(pos: { lat: number | null; lng: number | null; accuracy: number | null }, note = ''): Promise<SosResult> {
-  if (!isOnline()) {
-    await offline.enqueue({ kind: 'sos', lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, description: note });
+  const queue = async (): Promise<SosResult> => {
+    await offline.upsertQueuedSos({ kind: 'sos', lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, description: note });
     await refreshQueue();
     requestBackgroundSync();
     return { id: null, reach: null, queued: true };
+  };
+  if (!isOnline()) return queue();
+  let res;
+  try {
+    res = await client().rpc('submit_sos', {
+      p_lat: pos.lat,
+      p_lng: pos.lng,
+      p_accuracy: pos.accuracy,
+      p_note: note,
+    });
+  } catch (e) {
+    // the phone thinks it is online but the request never left: keep the SOS
+    if (isNetworkError(e)) return queue();
+    throw e;
   }
-  const { data, error } = await client().rpc('submit_sos', {
-    p_lat: pos.lat,
-    p_lng: pos.lng,
-    p_accuracy: pos.accuracy,
-    p_note: note,
-  });
+  const { data, error } = res;
+  if (error && isNetworkError(error)) return queue();
   if (error) fail(error);
   return { id: (data && data.id) || null, reach: data && typeof data.reach === 'number' ? data.reach : null, queued: false };
 }
@@ -1341,7 +1384,10 @@ export async function flushQueue(): Promise<number> {
   flushing = true;
   let sent = 0;
   try {
-    const rows = await offline.listQueue();
+    // SOS first; rows the server already refused five times wait for the user
+    const rows = (await offline.listQueue())
+      .filter((r) => !r.failed)
+      .sort((a, b) => (a.kind === 'sos' ? 0 : 1) - (b.kind === 'sos' ? 0 : 1));
     for (const row of rows) {
       try {
         if (row.kind === 'sos') {
@@ -1366,8 +1412,12 @@ export async function flushQueue(): Promise<number> {
         }
         await offline.removeFromQueue(row.id);
         sent++;
-      } catch {
-        break;
+      } catch (e) {
+        // no signal: stop and try again later
+        if (isNetworkError(e) || (e as { network?: boolean }).network) break;
+        // the server refused this row: count it and carry on with the rest
+        const attempts = (row.attempts || 0) + 1;
+        await offline.updateQueueRow({ ...row, attempts, failed: attempts >= 5, last_error: friendlyError(e) });
       }
     }
   } finally {
@@ -1989,4 +2039,98 @@ export async function dispatchLog(opts: { from?: string; to?: string; reportId?:
       report_created_at: rep.created_at || null,
     };
   });
+}
+
+// Lets the person retry or discard a row the server kept refusing.
+export async function retryQueued(id: number): Promise<number> {
+  const row = (await offline.listQueue()).find((r) => r.id === id);
+  if (row) await offline.updateQueueRow({ ...row, failed: false, attempts: 0 });
+  return flushQueue();
+}
+
+export async function discardQueued(id: number): Promise<void> {
+  await offline.removeFromQueue(id);
+  await refreshQueue();
+}
+
+/* ------------------------------------------------- organisation profile */
+export async function loadOrgProfile(): Promise<void> {
+  if (!supabase) return;
+  const { data, error } = await supabase.rpc('org_profile');
+  if (error || !data) return;
+  set({ org: { ...DEFAULT_ORG, ...(data as Partial<OrgProfile>) } });
+}
+
+/* ---------------------------------------------- alerts on this phone (push) */
+export type PushStatus = 'on' | 'off' | 'blocked' | 'unsupported';
+export async function pushStatus(): Promise<PushStatus> {
+  if (!pushSupported()) return 'unsupported';
+  if (Notification.permission === 'denied') return 'blocked';
+  if (Notification.permission !== 'granted') return 'off';
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    return sub ? 'on' : 'off';
+  } catch {
+    return 'off';
+  }
+}
+
+/* ------------------------------------------------------- message templates */
+export interface MessageTemplate {
+  id: string;
+  category: 'evacuation_order' | 'weather_advisory' | 'road_closure' | 'general';
+  label: string;
+  title_en: string;
+  body_en: string;
+  title_fil: string;
+  body_fil: string;
+  placeholders: string[];
+}
+
+const toTemplate = (r: Row): MessageTemplate => ({
+  id: r.id,
+  category: r.category || 'general',
+  label: r.label || '',
+  title_en: r.title_en || '',
+  body_en: r.body_en || '',
+  title_fil: r.title_fil || '',
+  body_fil: r.body_fil || '',
+  placeholders: Array.isArray(r.placeholders) ? r.placeholders : [],
+});
+
+// {barangay}, {center} ... found in a template's text
+export const templatePlaceholders = (...texts: string[]) =>
+  Array.from(new Set(texts.join(' ').match(/\{\w+\}/g) || []));
+
+export async function loadTemplates(): Promise<MessageTemplate[]> {
+  const { data, error } = await client().from('message_templates').select('*').order('category').order('label');
+  if (error) fail(error);
+  return (data || []).map(toTemplate);
+}
+
+export async function saveTemplate(id: string | null, input: Omit<MessageTemplate, 'id' | 'placeholders'>): Promise<void> {
+  const row = { ...input, placeholders: templatePlaceholders(input.title_en, input.body_en, input.title_fil, input.body_fil), updated_at: new Date().toISOString() };
+  const c = client();
+  const { error } = id ? await c.from('message_templates').update(row).eq('id', id) : await c.from('message_templates').insert(row);
+  if (error) fail(error);
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  const { error } = await client().from('message_templates').delete().eq('id', id);
+  if (error) fail(error);
+}
+
+export const fillTemplate = (text: string, values: Record<string, string>) =>
+  text.replace(/\{(\w+)\}/g, (m, k) => (values[k] ? values[k] : m));
+
+/* --------------------------------------- organisation profile (Super Admin) */
+export async function saveOrgProfile(org: OrgProfile): Promise<void> {
+  const c = client();
+  const { data, error } = await c.from('app_settings').select('value').eq('key', 'main').maybeSingle();
+  if (error) fail(error);
+  const value = { ...((data && data.value) || {}), org };
+  const { error: e2 } = await c.from('app_settings').upsert({ key: 'main', value, updated_at: new Date().toISOString() });
+  if (e2) fail(e2);
+  await loadOrgProfile();
 }

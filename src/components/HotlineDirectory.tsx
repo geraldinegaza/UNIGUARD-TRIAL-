@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useState } from 'react';
 import { EmergencyHotline, Barangay } from '../types';
 import { Phone, Download, Check, Info } from 'lucide-react';
@@ -48,7 +49,7 @@ export const HotlineDirectory: React.FC<HotlineDirectoryProps> = ({
           className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-95 w-fit shrink-0"
         >
           <Download className="w-3.5 h-3.5 text-white" />
-          <span>Save Offline</span>
+          <span>{t("Save Offline")}</span>
         </button>
       </div>
 
@@ -81,7 +82,7 @@ export const HotlineDirectory: React.FC<HotlineDirectoryProps> = ({
                   title={`Call ${hotline.agency_name}`}
                 >
                   <Phone className="w-3.5 h-3.5" />
-                  <span>Call</span>
+                  <span>{t("Call")}</span>
                 </a>
               </div>
             );
@@ -95,7 +96,7 @@ export const HotlineDirectory: React.FC<HotlineDirectoryProps> = ({
           <Info className="w-4 h-4 text-red-900" />
         </div>
         <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-medium">
-          If a line is busy, keep the call short and state your barangay, landmark and number of people needing help.
+          {t("If a line is busy, keep the call short and state your barangay, landmark and number of people needing help.")}
         </p>
       </div>
 

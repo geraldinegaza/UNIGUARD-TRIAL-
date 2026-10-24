@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   ChevronDown,
@@ -33,7 +34,7 @@ import { Barangay, User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { fmtCoords, locate } from '../lib/geo';
-import { absTime } from '../lib/util';
+import { absTime, telHref } from '../lib/util';
 import { PortalTag, UniGuardLockup, portalForRole } from '../brand';
 import { ResidentTopTabs } from './ResidentMobileNav';
 
@@ -106,43 +107,47 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     switch (tab) {
       case 'overview':
       case 'home':
-        return 'Home';
+        return t('Home');
+      case 'settings':
+        return t('Settings');
+      case 'reports':
+        return t('Reports & Documents');
       case 'relief':
-        return 'Relief';
+        return t('Relief');
       case 'shelters':
-        return 'Shelters';
+        return t('Shelters');
       case 'hotlines':
-        return 'Hotlines';
+        return t('Hotlines');
       case 'sos':
-        return 'Emergency SOS';
+        return t('Emergency SOS');
       case 'offline_sync':
-        return 'Offline Sync';
+        return t('Offline Sync');
       case 'notifications':
-        return 'Notifications';
+        return t('Notifications');
       case 'incidents':
       case 'feed':
       case 'triage':
-        return 'Incidents';
+        return t('Incidents');
       case 'advisories':
-        return 'Advisories';
+        return t('Advisories');
       case 'road_work':
-        return 'Road Work';
+        return t('Road Work');
       case 'sos_log':
-        return 'SOS Log';
+        return t('SOS Log');
       case 'analytics':
-        return 'Analytics';
+        return t('Analytics');
       case 'guides':
-        return 'Preparedness Guides';
+        return t('Preparedness Guides');
       case 'faqs':
-        return 'FAQs';
+        return t('FAQs');
       case 'others_review':
-        return 'Others Review';
+        return t('Others Review');
       case 'users':
-        return 'Users';
+        return t('Users');
       case 'audit_log':
-        return 'Audit Log';
+        return t('Audit Log');
       default:
-        return 'Home';
+        return t('Home');
     }
   };
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
@@ -164,10 +169,29 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     accuracy: string;
     sentAt: string;
     reached: string;
+    queued: boolean;
   } | null>(null);
   const [sosError, setSosError] = useState<string | null>(null);
 
   const data = useRepo();
+  // a queued SOS counts as delivered once the offline queue no longer holds one
+  const sosWaiting = data.queue.some((q) => q.kind === 'sos');
+  const sosQueued = !!lastSosInfo?.queued && sosWaiting;
+  const sosDelivered = !!lastSosInfo?.queued && !sosWaiting;
+  const callCard = (
+    <a
+      href={telHref(data.org.contact)}
+      className="flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-red-900/20 shadow-sm text-red-900 hover:bg-red-50 active:scale-[0.99] transition"
+    >
+      <span className="w-10 h-10 rounded-full bg-red-900 text-white flex items-center justify-center shrink-0">
+        <PhoneCall className="w-4.5 h-4.5" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-extrabold">{t('Call the {town} MDRRMO', { town: data.org.municipality })}</span>
+        <span className="block text-xs font-mono font-semibold text-red-900/80">{data.org.contact}</span>
+      </span>
+    </a>
+  );
   const portal = portalForRole(currentUser?.role);
   const isCitizen = currentUser?.role === 'citizen';
 
@@ -219,6 +243,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         accuracy: pos ? `± ${pos.accuracy} meters` : '—',
         sentAt,
         reached: res.queued ? 'Sends when back online' : `${res.reach ?? '—'} duty officers`,
+        queued: res.queued,
       });
       try {
         if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
@@ -230,7 +255,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         setSosSentSuccess(false);
       }, 3500);
     } catch (err: any) {
-      setSosError(err.message || 'Could not send SOS');
+      setSosError(err.message || 'Could not send the SOS. Call the MDRRMO now.');
     } finally {
       setIsSendingSos(false);
     }
@@ -434,7 +459,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   ? 'bg-white border border-neutral-200 text-neutral-800 hover:bg-red-900 hover:text-white'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
-              aria-label="Toggle navigation menu"
+              aria-label={t("Toggle navigation menu")}
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -455,7 +480,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   currentUser?.barangay_name ? (
                     <>
                       {/* the short name fits beside the actions on a phone */}
-                      <span className="hidden md:inline">Brgy. </span>
+                      <span className="hidden md:inline">{t("Brgy.")} </span>
                       {currentUser.barangay_name}
                     </>
                   ) : undefined
@@ -500,7 +525,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   setIsSearchCommandOpen(true);
                 }}
                 onFocus={() => setIsSearchCommandOpen(true)}
-                placeholder="Search"
+                placeholder={t("Search")}
                 className="w-full bg-transparent text-xs text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
               />
               {searchCommandQuery ? (
@@ -510,7 +535,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     setIsSearchCommandOpen(false);
                   }}
                   className="text-neutral-400 hover:text-neutral-600 p-0.5 cursor-pointer"
-                  title="Clear search"
+                  title={t("Clear search")}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -526,9 +551,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-72 sm:w-80 bg-white rounded-2xl border border-neutral-200 shadow-xl py-2 z-40 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
                 <div className="px-3.5 py-1.5 border-b border-neutral-100 mb-1 flex items-center justify-between">
                   <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                    Search
+                    {t("Search")}
                   </p>
-                  <span className="text-[10px] text-neutral-400 font-mono">ESC to close</span>
+                  <span className="text-[10px] text-neutral-400 font-mono">{t("ESC to close")}</span>
                 </div>
 
                 <div className="max-h-72 overflow-y-auto py-1">
@@ -536,7 +561,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   {filteredCommands.length > 0 && (
                     <div className="mb-2">
                       <p className="px-3.5 py-1 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
-                        Navigation Commands
+                        {t("Navigation Commands")}
                       </p>
                       {filteredCommands.map((cmd) => (
                         <button
@@ -554,7 +579,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                             </span>
                             <span className="font-medium">{cmd.label}</span>
                           </div>
-                          <span className="text-[10px] text-neutral-400 uppercase font-mono">Jump</span>
+                          <span className="text-[10px] text-neutral-400 uppercase font-mono">{t("Jump")}</span>
                         </button>
                       ))}
                     </div>
@@ -563,7 +588,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   {/* Matching Barangays */}
                   <div>
                     <p className="px-3.5 py-1 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
-                      Barangay Scope
+                      {t("Barangay Scope")}
                     </p>
                     <button
                       onClick={() => {
@@ -613,7 +638,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
                   {filteredCommands.length === 0 && filteredBarangays.length === 0 && (
                     <div className="px-4 py-6 text-center text-xs text-neutral-400">
-                      No matching command or barangay found.
+                      {t("No matching command or barangay found.")}
                     </div>
                   )}
                 </div>
@@ -642,11 +667,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     ? 'bg-red-900 text-white shadow-lg ring-2 ring-red-950'
                     : 'bg-red-900 hover:bg-red-800 text-white ring-2 ring-red-900/30'
                 }`}
-                title="Emergency SOS"
-                aria-label="Emergency SOS"
+                title={t("Emergency SOS")}
+                aria-label={t("Emergency SOS")}
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-white animate-pulse" />
-                <span className="font-extrabold text-xs tracking-wider">SOS</span>
+                <span className="font-extrabold text-xs tracking-wider">{t("SOS")}</span>
               </button>
 
               {/* Tooltip on hover saying "Emergency SOS" */}
@@ -654,7 +679,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
                   <div className="w-1.5 h-1.5 -mb-0.5 rotate-45 bg-neutral-900 border-t border-l border-neutral-800" />
                   <span className="relative z-10 py-1 px-2.5 text-[10px] font-bold leading-none text-white whitespace-nowrap bg-neutral-900 rounded-lg shadow-lg border border-neutral-800">
-                    Emergency SOS
+                    {t("Emergency SOS")}
                   </span>
                 </div>
               )}
@@ -679,18 +704,18 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           <AlertTriangle className="w-4 h-4 text-red-900" />
                         </div>
                         <h2 className="text-base font-extrabold text-neutral-900 tracking-tight">
-                          Emergency SOS
+                          {t("Emergency SOS")}
                         </h2>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-900 border border-red-900/20">
-                          Active Channel
+                          {t("Active Channel")}
                         </span>
                         <button
                           onClick={() => setIsSosOpen(false)}
                           className="p-1.5 rounded-xl text-neutral-400 hover:text-neutral-800 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          aria-label="Close emergency SOS"
+                          aria-label={t("Close emergency SOS")}
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -698,12 +723,27 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     </div>
 
                     <p className="text-neutral-500 text-xs font-normal leading-relaxed mt-2">
-                      Direct distress trigger to Lingayen MDRRMO Dispatch and local barangay quick responders.
+                      {t("Direct distress trigger to Lingayen MDRRMO Dispatch and local barangay quick responders.")}
                     </p>
                   </div>
 
                   {/* Scrollable Body */}
                   <div className="p-4 sm:p-5 space-y-4 max-h-[440px] sm:max-h-[500px] overflow-y-auto bg-neutral-50/40">
+                    {/* No signal or a failed send: the call option comes first (Fix Pack F7) */}
+                    {(sosQueued || sosError) && callCard}
+                    {sosQueued && (
+                      <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900" role="status">
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-200/70">{t("Waiting for signal")}</span>
+                        <p className="text-xs leading-relaxed mt-1.5">
+                          {t("No internet connection. Your SOS is saved on this phone and will be sent automatically as soon as you are back online. If you are in danger, call the MDRRMO now.")}
+                        </p>
+                      </div>
+                    )}
+                    {sosDelivered && (
+                      <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold" role="status">
+                        {t("Your SOS was delivered to the MDRRMO.")}
+                      </div>
+                    )}
                     {/* Hero Card: Tap to Send SOS (Signature Dark Red Gradient Card matching Home) */}
                     <div className="bg-gradient-to-br from-red-800 via-red-900 to-red-950 text-white rounded-3xl p-5 sm:p-6 text-center space-y-3 shadow-xl border border-red-900/40 relative overflow-hidden group">
                       {/* Big Glowing SOS Button */}
@@ -717,20 +757,26 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                             ? 'bg-red-950 text-white animate-pulse ring-4 ring-white/50'
                             : 'bg-white text-red-900 hover:bg-red-50 ring-4 ring-white/30 hover:scale-105 shadow-black/20'
                         }`}
-                        title="Tap to Send SOS"
+                        title={t("Tap to Send SOS")}
                       >
                         <AlertTriangle className={`w-7 h-7 ${isSendingSos ? 'animate-bounce text-white' : sosSentSuccess ? 'text-emerald-700' : 'text-red-900 animate-pulse'}`} />
                         <span className="text-[11px] font-black uppercase tracking-wider mt-0.5 font-mono">
-                          {isSendingSos ? 'Sending...' : sosSentSuccess ? 'Sent ✓' : 'SOS'}
+                          {isSendingSos ? t('Sending...') : sosSentSuccess ? t('Sent ✓') : t('SOS')}
                         </span>
                       </button>
 
                       <div>
                         <h3 className="text-base font-extrabold text-white tracking-tight">
-                          {isSendingSos ? 'Transmitting Distress Signal...' : sosSentSuccess ? 'Distress Signal Logged & Broadcast!' : 'Tap to Trigger Emergency SOS'}
+                          {isSendingSos
+                            ? t('Transmitting Distress Signal...')
+                            : sosSentSuccess && lastSosInfo?.queued
+                            ? t('Saved, will send when online')
+                            : sosSentSuccess
+                            ? t('Distress Signal Logged & Broadcast!')
+                            : t('Tap to Trigger Emergency SOS')}
                         </h3>
                         <p className="text-xs text-red-100/90 leading-relaxed max-w-[280px] mx-auto mt-1">
-                          {sosError || 'Hold still for a moment to acquire high-accuracy GPS coordinates. Duty dispatchers are immediately alerted.'}
+                          {sosError || t('Hold still for a moment to acquire high-accuracy GPS coordinates. Duty dispatchers are immediately alerted.')}
                         </p>
                       </div>
 
@@ -750,7 +796,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     <div className="bg-white border border-neutral-100 rounded-3xl p-4 sm:p-5 space-y-3 shadow-md">
                       <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
                         <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-400">
-                          Last SOS Dispatch
+                          {t("Last SOS Dispatch")}
                         </span>
                         <span className="font-mono text-[9px] font-bold px-2 py-0.5 rounded-lg bg-neutral-100 text-neutral-600 border border-neutral-200/80 truncate max-w-[150px]">
                           {lastSosInfo.id}
@@ -759,7 +805,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
                       <div className="space-y-2 text-xs">
                         <div className="flex items-center justify-between">
-                          <span className="text-neutral-500 font-medium text-xs">Position</span>
+                          <span className="text-neutral-500 font-medium text-xs">{t("Position")}</span>
                           <span className="font-mono font-bold text-xs text-neutral-800 flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             {lastSosInfo.position}
@@ -767,21 +813,21 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-neutral-500 font-medium text-xs">Accuracy</span>
+                          <span className="text-neutral-500 font-medium text-xs">{t("Accuracy")}</span>
                           <span className="font-mono font-bold text-xs text-neutral-800">
                             {lastSosInfo.accuracy}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-neutral-500 font-medium text-xs">Sent at</span>
+                          <span className="text-neutral-500 font-medium text-xs">{t("Sent at")}</span>
                           <span className="font-mono font-bold text-xs text-neutral-800">
                             {lastSosInfo.sentAt}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-neutral-500 font-medium text-xs">Reached</span>
+                          <span className="text-neutral-500 font-medium text-xs">{t("Reached")}</span>
                           <span className="font-mono font-bold text-xs text-red-900 px-2 py-0.5 rounded-full bg-red-50 border border-red-900/20">
                             {lastSosInfo.reached}
                           </span>
@@ -790,11 +836,13 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     </div>
                     )}
 
+                    {!(sosQueued || sosError) && callCard}
+
                     {/* Rate Limit Disclaimer Banner */}
                     <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-start gap-2.5 text-xs text-amber-900 leading-relaxed">
                       <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                       <p className="text-[11px] leading-relaxed text-amber-900">
-                        SOS is rate-limited to 5 calls per 10 minutes. False alarms take the duty officer away from real emergencies.
+                        {t("SOS is rate-limited to 5 calls per 10 minutes. False alarms take the duty officer away from real emergencies.")}
                       </p>
                     </div>
                   </div>
@@ -822,8 +870,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     ? 'bg-[#18181b] text-white shadow-xs'
                     : 'border border-neutral-200/80 bg-white hover:bg-neutral-50 text-neutral-700 shadow-2xs'
                 }`}
-                title="Notifications"
-                aria-label="Notifications"
+                title={t("Notifications")}
+                aria-label={t("Notifications")}
               >
                 <Bell className="w-4 h-4" />
                 {!isResident ? (
@@ -844,7 +892,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
                   <div className="w-1.5 h-1.5 -mb-0.5 rotate-45 bg-neutral-900 border-t border-l border-neutral-800" />
                   <span className="relative z-10 py-1 px-2.5 text-[10px] font-bold leading-none text-white whitespace-nowrap bg-neutral-900 rounded-lg shadow-lg border border-neutral-800">
-                    Notifications
+                    {t("Notifications")}
                   </span>
                 </div>
               )}
@@ -869,7 +917,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           <Bell className="w-4 h-4 text-red-900" />
                         </div>
                         <h2 className="text-base font-extrabold text-neutral-900 tracking-tight">
-                          Notifications
+                          {t("Notifications")}
                         </h2>
                       </div>
 
@@ -884,14 +932,14 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           }`}
                         >
                           <Check className="w-3.5 h-3.5" />
-                          <span>{hasMarkedRead ? 'All Read' : 'Mark All Read'}</span>
+                          <span>{hasMarkedRead ? t('All Read') : t('Mark All Read')}</span>
                         </button>
 
                         {/* Close Button */}
                         <button
                           onClick={() => setIsNotificationsOpen(false)}
                           className="p-1.5 rounded-xl text-neutral-400 hover:text-neutral-800 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          aria-label="Close notifications"
+                          aria-label={t("Close notifications")}
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -902,7 +950,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     <p className="text-neutral-500 text-xs font-normal leading-relaxed mt-2">
                       {!isResident
                         ? 'Push notification log • Every alert delivered to citizen devices.'
-                        : 'Push notifications delivered to this device, including alerts received while the app was closed.'}
+                        : t('Push notifications delivered to this device, including alerts received while the app was closed.')}
                     </p>
                   </div>
 
@@ -912,33 +960,33 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     <div className="bg-white rounded-2xl border border-neutral-100/90 p-4 space-y-2.5 shadow-sm">
                       <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                          Delivery Telemetry
+                          {t("Delivery Telemetry")}
                         </span>
                         <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-red-50 text-red-900 border border-red-900/20">
-                          Active Channel
+                          {t("Active Channel")}
                         </span>
                       </div>
 
                       <div className="space-y-2 text-xs">
                         <div className="flex items-center justify-between">
-                          <span className="text-neutral-500 font-medium">Unread</span>
+                          <span className="text-neutral-500 font-medium">{t("Unread")}</span>
                           <span className="font-mono font-bold text-xs text-red-900 px-2 py-0.5 rounded-lg bg-red-50 border border-red-100 shadow-2xs">
                             {!isResident ? unreadLguCount : unreadNotifications}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-neutral-500 font-medium">Delivered today</span>
+                          <span className="text-neutral-500 font-medium">{t("Delivered today")}</span>
                           <span className="font-mono font-bold text-xs text-neutral-800 px-2 py-0.5 rounded-lg bg-neutral-100 border border-neutral-200">
                             {!isResident ? lguNotifications.length : deliveredAlerts.length}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-neutral-500 font-medium">Delivery channel</span>
+                          <span className="text-neutral-500 font-medium">{t("Delivery channel")}</span>
                           <span className="font-mono text-xs font-bold text-neutral-800 flex items-center gap-1.5">
                             <span className={`w-2 h-2 rounded-full ${!isResident ? 'bg-neutral-800' : 'bg-red-900'} animate-pulse`} />
-                            Push + offline inbox
+                            {t("Push + offline inbox")}
                           </span>
                         </div>
                       </div>
@@ -950,7 +998,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                         <Radio className="w-4 h-4 text-red-900 animate-pulse" />
                       </div>
                       <p className="text-xs leading-relaxed font-medium">
-                        Alerts are delivered even when the app is closed, and are queued for the offline inbox when cellular signal is unavailable.
+                        {t("Alerts are delivered even when the app is closed, and are queued for the offline inbox when cellular signal is unavailable.")}
                       </p>
                     </div>
 
@@ -961,7 +1009,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                         <div className="flex items-center justify-between px-1">
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-bold uppercase tracking-wider text-neutral-900">
-                              Inbox
+                              {t("Inbox")}
                             </span>
                             {unreadLguCount > 0 && (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-900 border border-red-900/20">
@@ -970,7 +1018,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                             )}
                           </div>
                           <span className="text-[10px] text-neutral-700 font-bold bg-neutral-100 px-2 py-0.5 rounded-full border border-neutral-200 font-mono">
-                            Offline Synced
+                            {t("Offline Synced")}
                           </span>
                         </div>
 
@@ -995,7 +1043,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                                   </span>
                                   {!item.isRead && (
                                     <span className="px-1.5 py-0.5 rounded-full bg-red-50 text-red-900 text-[9px] font-black uppercase tracking-wider border border-red-900/20 shrink-0">
-                                      NEW
+                                      {t("NEW")}
                                     </span>
                                   )}
                                 </div>
@@ -1024,7 +1072,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                             Delivered Today ({deliveredAlerts.length})
                           </span>
                           <span className="text-[10px] text-neutral-700 font-bold bg-neutral-100 px-2.5 py-0.5 rounded-full border border-neutral-200 font-mono">
-                            Offline Synced
+                            {t("Offline Synced")}
                           </span>
                         </div>
 
@@ -1051,7 +1099,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                                 </span>
                                 <span className="flex items-center gap-1 font-semibold text-[10px] text-emerald-700">
                                   <Check className="w-3 h-3 text-emerald-700" />
-                                  Delivered to device
+                                  {t("Delivered to device")}
                                 </span>
                               </div>
                             </div>
@@ -1072,7 +1120,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                         className="w-full py-2.5 text-center text-xs font-bold text-neutral-800 hover:text-red-900 bg-neutral-50 hover:bg-red-50 border border-neutral-200 hover:border-red-900/30 rounded-2xl transition cursor-pointer active:scale-98 shadow-xs flex items-center justify-center gap-1.5"
                       >
                         <Eye className="w-3.5 h-3.5" />
-                        <span>View Full Notifications Tab</span>
+                        <span>{t("View Full Notifications Tab")}</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                     ) : (
@@ -1084,7 +1132,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                         className="w-full py-2.5 text-center text-xs font-bold text-white bg-red-900 hover:bg-red-800 rounded-2xl transition cursor-pointer active:scale-98 shadow-md flex items-center justify-center gap-1.5"
                       >
                         <Eye className="w-3.5 h-3.5" />
-                        <span>View All Notifications</span>
+                        <span>{t("View All Notifications")}</span>
                       </button>
                     )}
                   </div>
@@ -1098,8 +1146,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 <button
                   onClick={onOpenReportModal}
                   className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border border-neutral-200 hover:bg-red-900 text-neutral-800 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95"
-                  title="Report Hazard"
-                  aria-label="Report Hazard"
+                  title={t("Report Hazard")}
+                  aria-label={t("Report Hazard")}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -1108,7 +1156,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
                   <div className="w-1.5 h-1.5 -mb-0.5 rotate-45 bg-neutral-900 border-t border-l border-neutral-800" />
                   <span className="relative z-10 py-1 px-2.5 text-[10px] font-bold leading-none text-white whitespace-nowrap bg-neutral-900 rounded-lg shadow-lg border border-neutral-800">
-                    Report Hazard
+                    {t("Report Hazard")}
                   </span>
                 </div>
               </div>
@@ -1132,8 +1180,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     ? 'bg-[#18181b] text-white shadow-xs'
                     : 'border border-neutral-200/80 bg-white hover:bg-neutral-50 text-neutral-700 shadow-2xs'
                 }`}
-                title="Quick Menu"
-                aria-label="Quick Menu"
+                title={t("Quick Menu")}
+                aria-label={t("Quick Menu")}
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
@@ -1143,7 +1191,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
                   <div className="w-1.5 h-1.5 -mb-0.5 rotate-45 bg-neutral-900 border-t border-l border-neutral-800" />
                   <span className="relative z-10 py-1 px-2.5 text-[10px] font-bold leading-none text-white whitespace-nowrap bg-neutral-900 rounded-lg shadow-lg border border-neutral-800">
-                    Menu
+                    {t("Menu")}
                   </span>
                 </div>
               )}
@@ -1213,7 +1261,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                         <div className="w-8 h-8 rounded-xl bg-neutral-50 group-hover:bg-red-100/70 text-neutral-600 group-hover:text-red-900 border border-neutral-100 group-hover:border-red-200/60 flex items-center justify-center transition-colors shadow-2xs shrink-0">
                           <BookOpen className="w-4 h-4" />
                         </div>
-                        <span className="truncate">Preparedness Guides</span>
+                        <span className="truncate">{t("Preparedness Guides")}</span>
                       </div>
                       <ChevronRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-red-900 transition-transform group-hover:translate-x-0.5 shrink-0" />
                     </button>
@@ -1230,7 +1278,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                         <div className="w-8 h-8 rounded-xl bg-neutral-50 group-hover:bg-red-100/70 text-neutral-600 group-hover:text-red-900 border border-neutral-100 group-hover:border-red-200/60 flex items-center justify-center transition-colors shadow-2xs shrink-0">
                           <HelpCircle className="w-4 h-4" />
                         </div>
-                        <span className="truncate">FAQs</span>
+                        <span className="truncate">{t("FAQs")}</span>
                       </div>
                       <ChevronRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-red-900 transition-transform group-hover:translate-x-0.5 shrink-0" />
                     </button>
@@ -1248,7 +1296,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           <div className="w-8 h-8 rounded-xl bg-neutral-50 group-hover:bg-red-100/70 text-neutral-600 group-hover:text-red-900 border border-neutral-100 group-hover:border-red-200/60 flex items-center justify-center transition-colors shadow-2xs shrink-0">
                             <UserCheck className="w-4 h-4" />
                           </div>
-                          <span className="truncate">Others Review</span>
+                          <span className="truncate">{t("Others Review")}</span>
                         </div>
                         <ChevronRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-red-900 transition-transform group-hover:translate-x-0.5 shrink-0" />
                       </button>
@@ -1267,7 +1315,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           <div className="w-8 h-8 rounded-xl bg-neutral-50 group-hover:bg-red-100/70 text-neutral-600 group-hover:text-red-900 border border-neutral-100 group-hover:border-red-200/60 flex items-center justify-center transition-colors shadow-2xs shrink-0">
                             <Users className="w-4 h-4" />
                           </div>
-                          <span className="truncate">Users Management</span>
+                          <span className="truncate">{t("Users Management")}</span>
                         </div>
                         <ChevronRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-red-900 transition-transform group-hover:translate-x-0.5 shrink-0" />
                       </button>
@@ -1286,7 +1334,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           <div className="w-8 h-8 rounded-xl bg-neutral-50 group-hover:bg-red-100/70 text-neutral-600 group-hover:text-red-900 border border-neutral-100 group-hover:border-red-200/60 flex items-center justify-center transition-colors shadow-2xs shrink-0">
                             <FileText className="w-4 h-4" />
                           </div>
-                          <span className="truncate">Audit Log</span>
+                          <span className="truncate">{t("Audit Log")}</span>
                         </div>
                         <ChevronRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-red-900 transition-transform group-hover:translate-x-0.5 shrink-0" />
                       </button>
@@ -1307,7 +1355,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                         <span className="truncate">Offline Data &amp; Sync</span>
                       </div>
                       <span className="text-[10px] font-mono font-bold text-red-900 bg-red-50 border border-red-900/20 px-2.5 py-0.5 rounded-full shrink-0">
-                        Ready
+                        {t("Ready")}
                       </span>
                     </button>
                   </div>
@@ -1326,7 +1374,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           <div className="w-8 h-8 rounded-xl bg-red-50 group-hover:bg-red-100 text-red-900 border border-red-100 flex items-center justify-center shrink-0">
                             <LogOut className="w-4 h-4 text-red-900" />
                           </div>
-                          <span>Sign Out</span>
+                          <span>{t("Sign Out")}</span>
                         </div>
                         <LogOut className="w-3.5 h-3.5 text-red-900/60 group-hover:text-red-900 transition-colors shrink-0" />
                       </button>
@@ -1355,7 +1403,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                      Push Notification Log
+                      {t("Push Notification Log")}
                     </h2>
                     {unreadLguCount > 0 && (
                       <span className="px-2 py-0.5 rounded-full bg-rose-100 text-[#991B1B] text-[10px] font-black">
@@ -1364,7 +1412,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Every alert delivered to citizen devices and incoming SOS distress pings.
+                    {t("Every alert delivered to citizen devices and incoming SOS distress pings.")}
                   </p>
                 </div>
               </div>
@@ -1379,13 +1427,13 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   }`}
                 >
                   <Check className="w-3.5 h-3.5" />
-                  <span>{hasMarkedRead ? 'All Read' : 'Mark All Read'}</span>
+                  <span>{hasMarkedRead ? t('All Read') : t('Mark All Read')}</span>
                 </button>
 
                 <button
                   onClick={() => setIsAllNotificationsModalOpen(false)}
                   className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                  aria-label="Close modal"
+                  aria-label={t("Close modal")}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1400,7 +1448,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   type="text"
                   value={notifSearchQuery}
                   onChange={(e) => setNotifSearchQuery(e.target.value)}
-                  placeholder="Filter by resident name, phone number, or barangay..."
+                  placeholder={t("Filter by resident name, phone number, or barangay...")}
                   className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#991B1B]/20 focus:border-[#991B1B]"
                 />
                 {notifSearchQuery && (
@@ -1442,8 +1490,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               {filteredLguNotifications.length === 0 ? (
                 <div className="p-8 text-center bg-white rounded-xl border border-slate-200/80">
                   <Bell className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-slate-700">No notifications match your filter</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Try clearing your search query or tab selection.</p>
+                  <p className="text-xs font-bold text-slate-700">{t("No notifications match your filter")}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{t("Try clearing your search query or tab selection.")}</p>
                 </div>
               ) : (
                 filteredLguNotifications.map((item) => (
@@ -1463,11 +1511,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                             </span>
                             {!item.isRead ? (
                               <span className="px-1.5 py-0.2 rounded-md bg-rose-100 text-[#991B1B] text-[9px] font-black uppercase tracking-wider border border-rose-200/70">
-                                NEW
+                                {t("NEW")}
                               </span>
                             ) : (
                               <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wider border border-slate-200">
-                                READ
+                                {t("READ")}
                               </span>
                             )}
                           </div>
@@ -1501,7 +1549,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                           className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200 text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
                         >
                           <PhoneCall className="w-3 h-3" />
-                          <span>Call Resident</span>
+                          <span>{t("Call Resident")}</span>
                         </a>
 
                         {setActiveTab && (
@@ -1526,14 +1574,14 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             <div className="p-3 sm:p-4 bg-white border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-slate-500 text-[11px]">
                 <Radio className="w-3.5 h-3.5 text-[#991B1B] animate-pulse shrink-0" />
-                <span>Alerts are delivered even when the app is closed. History persists on this device.</span>
+                <span>{t("Alerts are delivered even when the app is closed. History persists on this device.")}</span>
               </div>
 
               <button
                 onClick={() => setIsAllNotificationsModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer self-end sm:self-auto"
               >
-                Close
+                {t("Close")}
               </button>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRepo } from '../hooks/useRepo';
 import { telHref } from '../lib/util';
@@ -234,7 +235,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 Evacuation Directory & Live Status
               </h3>
               <p className="text-xs text-neutral-500 mt-0.5">
-                Real-time intake capacities, facility amenities, and driving routes across Lingayen
+                {t("Real-time intake capacities, facility amenities, and driving routes across Lingayen")}
               </p>
             </div>
 
@@ -255,7 +256,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                     : 'bg-white text-neutral-700 border border-neutral-200 hover:border-red-900/40 hover:bg-red-50/30'
                 }`}
               >
-                <span>All</span>
+                <span>{t("All")}</span>
                 <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
                   residentFilter === 'all' ? 'bg-white/20 text-white' : 'bg-neutral-100 text-neutral-700'
                 }`}>
@@ -271,7 +272,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                     : 'bg-white text-neutral-700 border border-neutral-200 hover:border-red-900/40 hover:bg-red-50/30'
                 }`}
               >
-                <span>Open</span>
+                <span>{t("Open")}</span>
                 <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
                   residentFilter === 'open' ? 'bg-white/20 text-white' : 'bg-neutral-100 text-neutral-700'
                 }`}>
@@ -287,7 +288,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                     : 'bg-white text-neutral-700 border border-neutral-200 hover:border-red-900/40 hover:bg-red-50/30'
                 }`}
               >
-                <span>Full</span>
+                <span>{t("Full")}</span>
                 <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
                   residentFilter === 'full' ? 'bg-white/20 text-white' : 'bg-neutral-100 text-neutral-700'
                 }`}>
@@ -303,7 +304,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                     : 'bg-white text-neutral-700 border border-neutral-200 hover:border-red-900/40 hover:bg-red-50/30'
                 }`}
               >
-                <span>Closed</span>
+                <span>{t("Closed")}</span>
                 <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
                   residentFilter === 'closed' ? 'bg-white/20 text-white' : 'bg-neutral-100 text-neutral-700'
                 }`}>
@@ -320,7 +321,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                   type="text"
                   value={residentSearchQuery}
                   onChange={(e) => setResidentSearchQuery(e.target.value)}
-                  placeholder="Search shelter name or street..."
+                  placeholder={t("Search shelter name or street...")}
                   className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-neutral-200 rounded-xl focus:border-red-900 focus:outline-hidden transition-colors"
                 />
                 {residentSearchQuery && (
@@ -338,7 +339,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 onChange={(e) => setResidentSelectedBarangay(e.target.value)}
                 className="py-2 px-3 text-xs bg-white border border-neutral-200 rounded-xl focus:border-red-900 focus:outline-hidden text-neutral-700 font-medium cursor-pointer"
               >
-                <option value="all">All Barangays</option>
+                <option value="all">{t("All Barangays")}</option>
                 {barangays.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
@@ -353,8 +354,8 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
             {filteredResidentShelters.length === 0 ? (
               <div className="text-center py-12 text-neutral-400 space-y-2">
                 <Building2 className="w-10 h-10 mx-auto text-neutral-300" />
-                <p className="text-sm font-semibold text-neutral-600">No evacuation centers match your search</p>
-                <p className="text-xs text-neutral-400">Try adjusting your filter or search query</p>
+                <p className="text-sm font-semibold text-neutral-600">{t("No evacuation centers match your search")}</p>
+                <p className="text-xs text-neutral-400">{t("Try adjusting your filter or search query")}</p>
                 <button
                   onClick={() => {
                     setResidentFilter('all');
@@ -363,7 +364,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                   }}
                   className="mt-2 text-xs font-bold text-red-900 hover:underline cursor-pointer"
                 >
-                  Clear all filters
+                  {t("Clear all filters")}
                 </button>
               </div>
             ) : (
@@ -470,7 +471,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                           className="flex-1 bg-red-900 hover:bg-red-800 text-white py-2.5 px-3 rounded-xl text-xs font-bold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                         >
                           <Compass className="w-3.5 h-3.5" />
-                          <span>Navigate with Waze</span>
+                          <span>{t("Navigate with Waze")}</span>
                         </button>
 
                         <button
@@ -480,7 +481,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                             setTimeout(() => setSavedOfflineNotice(null), 3000);
                           }}
                           className="w-10 h-10 rounded-xl bg-white hover:bg-red-50 text-red-900 border border-red-900/20 flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
-                          title="Download offline coordinates"
+                          title={t("Download offline coordinates")}
                         >
                           <Download className="w-4 h-4" />
                         </button>
@@ -489,7 +490,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                           <button
                             onClick={() => onSelectOnMap(rawCenter)}
                             className="w-10 h-10 rounded-xl bg-white hover:bg-red-50 text-red-900 border border-red-900/20 flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
-                            title="View shelter on Map"
+                            title={t("View shelter on Map")}
                           >
                             <MapPin className="w-4 h-4" />
                           </button>
@@ -522,12 +523,12 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
           <h1 className={`text-xl sm:text-2xl font-semibold tracking-tight ${
             isBarangay ? 'text-[#011025]' : 'text-neutral-900'
           }`}>
-            Evacuation Centers
+            {t("Evacuation Centers")}
           </h1>
           <p className={`text-xs sm:text-sm mt-0.5 max-w-2xl leading-relaxed ${
             isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'
           }`}>
-            Keep capacity and availability accurate so residents arrive at a shelter with space.
+            {t("Keep capacity and availability accurate so residents arrive at a shelter with space.")}
           </p>
         </div>
 
@@ -546,7 +547,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 : isBarangay ? 'text-[#5482B4] hover:text-[#011025] hover:bg-[#C2E8FF]/40' : 'text-neutral-600 hover:text-neutral-900 hover:bg-white/60'
             }`}
           >
-            <span>All</span>
+            <span>{t("All")}</span>
             <span
               className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
                 statusFilter === 'all'
@@ -613,7 +614,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by shelter name, barangay, or hash ID..."
+            placeholder={t("Search by shelter name, barangay, or hash ID...")}
             className={`w-full pl-10 pr-9 py-2.5 text-xs font-medium rounded-full focus:outline-hidden transition-all shadow-2xs ${
               isBarangay
                 ? 'text-[#011025] placeholder-[#5482B4]/60 bg-[#C2E8FF]/10 hover:bg-[#C2E8FF]/20 focus:bg-white border border-[#7EA0C5]/30 focus:border-[#052659] focus:ring-2 focus:ring-[#C2E8FF]'
@@ -642,7 +643,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 : 'text-neutral-800 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-white border border-neutral-200 focus:border-neutral-400'
             }`}
           >
-            <option value="all">All Barangays</option>
+            <option value="all">{t("All Barangays")}</option>
             {barangays.map((b) => (
               <option key={b.id} value={b.id}>
                 Brgy. {b.name}
@@ -670,14 +671,14 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
             }`}>
               <h2 className={`text-sm font-semibold uppercase tracking-wide flex items-center gap-2 ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
                 <TrendingUp className="w-4 h-4" />
-                Occupancy Trend
+                {t("Occupancy Trend")}
               </h2>
               <span className={`text-[11px] font-mono ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
                 {last.occupancy} of {last.capacity} places used on the latest day
               </span>
             </div>
             <div className="px-5 sm:px-6 py-4">
-              <div className="h-28 flex items-end gap-1.5" role="img" aria-label="Daily evacuees against capacity">
+              <div className="h-28 flex items-end gap-1.5" role="img" aria-label={t("Daily evacuees against capacity")}>
                 {points.map((p) => (
                   <div key={p.day} className="flex-1 h-full flex items-end relative group" title={`${p.day}: ${p.occupancy} of ${p.capacity}`}>
                     <div
@@ -734,7 +735,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                         ? 'bg-[#C2E8FF]/60 text-[#052659] border border-[#7EA0C5]/40'
                         : 'bg-neutral-100 text-neutral-800 border border-neutral-200'
                     }`}>
-                      OPEN
+                      {t("OPEN")}
                     </span>
                   )}
                   {center.status === 'full' && (
@@ -743,7 +744,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                         ? 'bg-[#052659] text-white border border-[#011025]/40'
                         : 'bg-[#18181b] text-white'
                     }`}>
-                      FULL
+                      {t("FULL")}
                     </span>
                   )}
                   {center.status === 'closed' && (
@@ -752,7 +753,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                         ? 'bg-[#5482B4] text-white border border-[#5482B4]'
                         : 'bg-[#70757a] text-white'
                     }`}>
-                      CLOSED
+                      {t("CLOSED")}
                     </span>
                   )}
                 </div>
@@ -790,7 +791,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 {/* Occupancy Header & Metrics matching draft */}
                 <div className="space-y-1.5 pt-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className={`font-medium ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-600'}`}>Occupancy</span>
+                    <span className={`font-medium ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-600'}`}>{t("Occupancy")}</span>
                     <span className={`font-mono font-semibold ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
                       {center.current_occupancy} / {center.capacity} &bull; {percent}%
                     </span>
@@ -872,7 +873,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                         : isBarangay ? 'text-[#5482B4] hover:text-[#011025] hover:bg-[#C2E8FF]/40' : 'text-neutral-600 hover:text-neutral-900 hover:bg-white/60'
                     }`}
                   >
-                    Open
+                    {t("Open")}
                   </button>
 
                   <button
@@ -883,7 +884,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                         : isBarangay ? 'text-[#5482B4] hover:text-[#011025] hover:bg-[#C2E8FF]/40' : 'text-neutral-600 hover:text-neutral-900 hover:bg-white/60'
                     }`}
                   >
-                    Full
+                    {t("Full")}
                   </button>
 
                   <button
@@ -894,7 +895,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                         : isBarangay ? 'text-[#5482B4] hover:text-[#011025] hover:bg-[#C2E8FF]/40' : 'text-neutral-600 hover:text-neutral-900 hover:bg-white/60'
                     }`}
                   >
-                    Closed
+                    {t("Closed")}
                   </button>
                 </div>
 
@@ -908,7 +909,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                   }`}
                 >
                   <Navigation className="w-3.5 h-3.5" />
-                  <span>Navigate with Waze</span>
+                  <span>{t("Navigate with Waze")}</span>
                 </button>
 
                 {/* Secondary Utility Actions: Edit Occupancy & Pin on Map */}
@@ -920,7 +921,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                     }`}
                   >
                     <Edit3 className="w-3 h-3" />
-                    <span>Edit Shelter</span>
+                    <span>{t("Edit Shelter")}</span>
                   </button>
 
                   {onSelectOnMap && (
@@ -961,7 +962,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
             <h3 className={`font-semibold text-base mb-1 ${
               isBarangay ? 'text-[#011025]' : 'text-neutral-900'
             }`}>
-              Update Evacuation Shelter
+              {t("Update Evacuation Shelter")}
             </h3>
             <p className={`text-xs mb-4 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
               {editingCenter.name}
@@ -971,7 +972,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
               <div>
                 <label className={`block text-xs font-semibold mb-1 ${
                   isBarangay ? 'text-[#052659]' : 'text-neutral-700'
-                }`}>Shelter Status</label>
+                }`}>{t("Shelter Status")}</label>
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value as EvacuationStatus)}
@@ -983,7 +984,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 >
                   <option value="open">Open (Available)</option>
                   <option value="full">Full (At Max Capacity)</option>
-                  <option value="closed">Closed</option>
+                  <option value="closed">{t("Closed")}</option>
                 </select>
               </div>
 
@@ -1010,7 +1011,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
               <div>
                 <span className={`block text-xs font-semibold mb-1 ${
                   isBarangay ? 'text-[#052659]' : 'text-neutral-700'
-                }`}>Facilities</span>
+                }`}>{t("Facilities")}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {FACILITY_PRESETS.map((f) => {
                     const on = editFacilities.includes(f);
@@ -1035,7 +1036,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                   type="text"
                   value={editOtherFacilities}
                   onChange={(e) => setEditOtherFacilities(e.target.value)}
-                  placeholder="Other facilities, separated by commas"
+                  placeholder={t("Other facilities, separated by commas")}
                   className={`mt-2 w-full text-xs p-2.5 rounded-xl outline-hidden transition-all ${
                     isBarangay
                       ? 'bg-[#C2E8FF]/10 text-[#011025] border border-[#7EA0C5]/40 focus:bg-white focus:border-[#052659]'
@@ -1048,8 +1049,8 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 <div>
                   <label className={`block text-xs font-semibold mb-1 ${
                   isBarangay ? 'text-[#052659]' : 'text-neutral-700'
-                }`}>Contact person</label>
-                  <input type="text" value={editContactPerson} onChange={(e) => setEditContactPerson(e.target.value)} placeholder="Camp manager" className={`w-full text-xs p-2.5 rounded-xl outline-hidden transition-all ${
+                }`}>{t("Contact person")}</label>
+                  <input type="text" value={editContactPerson} onChange={(e) => setEditContactPerson(e.target.value)} placeholder={t("Camp manager")} className={`w-full text-xs p-2.5 rounded-xl outline-hidden transition-all ${
                     isBarangay
                       ? 'bg-[#C2E8FF]/10 text-[#011025] border border-[#7EA0C5]/40 focus:bg-white focus:border-[#052659]'
                       : 'bg-neutral-50/70 border border-neutral-200 focus:bg-white focus:border-neutral-400'
@@ -1058,7 +1059,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 <div>
                   <label className={`block text-xs font-semibold mb-1 ${
                   isBarangay ? 'text-[#052659]' : 'text-neutral-700'
-                }`}>Contact number</label>
+                }`}>{t("Contact number")}</label>
                   <input type="tel" inputMode="tel" value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)} placeholder="0917 000 0000" className={`w-full text-xs p-2.5 rounded-xl outline-hidden transition-all ${
                     isBarangay
                       ? 'bg-[#C2E8FF]/10 text-[#011025] border border-[#7EA0C5]/40 focus:bg-white focus:border-[#052659]'
@@ -1077,7 +1078,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                     isBarangay ? 'text-[#5482B4] hover:bg-[#C2E8FF]/30' : 'text-neutral-600 hover:bg-neutral-100'
                   }`}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
                 <button
                   type="submit"
@@ -1085,7 +1086,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                     isBarangay ? 'bg-[#052659] hover:bg-[#031c42] border border-[#011025]/20' : 'bg-[#18181b] hover:bg-neutral-800'
                   }`}
                 >
-                  Save Updates
+                  {t("Save Updates")}
                 </button>
               </div>
             </form>

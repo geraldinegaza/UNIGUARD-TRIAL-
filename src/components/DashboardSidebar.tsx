@@ -26,10 +26,12 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Truck
+  Truck,
+  Settings
 } from 'lucide-react';
 import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
+import { t } from '../lib/i18n';
 import * as repo from '../services/repo';
 import { relTime } from '../lib/util';
 import { TriadEmblem, UniGuardLockup, portalForRole } from '../brand';
@@ -189,6 +191,13 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       icon: PhoneCall,
       badge: null,
     },
+    {
+      id: 'settings',
+      label: 'Settings',
+      shortLabel: 'Settings',
+      icon: Settings,
+      badge: null,
+    },
   ];
 
   // Navigation Items for Admin and Operations Staff (matching initial draft screenshot)
@@ -338,7 +347,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                       : 'bg-[#2A2A2A] text-white'
                   }`}
                 >
-                  <span className="[text-overflow:clip]">{item.label}</span>
+                  <span className="[text-overflow:clip]">{t(item.label)}</span>
                   {item.badge && (
                     <span className="bg-white/20 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0">
                       {item.badge}
@@ -359,7 +368,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                       : 'text-gray-600 hover:text-gray-900 hover:bg-black/5'
                   }`}
                 >
-                  <span className="[text-overflow:clip]">{item.label}</span>
+                  <span className="[text-overflow:clip]">{t(item.label)}</span>
                   {item.badge && (
                     <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded-full shrink-0 ${
                       isBarangay
@@ -681,6 +690,20 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   <span>Offline Sync</span>
                 </button>
 
+                {/* Settings: alerts, language, offline, templates */}
+                <button
+                  onClick={() => {
+                    setActiveTab('settings');
+                    setIsMenuOpen(false);
+                  }}
+                  className={`w-full px-3 py-2 text-left text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
+                    isBarangay ? 'text-[#011025] hover:bg-[#C2E8FF]/30' : 'text-neutral-700 hover:bg-neutral-100'
+                  }`}
+                >
+                  <Settings className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
+                  <span>{t('Settings')}</span>
+                </button>
+
                 {onSignOut && (
                   <div className={`pt-1 border-t mt-1 ${isBarangay ? 'border-[#7EA0C5]/20' : 'border-gray-100'}`}>
                     <button
@@ -794,8 +817,8 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                       ? 'bg-white text-[#991B1B] shadow-[0_4px_16px_rgba(0,0,0,0.15)] font-bold'
                       : 'text-white/85 hover:text-white hover:bg-white/10'
                   }`}
-                  title={item.label}
-                  aria-label={item.label}
+                  title={t(item.label)}
+                  aria-label={t(item.label)}
                 >
                   <Icon className={`w-5 h-5 shrink-0 transition-colors ${
                     isActive ? 'text-[#991B1B]' : 'text-rose-100'
@@ -804,7 +827,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
                 {/* Floating Tooltip in minimized mode */}
                 <div className="opacity-0 group-hover:opacity-100 pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-black/90 text-white text-xs font-semibold rounded-lg shadow-xl whitespace-nowrap z-50 transition-opacity duration-150">
-                  {item.label}
+                  {t(item.label)}
                 </div>
               </div>
             );
@@ -833,7 +856,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                     ? isResident ? 'text-[#991B1B]' : 'text-white'
                     : isResident ? 'text-rose-100' : 'text-neutral-400'
                 }`} />
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">{t(item.label)}</span>
               </div>
 
               {item.badge && (

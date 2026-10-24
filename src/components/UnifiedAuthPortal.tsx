@@ -1,3 +1,4 @@
+import { t, useT } from '../lib/i18n';
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { UniGuardLogo } from './UniGuardLogo';
@@ -6,6 +7,7 @@ import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import { normalisePhone } from '../lib/util';
 import * as auth from '../services/auth';
+import { LINK_RETURN, cleanLinkFromUrl } from '../lib/emailLink';
 
 interface UnifiedAuthPortalProps {
   onLoginSuccess: (user: User) => void;
@@ -15,6 +17,7 @@ interface UnifiedAuthPortalProps {
 }
 
 export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuccess, recovery, onRecoveryDone }) => {
+  const { lang, setLang } = useT();
   const [viewMode, setViewMode] = useState<'login' | 'register' | 'forgot' | 'reset'>(recovery ? 'reset' : 'login');
 
   useEffect(() => {
@@ -36,7 +39,22 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regConsent, setRegConsent] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  // what an email link brought the person back with (Fix Pack F1)
+  const [notice, setNotice] = useState<string | null>(() =>
+    LINK_RETURN && LINK_RETURN.kind === 'confirmed' ? 'Your email is confirmed. You can now sign in.' : null
+  );
+  const [linkExpired, setLinkExpired] = useState(() => !!LINK_RETURN && LINK_RETURN.kind === 'expired');
+  useEffect(() => cleanLinkFromUrl(), []);
+  const handleResend = async () => {
+    if (!email.trim()) {
+      setErrorMessage('Enter your email address first, then tap "Send a new link".');
+      return;
+    }
+    await auth.resendConfirmation(email);
+    setLinkExpired(false);
+    setErrorMessage(null);
+    setNotice(`If ${email.trim()} is waiting for confirmation, a new link is on its way.`);
+  };
 
   // Forgot / reset password fields
   const [forgotEmail, setForgotEmail] = useState('');
@@ -173,10 +191,10 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
 
         {/* Faint civic watermark text matching the background in reference image */}
         <div className="absolute top-12 left-12 text-7xl md:text-9xl font-black text-rose-300/20 tracking-widest uppercase">
-          MDRRMO
+          {t("MDRRMO")}
         </div>
         <div className="absolute bottom-12 right-16 text-6xl md:text-8xl font-black text-rose-300/20 tracking-widest uppercase">
-          LINGAYEN
+          {t("LINGAYEN")}
         </div>
 
         {/* Light ambient rings */}
@@ -199,14 +217,14 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-2xl font-black tracking-tight text-slate-900">
-                    Uni<span className="text-red-600">Guard</span>
+                    {t("Uni")}<span className="text-red-600">{t("Guard")}</span>
                   </span>
                   <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
-                    Lingayen
+                    {t("Lingayen")}
                   </span>
                 </div>
                 <p className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
-                  Unified DRRM System
+                  {t("Unified DRRM System")}
                 </p>
               </div>
             </div>
@@ -223,11 +241,39 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
               </p>
             </div>
 
+            {/* Language (English / Filipino), remembered on this device */}
+            <div className="mb-4 flex justify-end">
+              <div className="inline-flex rounded-full border border-slate-200 p-0.5 text-[11px] font-bold" role="radiogroup" aria-label="Language / Wika">
+                {(['en', 'fil'] as const).map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    role="radio"
+                    aria-checked={lang === l}
+                    onClick={() => setLang(l)}
+                    className={`px-3 py-1 rounded-full cursor-pointer ${lang === l ? 'bg-[#D32F2F] text-white' : 'text-slate-600'}`}
+                  >
+                    {l === 'en' ? 'English' : 'Filipino'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Error Message */}
             {errorMessage && (
               <div className="mb-4 p-2.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-xs text-red-700">
                 <AlertTriangle className="w-4 h-4 text-[#D32F2F] shrink-0 mt-0.5" />
-                <span>{errorMessage}</span>
+                <span>{t(errorMessage)}</span>
+              </div>
+            )}
+
+            {/* An expired or reused email link */}
+            {linkExpired && viewMode === 'login' && (
+              <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
+                <p>{t("This confirmation link has expired or was already used. Sign in, or request a new link.")}</p>
+                <button type="button" onClick={handleResend} className="font-bold underline cursor-pointer">
+                  {t("Send a new link")}
+                </button>
               </div>
             )}
 
@@ -235,7 +281,7 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
             {notice && (
               <div className="mb-4 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-800">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{notice}</span>
+                <span>{t(notice)}</span>
               </div>
             )}
 
@@ -248,13 +294,13 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                 {/* E-mail Input (Minimal Clean Underline Style) */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    E-mail:
+                    {t("E-mail:")}
                   </label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. name@example.ph"
+                    placeholder={t("e.g. name@example.ph")}
                     required
                     className="w-full py-1.5 bg-transparent border-b-2 border-slate-200 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:border-[#D32F2F] transition-colors"
                   />
@@ -264,7 +310,7 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-semibold text-slate-700">
-                      Password:
+                      {t("Password:")}
                     </label>
                   </div>
                   <div className="relative">
@@ -292,7 +338,7 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                       onClick={() => setViewMode('forgot')}
                       className="text-[11px] font-semibold text-[#D32F2F] hover:text-[#B71C1C] hover:underline cursor-pointer"
                     >
-                      Forgot Password?
+                      {t("Forgot Password?")}
                     </button>
                   </div>
                 </div>
@@ -307,20 +353,20 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                     {isLoading ? (
                       <BrandLoader mode="inline" portal="auth" process="signin" variant="reverse" />
                     ) : (
-                      <span>Login</span>
+                      <span>{t("Login")}</span>
                     )}
                   </button>
                 </div>
 
                 {/* Bottom Sign Up Link */}
                 <div className="pt-2 text-xs text-slate-600">
-                  <span>Don't have an Account? </span>
+                  <span>{t("Don't have an Account?")} </span>
                   <button
                     type="button"
                     onClick={() => { setErrorMessage(null); setViewMode('register'); }}
                     className="font-bold text-[#D32F2F] hover:text-[#B71C1C] hover:underline cursor-pointer"
                   >
-                    Sign Up
+                    {t("Sign Up")}
                   </button>
                 </div>
 
@@ -334,13 +380,13 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
               <form onSubmit={handleRegister} className="space-y-2.5 sm:space-y-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-0.5">
-                    Full Name:
+                    {t("Full Name:")}
                   </label>
                   <input
                     type="text"
                     value={regFullName}
                     onChange={(e) => setRegFullName(e.target.value)}
-                    placeholder="e.g. Juan Dela Cruz"
+                    placeholder={t("e.g. Juan Dela Cruz")}
                     required
                     className="w-full py-1 bg-transparent border-b-2 border-slate-200 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:border-[#D32F2F]"
                   />
@@ -349,20 +395,20 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-0.5">
-                      E-mail:
+                      {t("E-mail:")}
                     </label>
                     <input
                       type="email"
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="name@example.ph"
+                      placeholder={t("name@example.ph")}
                       required
                       className="w-full py-1 bg-transparent border-b-2 border-slate-200 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:border-[#D32F2F]"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-0.5">
-                      Mobile Number:
+                      {t("Mobile Number:")}
                     </label>
                     <input
                       type="tel"
@@ -394,26 +440,26 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-0.5">
-                      Password:
+                      {t("Password:")}
                     </label>
                     <input
                       type="password"
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="At least 8 chars"
+                      placeholder={t("At least 8 chars")}
                       required
                       className="w-full py-1 bg-transparent border-b-2 border-slate-200 text-slate-800 text-sm focus:outline-none focus:border-[#D32F2F]"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-0.5">
-                      Confirm Password:
+                      {t("Confirm Password:")}
                     </label>
                     <input
                       type="password"
                       value={regConfirmPassword}
                       onChange={(e) => setRegConfirmPassword(e.target.value)}
-                      placeholder="Repeat password"
+                      placeholder={t("Repeat password")}
                       required
                       className="w-full py-1 bg-transparent border-b-2 border-slate-200 text-slate-800 text-sm focus:outline-none focus:border-[#D32F2F]"
                     />
@@ -428,7 +474,7 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                     className="mt-0.5 rounded border-slate-300 text-[#D32F2F] focus:ring-[#D32F2F]"
                   />
                   <span>
-                    I consent to the processing of emergency data under the Data Privacy Act of 2012.
+                    {t("I consent to the processing of emergency data under the Data Privacy Act of 2012.")}
                   </span>
                 </label>
 
@@ -438,18 +484,18 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                     disabled={isLoading}
                     className="px-8 py-2 bg-gradient-to-r from-[#D32F2F] to-[#E53935] hover:from-[#B71C1C] hover:to-[#D32F2F] text-white font-semibold rounded-xl shadow-lg shadow-red-700/25 transition-all text-sm cursor-pointer"
                   >
-                    <span>Create Account</span>
+                    <span>{t("Create Account")}</span>
                   </button>
                 </div>
 
                 <div className="pt-0.5 text-xs text-slate-600">
-                  <span>Already have an account? </span>
+                  <span>{t("Already have an account?")} </span>
                   <button
                     type="button"
                     onClick={() => { setErrorMessage(null); setViewMode('login'); }}
                     className="font-bold text-[#D32F2F] hover:text-[#B71C1C] hover:underline cursor-pointer"
                   >
-                    Sign In
+                    {t("Sign In")}
                   </button>
                 </div>
               </form>
@@ -461,17 +507,17 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
             {viewMode === 'forgot' && (
               <div className="space-y-4 py-2">
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Enter your registered email address and we'll dispatch password recovery instructions.
+                  {t("Enter your registered email address and we'll dispatch password recovery instructions.")}
                 </p>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    E-mail:
+                    {t("E-mail:")}
                   </label>
                   <input
                     type="email"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
-                    placeholder="e.g. name@example.ph"
+                    placeholder={t("e.g. name@example.ph")}
                     className="w-full py-1.5 bg-transparent border-b-2 border-slate-200 text-slate-800 text-sm focus:outline-none focus:border-[#D32F2F]"
                   />
                 </div>
@@ -481,7 +527,7 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                   disabled={isLoading}
                   className="px-6 py-2 bg-[#D32F2F] text-white font-semibold rounded-xl text-xs hover:bg-[#B71C1C]"
                 >
-                  Send Recovery Link
+                  {t("Send Recovery Link")}
                 </button>
                 <div>
                   <button
@@ -489,7 +535,7 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                     onClick={() => setViewMode('login')}
                     className="text-xs font-semibold text-slate-500 hover:text-[#D32F2F]"
                   >
-                    ← Back to Login
+                    {t("← Back to Login")}
                   </button>
                 </div>
               </div>
@@ -501,29 +547,29 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
             {viewMode === 'reset' && (
               <div className="space-y-4 py-2">
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Choose a new password for your account.
+                  {t("Choose a new password for your account.")}
                 </p>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    New Password:
+                    {t("New Password:")}
                   </label>
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="At least 8 chars"
+                    placeholder={t("At least 8 chars")}
                     className="w-full py-1.5 bg-transparent border-b-2 border-slate-200 text-slate-800 text-sm focus:outline-none focus:border-[#D32F2F]"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Confirm Password:
+                    {t("Confirm Password:")}
                   </label>
                   <input
                     type="password"
                     value={confirmNewPassword}
                     onChange={(e) => setConfirmNewPassword(e.target.value)}
-                    placeholder="Repeat password"
+                    placeholder={t("Repeat password")}
                     className="w-full py-1.5 bg-transparent border-b-2 border-slate-200 text-slate-800 text-sm focus:outline-none focus:border-[#D32F2F]"
                   />
                 </div>
@@ -533,7 +579,7 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
                   disabled={isLoading}
                   className="px-6 py-2 bg-[#D32F2F] text-white font-semibold rounded-xl text-xs hover:bg-[#B71C1C]"
                 >
-                  Update Password
+                  {t("Update Password")}
                 </button>
               </div>
             )}
@@ -541,7 +587,7 @@ export const UnifiedAuthPortal: React.FC<UnifiedAuthPortalProps> = ({ onLoginSuc
 
           {/* Subtext notice: LGU & Barangay access */}
           <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400">
-            <span className="font-semibold text-slate-600">Barangay officials and LGU staff:</span> Accounts are provisioned directly by the Lingayen MDRRMO administrator.
+            <span className="font-semibold text-slate-600">{t("Barangay officials and LGU staff:")}</span> {t("Accounts are provisioned directly by the Lingayen MDRRMO administrator.")}
           </div>
 
         </div>

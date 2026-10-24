@@ -87,3 +87,18 @@ export function removeFromQueue(id: number): Promise<void> {
     .then(() => undefined)
     .catch(() => undefined);
 }
+
+export function updateQueueRow(row: QueuedReport): Promise<void> {
+  return tx(STORE_QUEUE, 'readwrite', (s) => s.put(row))
+    .then(() => undefined)
+    .catch(() => undefined);
+}
+
+// One waiting SOS is enough: a newer tap within ten minutes replaces the
+// queued one with the fresher position instead of adding another.
+export async function upsertQueuedSos(item: Omit<QueuedReport, 'id' | 'queued_at'>): Promise<void> {
+  const rows = await listQueue();
+  const recent = rows.find((r) => r.kind === 'sos' && !r.failed && Date.now() - Date.parse(r.queued_at) < 10 * 60000);
+  if (recent) return updateQueueRow({ ...recent, ...item, id: recent.id, queued_at: new Date().toISOString() });
+  return enqueue(item);
+}

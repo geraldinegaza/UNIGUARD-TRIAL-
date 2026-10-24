@@ -1,5 +1,5 @@
 -- ============================================================================
---  UniGuard · per-role security test (after migrations 026 + 122-151)
+--  UniGuard · per-role security test (after migrations 026 + 122-152)
 --
 --  Impersonates each role and asserts what it can and cannot do. Everything
 --  runs inside one transaction that is rolled back, so nothing is written.
@@ -221,5 +221,33 @@ select pg_temp.ok((select status = 'verified' and verified_by_role = 'lgu_ldrrmc
                   'the LDRRMO verifies the overdue report, recorded as an LGU verification');
 select pg_temp.ok((select count(*) from public.lgu_escalation_queue where id = (select baay_report from t_rep)) = 0,
                   'a verified report leaves the overdue queue');
+
+-- ------------------------------------------------- Phase 4 (migration 152)
+select pg_temp.as_backend();
+set local role anon;
+select pg_temp.ok((public.org_profile() ->> 'contact') is not null, 'anyone can read the MDRRMO name and hotline');
+select pg_temp.as_backend();
+
+create temp table t_adv as select id from public.advisories where citywide limit 1;
+grant select on t_adv to authenticated;
+select pg_temp.as_user((select citizen from t_ids));
+select pg_temp.must_fail($$select public.fanout_advisory((select id from t_adv))$$,
+                         'a resident cannot re-send an advisory''s notifications');
+select pg_temp.ok((select count(*) from public.message_templates) = 0, 'a resident cannot read message templates');
+
+select pg_temp.as_user((select official from t_ids));
+select pg_temp.ok((select count(*) from public.message_templates) > 0, 'an official reads the message templates');
+select pg_temp.ok(pg_temp.rows_changed($$update public.message_templates set label = 'x' where true$$) = 0, 'an official cannot edit templates');
+
+select pg_temp.as_user((select lgu from t_ids));
+insert into public.message_templates (category, label, title_en, body_en) values ('general', 'Test template', 'Hello {barangay}', 'Body');
+select pg_temp.ok((select id like 'MT-%' from public.message_templates where label = 'Test template'), 'LDRRMO staff add a template and it gets an id');
+select pg_temp.ok(pg_temp.rows_changed($$update public.app_settings set value = value where key = 'main'$$) = 0,
+                  'LDRRMO staff cannot change the organisation profile');
+
+select pg_temp.as_user((select superadmin from t_ids));
+select pg_temp.ok(pg_temp.rows_changed($$update public.app_settings set value = jsonb_set(value, '{org,contact}', '"(075) 000-0000"') where key = 'main'$$) = 1,
+                  'the Super Admin changes the organisation profile');
+select pg_temp.ok((public.org_profile() ->> 'contact') = '(075) 000-0000', 'the new hotline is what residents see');
 
 rollback;

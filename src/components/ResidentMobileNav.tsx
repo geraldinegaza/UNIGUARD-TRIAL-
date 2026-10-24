@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Home,
@@ -10,6 +11,7 @@ import {
   LogOut,
   X,
   type LucideIcon,
+  Settings,
 } from 'lucide-react';
 import { User } from '../types';
 import { PortalTag } from '../brand';
@@ -53,7 +55,7 @@ export const ResidentTopTabs: React.FC<ResidentTopTabsProps> = ({ activeTab, set
     <div
       ref={stripRef}
       role="navigation"
-      aria-label="Sections"
+      aria-label={t("Sections")}
       className="md:hidden flex-1 min-w-0 flex overflow-x-auto no-scrollbar"
     >
       {/* centred between the emblem and the buttons; scrolls if a phone is too narrow */}
@@ -70,7 +72,7 @@ export const ResidentTopTabs: React.FC<ResidentTopTabsProps> = ({ activeTab, set
                 active ? 'font-extrabold text-neutral-900' : 'font-semibold text-neutral-400'
               }`}
             >
-              {item.label}
+              {t(item.label)}
               <span
                 aria-hidden="true"
                 className={`absolute left-1/2 -translate-x-1/2 bottom-1 h-[3px] rounded-full bg-[#991B1B] transition-all duration-200 ${
@@ -96,6 +98,7 @@ const BAR_RIGHT: { id: string; label: string; icon: LucideIcon }[] = [{ id: 'hot
 const MENU_ITEMS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'offline_sync', label: 'Offline Sync', icon: Download },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 interface ResidentBottomNavProps {
@@ -141,8 +144,7 @@ export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab,
   const slot = (
     item: { id: string; label: string; icon: LucideIcon },
     active: boolean,
-    onClick: () => void,
-    extra?: React.ButtonHTMLAttributes<HTMLButtonElement>
+    onClick: () => void, extra?: React.ButtonHTMLAttributes<HTMLButtonElement>
   ) => {
     const Icon = item.icon;
     return (
@@ -165,14 +167,14 @@ export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab,
             active ? 'font-extrabold text-[#991B1B]' : 'font-medium text-neutral-500'
           }`}
         >
-          {item.label}
+          {t(item.label)}
         </span>
       </button>
     );
   };
 
   return (
-    <nav aria-label="Emergency essentials" className="md:hidden shrink-0 relative z-30 px-2 pb-2 pt-7 -mt-7 pointer-events-none">
+    <nav aria-label={t("Emergency essentials")} className="md:hidden shrink-0 relative z-30 px-2 pb-2 pt-7 -mt-7 pointer-events-none">
       <div className="pointer-events-auto relative flex items-stretch rounded-[26px] bg-white px-1 border border-red-100 shadow-[0_8px_28px_-10px_rgba(74,13,18,0.3)]">
         {BAR_LEFT.map((item) => {
           const active = !isMenuOpen && isActive(item.id);
@@ -187,7 +189,7 @@ export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab,
             setIsMenuOpen(false);
             onSos();
           }}
-          aria-label="Emergency SOS"
+          aria-label={t("Emergency SOS")}
           className="group relative flex-1 min-w-0 h-[62px] flex flex-col items-center justify-end pb-[9px] cursor-pointer select-none"
         >
           <span
@@ -197,7 +199,7 @@ export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab,
           <span className="absolute left-1/2 -translate-x-1/2 -top-[14px] w-[52px] h-[52px] rounded-full flex items-center justify-center text-white bg-gradient-to-b from-[#B4232A] to-[#7F1D1D] shadow-[0_6px_14px_-4px_rgba(127,29,29,0.55)] group-active:scale-95 transition-transform">
             <AlertTriangle className="w-[22px] h-[22px]" strokeWidth={2.3} />
           </span>
-          <span className="relative text-[11px] leading-none font-extrabold tracking-wide text-[#991B1B]">SOS</span>
+          <span className="relative text-[11px] leading-none font-extrabold tracking-wide text-[#991B1B]">{t("SOS")}</span>
         </button>
 
         {BAR_RIGHT.map((item) => {
@@ -226,7 +228,7 @@ export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab,
         id="resident-mobile-menu"
         role="dialog"
         aria-modal="true"
-        aria-label="Menu"
+        aria-label={t("Menu")}
         inert={!isMenuOpen}
         onTouchStart={onDrawerTouchStart}
         onTouchEnd={onDrawerTouchEnd}
@@ -250,7 +252,7 @@ export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab,
           <button
             type="button"
             onClick={() => setIsMenuOpen(false)}
-            aria-label="Close menu"
+            aria-label={t("Close menu")}
             className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center cursor-pointer text-[#991B1B] bg-red-50 active:bg-red-100"
           >
             <X className="w-5 h-5" />
@@ -272,7 +274,7 @@ export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab,
                 }`}
               >
                 <Icon className={`w-[22px] h-[22px] shrink-0 ${active ? 'text-white' : 'text-[#991B1B]'}`} strokeWidth={1.8} />
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">{t(item.label)}</span>
               </button>
             );
           })}
@@ -289,7 +291,7 @@ export const ResidentBottomNav: React.FC<ResidentBottomNavProps> = ({ activeTab,
               className="w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold cursor-pointer text-[#991B1B] bg-red-50 border border-red-100 active:bg-red-100"
             >
               <LogOut className="w-4 h-4" />
-              <span>Sign Out</span>
+              <span>{t("Sign Out")}</span>
             </button>
           </div>
         )}

@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useState, useMemo } from 'react';
 import {
   X,
@@ -211,10 +212,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             </div>
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-extrabold text-neutral-900 tracking-tight leading-tight">
-                Report a Hazard
+                {t("Report a Hazard")}
               </h2>
               <p className="text-xs text-neutral-500 mt-0.5 leading-snug truncate">
-                Dispatched to <span className="font-extrabold text-red-900">Lingayen MDRRMO</span> &amp; Brgy. {selectedBarangayName}
+                {t("Dispatched to")} <span className="font-extrabold text-red-900">{t("Lingayen MDRRMO")}</span> &amp; Brgy. {selectedBarangayName}
               </p>
             </div>
           </div>
@@ -224,7 +225,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               type="button"
               onClick={onClose}
               className="p-2 rounded-2xl text-neutral-400 hover:text-neutral-800 hover:bg-neutral-100 transition-colors cursor-pointer"
-              aria-label="Close modal"
+              aria-label={t("Close modal")}
             >
               <X className="w-4 h-4" />
             </button>
@@ -242,7 +243,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               <div className="space-y-0.5">
                 <p className="font-bold text-xs text-red-950">Offline Resilience Active (PWA Caching)</p>
                 <p className="text-red-900/90 text-xs leading-relaxed font-medium">
-                  Your report will be stored securely in the device's local outbox and synced as soon as connectivity resumes.
+                  {t("Your report will be stored securely in the device's local outbox and synced as soon as connectivity resumes.")}
                 </p>
               </div>
             </div>
@@ -259,7 +260,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   Existing {hazardType} Report Detected Nearby ({nearbyDuplicates.length} active)
                 </p>
                 <p className="text-neutral-600 text-xs leading-relaxed font-medium">
-                  A matching hazard is already active in this sector. You may proceed with an independent ground report.
+                  {t("A matching hazard is already active in this sector. You may proceed with an independent ground report.")}
                 </p>
               </div>
             </div>
@@ -271,10 +272,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             <div className="bg-white rounded-3xl border border-neutral-100/90 p-5 sm:p-6 space-y-4 shadow-sm">
               <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-900">
-                  Hazard Details
+                  {t("Hazard Details")}
                 </h3>
                 <span className="text-[10px] font-mono font-bold text-red-900 bg-red-50 border border-red-900/20 px-2.5 py-0.5 rounded-full">
-                  Step 1 of 2
+                  {t("Step 1 of 2")}
                 </span>
               </div>
 
@@ -283,7 +284,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 {/* HAZARD TYPE */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">
-                    Hazard Type
+                    {t("Hazard Type")}
                   </label>
                   <div className="relative">
                     <select
@@ -305,7 +306,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       required
                       value={hazardOther}
                       onChange={(e) => setHazardOther(e.target.value)}
-                      placeholder="What is the hazard?"
+                      placeholder={t("What is the hazard?")}
                       className="w-full text-xs sm:text-sm font-medium p-3.5 bg-neutral-50/60 border border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:ring-2 focus:ring-red-900/20 focus:border-red-900 focus:bg-white focus:outline-none rounded-2xl shadow-xs leading-relaxed transition-all"
                     />
                   )}
@@ -314,7 +315,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 {/* BARANGAY JURISDICTION */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">
-                    Barangay Sector
+                    {t("Barangay Sector")}
                   </label>
                   <div className="relative">
                     <select
@@ -336,7 +337,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               {/* HOW URGENT DOES IT LOOK */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500">
-                  Urgency Level
+                  {t("Urgency Level")}
                 </label>
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Option 1: Looks Minor */}
@@ -354,7 +355,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       <span className={`w-1.5 h-3 rounded-full ${urgency === 'minor' ? 'bg-white/30' : 'bg-neutral-200'}`} />
                       <span className={`w-1.5 h-3 rounded-full ${urgency === 'minor' ? 'bg-white/30' : 'bg-neutral-200'}`} />
                     </div>
-                    <span>Looks Minor</span>
+                    <span>{t("Looks Minor")}</span>
                   </button>
 
                   {/* Option 2: Getting Worse */}
@@ -372,7 +373,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       <span className={`w-1.5 h-3 rounded-full ${urgency === 'worse' ? 'bg-white' : 'bg-red-800'}`} />
                       <span className={`w-1.5 h-3 rounded-full ${urgency === 'worse' ? 'bg-white/30' : 'bg-neutral-200'}`} />
                     </div>
-                    <span>Getting Worse</span>
+                    <span>{t("Getting Worse")}</span>
                   </button>
 
                   {/* Option 3: People at Risk */}
@@ -390,7 +391,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       <span className={`w-1.5 h-3 rounded-full ${urgency === 'risk' ? 'bg-white' : 'bg-red-900'}`} />
                       <span className={`w-1.5 h-3 rounded-full ${urgency === 'risk' ? 'bg-white' : 'bg-red-900'}`} />
                     </div>
-                    <span>People at Risk</span>
+                    <span>{t("People at Risk")}</span>
                   </button>
                 </div>
               </div>
@@ -404,12 +405,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe what you are seeing: water depth (knee or waist high), affected roads, trapped families, or nearby landmarks."
+                  placeholder={t("Describe what you are seeing: water depth (knee or waist high), affected roads, trapped families, or nearby landmarks.")}
                   rows={3}
                   className="w-full text-xs sm:text-sm font-medium p-3.5 bg-neutral-50/60 border border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:ring-2 focus:ring-red-900/20 focus:border-red-900 focus:bg-white focus:outline-none rounded-2xl shadow-xs leading-relaxed transition-all"
                 />
                 <p className="text-[11px] text-neutral-400 leading-snug">
-                  Landmark references help Lingayen rescue teams pinpoint the exact scene.
+                  {t("Landmark references help Lingayen rescue teams pinpoint the exact scene.")}
                 </p>
               </div>
             </div>
@@ -420,10 +421,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               <div className="bg-white rounded-3xl border border-neutral-100/90 p-5 space-y-3 flex flex-col justify-between shadow-sm">
                 <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-900">
-                    Photo Evidence
+                    {t("Photo Evidence")}
                   </h3>
                   <span className="text-[10px] font-mono font-bold text-neutral-400">
-                    Optional
+                    {t("Optional")}
                   </span>
                 </div>
 
@@ -433,10 +434,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     <Camera className="w-5 h-5 text-red-900" />
                   </div>
                   <span className="text-xs font-bold text-neutral-800 group-hover:text-red-900 transition-colors leading-tight">
-                    Attach Hazard Photo
+                    {t("Attach Hazard Photo")}
                   </span>
                   <span className="text-[10px] text-neutral-400 mt-0.5">
-                    JPG or PNG up to 10 MB
+                    {t("JPG or PNG up to 10 MB")}
                   </span>
                   <input
                     type="file"
@@ -452,14 +453,14 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   <div className="relative inline-block w-full">
                     <img
                       src={photoUrl}
-                      alt="Hazard preview"
+                      alt={t("Hazard preview")}
                       className="w-full h-20 object-cover rounded-xl border border-neutral-200 shadow-xs"
                     />
                     <button
                       type="button"
                       onClick={clearPhoto}
                       className="absolute top-1.5 right-1.5 bg-neutral-900/80 hover:bg-neutral-900 text-white rounded-full p-1 text-xs shadow-md cursor-pointer transition active:scale-90"
-                      title="Remove photo"
+                      title={t("Remove photo")}
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -471,10 +472,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               <div className="bg-white rounded-3xl border border-neutral-100/90 p-5 space-y-3 flex flex-col justify-between shadow-sm">
                 <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-900">
-                    Incident Coordinates
+                    {t("Incident Coordinates")}
                   </h3>
                   <span className="text-[10px] font-mono font-bold text-red-900 bg-red-50 border border-red-900/20 px-2 py-0.5 rounded-full">
-                    GPS Tag
+                    {t("GPS Tag")}
                   </span>
                 </div>
 
@@ -497,7 +498,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                           : 'Not acquired'}
                       </p>
                       <p className="text-[10px] text-neutral-400 truncate mt-0.5">
-                        High-accuracy ground position
+                        {t("High-accuracy ground position")}
                       </p>
                     </div>
                   </div>
@@ -531,14 +532,14 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 {/* Info Rows: Barangay queue & Verification */}
                 <div className="space-y-1.5 pt-1 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-neutral-500 text-[11px]">Target Dispatch</span>
+                    <span className="font-medium text-neutral-500 text-[11px]">{t("Target Dispatch")}</span>
                     <span className="font-bold text-neutral-900 text-[11px]">
                       Brgy. {selectedBarangayName}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-neutral-500 text-[11px]">Crowd Verification</span>
+                    <span className="font-medium text-neutral-500 text-[11px]">{t("Crowd Verification")}</span>
                     <span className="font-bold font-mono text-red-900 text-[11px]">
                       {CONFIG.CORROBORATION_THRESHOLD} corroborations
                     </span>
@@ -568,7 +569,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             ) : (
               <>
                 <Check className="w-4 h-4 stroke-[3]" />
-                <span>Submit Ground Hazard Report</span>
+                <span>{t("Submit Ground Hazard Report")}</span>
               </>
             )}
           </button>

@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
+import { TemplatePicker } from './TemplatePicker';
 import { BrandLoader, portalForRole } from '../brand';
 import {
   Bell,
@@ -602,6 +603,15 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
             </div>
 
             <form onSubmit={handlePublishBroadcast} className="space-y-4">
+              <TemplatePicker
+                isBarangay={isBarangay}
+                defaults={{ barangay: ownArea || (affectedArea.startsWith('Municipality') ? '' : affectedArea), area: ownArea || 'Lingayen' }}
+                onApply={(title, body, category) => {
+                  setAdvisoryTitle(title);
+                  setMessage(body);
+                  setSeverity(category === 'evacuation_order' ? 'Emergency' : category === 'weather_advisory' ? 'Warning' : category === 'road_closure' ? 'Advisory' : 'Notice');
+                }}
+              />
               <div>
                 <label className={`block text-[11px] font-semibold uppercase tracking-wider ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'} mb-1.5`}>
                   ADVISORY TITLE

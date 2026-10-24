@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useState } from 'react';
 import {
   AlertTriangle,
@@ -120,7 +121,7 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
           <p className="text-sm sm:text-base font-semibold text-neutral-800">
-            Live situation for <span className="font-extrabold text-red-900">{locationLabel}</span>.
+            {t("Live situation for")} <span className="font-extrabold text-red-900">{locationLabel}</span>.
           </p>
         </div>
 
@@ -129,7 +130,7 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
           className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-red-900 hover:bg-red-800 text-white text-xs sm:text-sm font-bold transition-all shadow-lg hover:shadow-xl cursor-pointer active:scale-95 w-fit shrink-0"
         >
           <span className="text-base font-light leading-none">+</span>
-          <span>Report a Hazard</span>
+          <span>{t("Report a Hazard")}</span>
         </button>
       </div>
 
@@ -140,7 +141,7 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-red-100/80">
-                In Your Barangay
+                {t("In Your Barangay")}
               </p>
               <p className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight font-mono tabular-nums mt-2">
                 {inYourBarangayCount}
@@ -152,7 +153,7 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
           </div>
           <div className="mt-6 pt-4 border-t border-white/15 flex items-center gap-2 text-xs text-red-100/90 font-medium">
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span>Active ground hazard reports</span>
+            <span>{t("Active ground hazard reports")}</span>
           </div>
         </div>
 
@@ -164,7 +165,7 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                Shelters Open
+                {t("Shelters Open")}
               </p>
               <p className="text-3xl sm:text-5xl font-extrabold text-neutral-900 group-hover:text-red-900 transition-colors tracking-tight font-mono tabular-nums mt-2">
                 {openSheltersCount}
@@ -177,7 +178,7 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
           <div className="mt-4 pt-3 sm:mt-6 sm:pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-900" />
-              <span>Available for intake</span>
+              <span>{t("Available for intake")}</span>
             </span>
             <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:text-red-900 transition-transform group-hover:translate-x-1" />
           </div>
@@ -191,7 +192,7 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                Active Advisories
+                {t("Active Advisories")}
               </p>
               <p className="text-3xl sm:text-5xl font-extrabold text-red-900 group-hover:text-red-800 transition-colors tracking-tight font-mono tabular-nums mt-2">
                 {activeAdvisoriesCount}
@@ -204,7 +205,7 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
           <div className="mt-4 pt-3 sm:mt-6 sm:pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-900" />
-              <span>Official bulletins</span>
+              <span>{t("Official bulletins")}</span>
             </span>
             <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:text-red-900 transition-transform group-hover:translate-x-1" />
           </div>
@@ -220,10 +221,10 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
         <div className="relative z-10 space-y-4">
           <div className="flex items-center gap-2.5">
             <span className="px-3 py-1 rounded-xl bg-white text-red-900 text-xs font-black uppercase tracking-wider shadow-md">
-              {severityBadge[topAdvisory.severity].label}
+              {t(severityBadge[topAdvisory.severity].label)}
             </span>
             <span className="px-3 py-1 rounded-xl bg-red-950/80 text-white text-xs font-bold uppercase tracking-wider border border-white/20">
-              PUSH ALERT
+              {t("PUSH ALERT")}
             </span>
           </div>
 
@@ -248,25 +249,25 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
       <div className="bg-white rounded-3xl border border-neutral-100/80 overflow-hidden shadow-xl hover:shadow-2xl transition-shadow">
         <div className="p-6 sm:p-7 pb-5 border-b border-neutral-100 flex items-center justify-between bg-white">
           <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
-            Your Reports
+            {t("Your Reports")}
           </h3>
           <button
             onClick={onOpenReportModal}
             className="px-5 py-2.5 rounded-xl bg-red-900 hover:bg-red-800 text-white text-xs font-bold transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-95"
           >
-            + New Report
+            {t("+ New Report")}
           </button>
         </div>
 
         <div className="p-6 sm:p-7">
           {userReports.length === 0 ? (
             <div className="text-center py-8 text-neutral-400">
-              <p className="text-xs sm:text-sm font-medium">You haven't submitted any incident reports yet.</p>
+              <p className="text-xs sm:text-sm font-medium">{t("You haven't submitted any incident reports yet.")}</p>
               <button
                 onClick={onOpenReportModal}
                 className="mt-3 text-xs sm:text-sm font-bold text-red-900 hover:underline cursor-pointer"
               >
-                + Submit a ground hazard report
+                {t("+ Submit a ground hazard report")}
               </button>
             </div>
           ) : (
@@ -312,7 +313,7 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
       <div className="bg-white rounded-3xl border border-neutral-100/80 overflow-hidden shadow-xl hover:shadow-2xl transition-shadow">
         <div className="p-6 sm:p-7 pb-5 border-b border-neutral-100 flex items-center justify-between bg-white">
           <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
-            Advisories and Alerts
+            {t("Advisories and Alerts")}
           </h3>
           <span className="text-xs font-bold text-red-900 bg-red-50 border border-red-900/20 px-3.5 py-1 rounded-full">
             {activeAdvisoriesCount} live
@@ -354,13 +355,13 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
       <div className="bg-white rounded-3xl border border-neutral-100/80 overflow-hidden shadow-xl hover:shadow-2xl transition-shadow">
         <div className="p-6 sm:p-7 pb-5 border-b border-neutral-100 flex items-center justify-between bg-white">
           <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
-            Nearest Open Shelters
+            {t("Nearest Open Shelters")}
           </h3>
           <button
             onClick={() => setActiveTab('shelters')}
             className="px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-95"
           >
-            All Shelters
+            {t("All Shelters")}
           </button>
         </div>
 
@@ -408,13 +409,13 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
       <div className="bg-white rounded-3xl border border-neutral-100/80 overflow-hidden shadow-xl hover:shadow-2xl transition-shadow">
         <div className="p-6 sm:p-7 pb-5 border-b border-neutral-100 flex items-center justify-between bg-white">
           <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
-            Emergency Hotlines
+            {t("Emergency Hotlines")}
           </h3>
           <button
             onClick={() => setActiveTab('hotlines')}
             className="px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-95"
           >
-            View All
+            {t("View All")}
           </button>
         </div>
 
@@ -449,17 +450,17 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
       <div className="rounded-3xl border border-neutral-100/80 bg-white p-6 sm:p-7 text-xs text-neutral-700 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-neutral-500">Offline copy:</span>
+            <span className="font-semibold text-neutral-500">{t("Offline copy:")}</span>
             <span className="font-bold text-red-900 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-900/20">{lastSync ? 'Ready' : 'Not yet synced'}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-neutral-500">Last sync:</span>
+            <span className="font-semibold text-neutral-500">{t("Last sync:")}</span>
             <span className="font-bold text-neutral-900">{syncLabel(lastSync)}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 sm:self-center">
-          <span className="font-semibold text-neutral-500">Hotlines cached:</span>
+          <span className="font-semibold text-neutral-500">{t("Hotlines cached:")}</span>
           <span className="font-bold text-white bg-neutral-900 px-3 py-1 rounded-xl shadow-xs">
             {hotlines.length}
           </span>

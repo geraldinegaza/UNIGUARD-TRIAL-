@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Wifi,
@@ -49,7 +50,8 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
   const portal = portalForRole(currentUser?.role);
 
   // Last successful sync, from the data store
-  const { lastSync } = useRepo();
+  const { lastSync, queue } = useRepo();
+  const isResident = currentUser?.role === 'citizen';
   const syncTimeFormatted = lastSync
     ? new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
     : '—';
@@ -92,6 +94,14 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
 
   // Force refresh: unregisters the service worker, clears every cache and reloads
   const handleForceRefresh = async () => {
+    // reloading keeps the queue (it lives in IndexedDB), but say so first (Fix Pack F11)
+    if (
+      queue.length &&
+      !window.confirm(
+        `You have ${queue.length} item${queue.length === 1 ? '' : 's'} waiting to send. They will be kept and sent when you're back online. Reload the app now?`
+      )
+    )
+      return;
     setIsForceRefreshing(true);
     setStatusNotification('Clearing the offline cache and reloading the newest build...');
     await repo.forceRefresh();
@@ -114,7 +124,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className={`text-base font-semibold ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'} tracking-tight`}>
-                UniGuard Command Console
+                {t("UniGuard Command Console")}
               </h2>
               <span className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
                 isBarangay
@@ -129,7 +139,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
               </span>
             </div>
             <p className={`text-xs ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
-              Municipality of Lingayen, Pangasinan
+              {t("Municipality of Lingayen, Pangasinan")}
             </p>
           </div>
         </div>
@@ -143,7 +153,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search incidents, responders, or locations"
+              placeholder={t("Search incidents, responders, or locations")}
               className={`w-full pl-10 pr-14 py-2.5 ${
                 isBarangay
                   ? 'bg-white hover:bg-[#C2E8FF]/15 focus:bg-white text-xs font-medium text-[#011025] placeholder-[#7EA0C5] border border-[#7EA0C5]/40 focus:border-[#052659] focus:ring-2 focus:ring-[#052659]/15'
@@ -172,7 +182,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
             }`}
           >
             <Radio className={`w-3.5 h-3.5 ${isLiveFeedActive ? 'animate-pulse' : ''}`} />
-            <span>Live feed</span>
+            <span>{t("Live feed")}</span>
           </button>
 
           {/* Network status: pressing it re-checks the connection for real */}
@@ -183,17 +193,17 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
                 ? (isBarangay ? 'bg-white text-[#052659] border-[#7EA0C5]/40 hover:bg-[#C2E8FF]/30' : 'bg-white text-neutral-700 border-neutral-200/80 hover:bg-neutral-50')
                 : (isBarangay ? 'bg-[#052659] text-white border-[#011025] shadow-xs' : 'bg-[#18181b] text-white border-neutral-800 shadow-xs')
             }`}
-            title="Check connection"
+            title={t("Check connection")}
           >
             {isOnline ? (
               <>
                 <Wifi className={`w-3.5 h-3.5 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`} />
-                <span className="hidden sm:inline">Online</span>
+                <span className="hidden sm:inline">{t("Online")}</span>
               </>
             ) : (
               <>
                 <WifiOff className="w-3.5 h-3.5 text-white" />
-                <span>Offline Mode</span>
+                <span>{t("Offline Mode")}</span>
               </>
             )}
           </button>
@@ -223,10 +233,10 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
       {/* 2. Page Title Header: Exact wording from Screenshot */}
       <div className="px-1">
         <h1 className={`text-xl sm:text-2xl font-semibold ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'} tracking-tight`}>
-          Offline Readiness
+          {t("Offline Readiness")}
         </h1>
         <p className={`text-xs sm:text-sm ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'} mt-0.5 max-w-2xl leading-relaxed`}>
-          Progressive web app caching keeps the essentials available when networks fail.
+          {t("Progressive web app caching keeps the essentials available when networks fail.")}
         </p>
       </div>
 
@@ -254,12 +264,12 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
 
             {/* Title from screenshot */}
             <h3 className={`text-xl sm:text-2xl font-semibold ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'} tracking-tight`}>
-              Offline Copy Ready
+              {t("Offline Copy Ready")}
             </h3>
 
             {/* Subtitle from screenshot */}
             <p className={`text-xs sm:text-sm ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-600'} leading-relaxed font-normal`}>
-              Cellular networks often fail during a disaster. UniGuard keeps hotlines, shelters and critical advisories on this device so they still open without a signal.
+              {t("Cellular networks often fail during a disaster. UniGuard keeps hotlines, shelters and critical advisories on this device so they still open without a signal.")}
             </p>
 
             {/* Check Connection Action Button */}
@@ -285,7 +295,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
                 ) : (
                   <>
                     <Wifi className="w-4 h-4" />
-                    <span>Check Connection</span>
+                    <span>{t("Check Connection")}</span>
                   </>
                 )}
               </button>
@@ -299,20 +309,20 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
             <h3 className={`text-sm font-semibold uppercase tracking-wide pb-3 border-b ${
               isBarangay ? 'text-[#011025] border-[#7EA0C5]/30' : 'text-neutral-900 border-neutral-100'
             }`}>
-              Service Worker Cache
+              {t("Saved on This Phone")}
             </h3>
 
             {/* Key-Value Rows matching screenshot */}
             <div className="space-y-3.5 text-xs pt-3">
               <div className="flex items-center justify-between">
-                <span className={isBarangay ? 'text-[#5482B4] font-medium' : 'text-neutral-500 font-medium'}>Last Successful Sync</span>
+                <span className={isBarangay ? 'text-[#5482B4] font-medium' : 'text-neutral-500 font-medium'}>{t("Last Successful Sync")}</span>
                 <span className={`font-mono font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
                   {syncTimeFormatted} today
                 </span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className={isBarangay ? 'text-[#5482B4] font-medium' : 'text-neutral-500 font-medium'}>Reports Queued While Offline</span>
+                <span className={isBarangay ? 'text-[#5482B4] font-medium' : 'text-neutral-500 font-medium'}>{t("Reports waiting to send")}</span>
                 <span className={`font-mono font-semibold px-2.5 py-0.5 rounded-full ${
                   isBarangay
                     ? 'text-[#052659] bg-[#C2E8FF]/60 border border-[#7EA0C5]/40'
@@ -323,12 +333,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
               </div>
 
               <div className="flex items-center justify-between">
-                <span className={isBarangay ? 'text-[#5482B4] font-medium' : 'text-neutral-500 font-medium'}>Strategy</span>
-                <span className={`font-mono font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>Network first</span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className={isBarangay ? 'text-[#5482B4] font-medium' : 'text-neutral-500 font-medium'}>Build</span>
+                <span className={isBarangay ? 'text-[#5482B4] font-medium' : 'text-neutral-500 font-medium'}>{t("App version")}</span>
                 <span className={`font-mono font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>{CONFIG.BUILD}</span>
               </div>
             </div>
@@ -356,23 +361,81 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
               ) : (
                 <>
                   <RefreshCw className={`w-3.5 h-3.5 ${isBarangay ? 'text-[#052659]' : 'text-neutral-600'}`} />
-                  <span>Force Refresh</span>
+                  <span>{isResident ? 'Reload App' : 'Force Refresh'}</span>
                 </>
               )}
             </button>
 
             <p className={`text-[11px] text-center ${isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'}`}>
-              Clears the offline cache and reloads the newest build.
+              {t("Loads the newest version of UniGuard. Anything waiting to send is kept.")}
             </p>
           </div>
         </div>
       </div>
 
+      {/* Waiting to send: reports and SOS saved on this phone (Fix Pack F11) */}
+      {queue.length > 0 && (
+        <div className={`bg-white rounded-[24px] border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/70'} shadow-xs p-5 sm:p-6 space-y-3`}>
+          <h3 className={`text-sm font-semibold uppercase tracking-wide ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>{t("Waiting to Send")}</h3>
+          <p className={`text-xs ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
+            {t("Saved on this phone. They send automatically when you're online.")}
+          </p>
+          <ul className="space-y-2">
+            {queue.map((q) => (
+              <li
+                key={q.id}
+                className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center gap-2 ${
+                  q.failed ? 'border-red-200 bg-red-50/60' : isBarangay ? 'border-[#7EA0C5]/30' : 'border-neutral-200'
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className={`font-semibold ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
+                      {q.kind === 'sos' ? 'SOS' : q.hazard_type ? `Report: ${q.hazard_type}` : 'Report'}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                        q.failed ? 'bg-red-100 text-red-800 border-red-200' : 'bg-amber-50 text-amber-900 border-amber-200'
+                      }`}
+                    >
+                      {q.failed ? 'Could not send' : 'Waiting to send'}
+                    </span>
+                    <span className={`text-[11px] ${isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'}`}>{new Date(q.queued_at).toLocaleString()}</span>
+                  </div>
+                  {q.description && <p className={`text-[11px] mt-0.5 line-clamp-2 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>{q.description}</p>}
+                  {q.failed && q.last_error && <p className="text-[11px] mt-0.5 text-red-800">{q.last_error}</p>}
+                </div>
+                {q.failed && (
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => repo.retryQueued(q.id)}
+                      className="px-3 py-1.5 min-h-[32px] rounded-full text-[11px] font-semibold bg-red-900 text-white cursor-pointer"
+                    >
+                      {t("Try again")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm('Delete this saved item? It will not be sent.')) repo.discardQueued(q.id);
+                      }}
+                      className="px-3 py-1.5 min-h-[32px] rounded-full text-[11px] font-semibold bg-white border border-red-200 text-red-800 cursor-pointer"
+                    >
+                      {t("Delete")}
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* 4. Bottom Row: Cached on This Device Card (Matching Screenshot) */}
       <div className={`bg-white rounded-[24px] border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/70'} shadow-xs p-6 space-y-4`}>
         <div className={`flex items-center justify-between pb-3 border-b ${isBarangay ? 'border-[#7EA0C5]/30' : 'border-neutral-100'}`}>
           <h3 className={`text-sm font-semibold uppercase tracking-wide ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-            Cached on This Device
+            {t("Cached on This Device")}
           </h3>
           <span className={`text-xs font-mono font-medium ${isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'}`}>
             Synced Today, {syncTimeFormatted}
@@ -392,7 +455,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
             <div className="flex items-center gap-3.5">
               <PhoneCall className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'} group-hover:scale-110 transition-transform shrink-0`} />
               <span className={`text-xs sm:text-sm font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-                Emergency Hotlines
+                {t("Emergency Hotlines")}
               </span>
             </div>
 
@@ -417,7 +480,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
             <div className="flex items-center gap-3.5">
               <Building2 className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'} group-hover:scale-110 transition-transform shrink-0`} />
               <span className={`text-xs sm:text-sm font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-                Evacuation Centers
+                {t("Evacuation Centers")}
               </span>
             </div>
 
@@ -442,7 +505,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
             <div className="flex items-center gap-3.5">
               <Megaphone className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'} group-hover:scale-110 transition-transform shrink-0`} />
               <span className={`text-xs sm:text-sm font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-                Critical Advisories
+                {t("Critical Advisories")}
               </span>
             </div>
 

@@ -964,6 +964,16 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                   {onOpenOperations && (
                     <button
                       type="button"
+                      onClick={() => onOpenOperations('settings')}
+                      className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
+                    >
+                      Settings
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {onOpenOperations && (
+                    <button
+                      type="button"
                       onClick={() => onOpenOperations('hotlines')}
                       className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
                     >

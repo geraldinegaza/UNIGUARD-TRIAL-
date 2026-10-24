@@ -303,6 +303,10 @@ export interface QueuedReport {
   lng: number | null;
   accuracy?: number | null;
   photo?: Blob | null; // compressed photo, uploaded when the queue flushes
+  /** times the server refused this row; after 5 it is marked failed */
+  attempts?: number;
+  failed?: boolean;
+  last_error?: string;
 }
 
 /* ------------------------------------------------------------- dispatch units */

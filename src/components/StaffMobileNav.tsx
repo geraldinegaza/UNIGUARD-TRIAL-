@@ -20,6 +20,7 @@ import {
   LogOut,
   X,
   type LucideIcon,
+  Settings,
 } from 'lucide-react';
 import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
@@ -71,7 +72,10 @@ const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
   },
   {
     title: 'This device',
-    items: [{ id: 'offline_sync', label: 'Offline Sync', icon: Download }],
+    items: [
+      { id: 'offline_sync', label: 'Offline Sync', icon: Download },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ],
   },
 ];
 

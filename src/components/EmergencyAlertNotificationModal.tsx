@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useEffect } from 'react';
 import { AlertTriangle, MapPin, X, Check, ShieldAlert } from 'lucide-react';
 import { Advisory } from '../types';
@@ -83,14 +84,14 @@ export const EmergencyAlertNotificationModal: React.FC<EmergencyAlertNotificatio
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#18181b]" />
             </span>
             <span className="text-[10px] font-semibold uppercase tracking-wider">
-              Emergency Alert
+              {t("Emergency Alert")}
             </span>
           </div>
 
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-500 hover:text-neutral-800 flex items-center justify-center transition-colors cursor-pointer border border-neutral-200/60"
-            aria-label="Close notification"
+            aria-label={t("Close notification")}
           >
             <X className="w-4 h-4" />
           </button>
@@ -131,7 +132,7 @@ export const EmergencyAlertNotificationModal: React.FC<EmergencyAlertNotificatio
           {/* Subtle branding matching the portal */}
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-400">
             <UniGuardLogo size="xs" portal={portal} state="alert" className="scale-75 origin-left" />
-            <span>Municipality of Lingayen MDRRMO</span>
+            <span>{t("Municipality of Lingayen MDRRMO")}</span>
           </div>
 
           <button
@@ -139,7 +140,7 @@ export const EmergencyAlertNotificationModal: React.FC<EmergencyAlertNotificatio
             className="w-full sm:w-auto px-5 py-2 rounded-full bg-[#18181b] hover:bg-neutral-800 text-white text-xs font-medium tracking-wide transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
           >
             <Check className="w-4 h-4" />
-            <span>Acknowledge</span>
+            <span>{t("Acknowledge")}</span>
           </button>
         </div>
 

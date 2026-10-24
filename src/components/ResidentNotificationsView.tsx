@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useState, useMemo } from 'react';
 import {
   Bell,
@@ -153,10 +154,10 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
           <p className="text-sm sm:text-base font-semibold text-neutral-800">
-            Emergency notifications &amp; alerts for <span className="font-extrabold text-red-900">Lingayen, Pangasinan</span>.
+            Emergency notifications &amp; alerts for <span className="font-extrabold text-red-900">{t("Lingayen, Pangasinan")}</span>.
           </p>
           <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
-            Push notifications delivered to this device, including emergency alerts received while the app was closed.
+            {t("Push notifications delivered to this device, including emergency alerts received while the app was closed.")}
           </p>
         </div>
 
@@ -165,7 +166,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
           className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-red-900 hover:bg-red-800 text-white text-xs sm:text-sm font-bold transition-all shadow-lg hover:shadow-xl cursor-pointer active:scale-95 w-fit shrink-0"
         >
           <CheckCheck className="w-4 h-4 text-white" />
-          <span>Mark All as Read</span>
+          <span>{t("Mark All as Read")}</span>
         </button>
       </div>
 
@@ -176,7 +177,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-red-100/80">
-                Delivered Today
+                {t("Delivered Today")}
               </p>
               <p className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight font-mono tabular-nums mt-2">
                 {deliveredToday}
@@ -188,7 +189,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
           </div>
           <div className="mt-6 pt-4 border-t border-white/15 flex items-center gap-2 text-xs text-red-100/90 font-medium">
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span>Active push notifications delivered to device</span>
+            <span>{t("Active push notifications delivered to device")}</span>
           </div>
         </div>
 
@@ -197,7 +198,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                Unread Alerts
+                {t("Unread Alerts")}
               </p>
               <p className="text-3xl sm:text-5xl font-extrabold text-neutral-900 group-hover:text-red-900 transition-colors tracking-tight font-mono tabular-nums mt-2">
                 {unreadCount}
@@ -223,10 +224,10 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                Delivery Channel
+                {t("Delivery Channel")}
               </p>
               <p className="text-2xl sm:text-3xl font-extrabold text-red-900 group-hover:text-red-800 transition-colors tracking-tight font-mono tabular-nums mt-3">
-                Push + Inbox
+                {t("Push + Inbox")}
               </p>
             </div>
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-50 text-red-900 border border-red-100/60 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform shrink-0">
@@ -236,10 +237,10 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
           <div className="mt-4 pt-3 sm:mt-6 sm:pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-900" />
-              <span>Offline queue verified</span>
+              <span>{t("Offline queue verified")}</span>
             </span>
             <span className="font-mono font-bold text-red-900 tabular-nums">
-              Active
+              {t("Active")}
             </span>
           </div>
         </div>
@@ -254,7 +255,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
               {latestItem.severity}
             </span>
             <span className="px-3 py-1 rounded-xl bg-red-950/80 text-white text-xs font-bold uppercase tracking-wider border border-white/20">
-              LATEST BROADCAST
+              {t("LATEST BROADCAST")}
             </span>
           </div>
 
@@ -279,7 +280,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white text-red-900 hover:bg-red-50 text-xs sm:text-sm font-bold transition-all shadow-md cursor-pointer active:scale-95"
               >
                 <Building2 className="w-4 h-4 text-red-900" />
-                <span>View Open Shelters</span>
+                <span>{t("View Open Shelters")}</span>
               </button>
             )}
 
@@ -288,7 +289,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-bold border border-white/20 transition-all cursor-pointer active:scale-95"
             >
               <Check className="w-4 h-4 text-white" />
-              <span>Acknowledge Notice</span>
+              <span>{t("Acknowledge Notice")}</span>
             </button>
           </div>
 
@@ -307,15 +308,15 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
               <div className="mt-4 p-5 rounded-2xl bg-red-950/90 border border-white/15 text-xs sm:text-sm text-red-50 space-y-3 shadow-inner animate-in fade-in duration-200">
                 <div className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-white text-red-950 text-xs font-black flex items-center justify-center shrink-0 mt-0.5 shadow-sm">1</span>
-                  <span><strong>Background Push Reception:</strong> Emergency alerts trigger system-level banners even when the UniGuard application process is closed.</span>
+                  <span><strong>{t("Background Push Reception:")}</strong> {t("Emergency alerts trigger system-level banners even when the UniGuard application process is closed.")}</span>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-white text-red-950 text-xs font-black flex items-center justify-center shrink-0 mt-0.5 shadow-sm">2</span>
-                  <span><strong>Zero-Signal Offline Cache:</strong> If cellular network coverage is lost, incoming messages remain queued in the offline cache and are immediately synchronized upon signal reconnection.</span>
+                  <span><strong>{t("Zero-Signal Offline Cache:")}</strong> {t("If cellular network coverage is lost, incoming messages remain queued in the offline cache and are immediately synchronized upon signal reconnection.")}</span>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="w-5 h-5 rounded-full bg-white text-red-950 text-xs font-black flex items-center justify-center shrink-0 mt-0.5 shadow-sm">3</span>
-                  <span><strong>Official Authentication:</strong> All broadcast notifications originate strictly from verified LDRRMC administrators and the Municipal Mayor's Emergency Desk.</span>
+                  <span><strong>{t("Official Authentication:")}</strong> {t("All broadcast notifications originate strictly from verified LDRRMC administrators and the Municipal Mayor's Emergency Desk.")}</span>
                 </div>
               </div>
             )}
@@ -342,7 +343,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
               </span>
             </div>
             <p className="text-xs text-neutral-500 mt-1">
-              Complete chronological log of civil emergency notices and advisory broadcasts received by this device
+              {t("Complete chronological log of civil emergency notices and advisory broadcasts received by this device")}
             </p>
           </div>
 
@@ -366,7 +367,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
                   : 'bg-white border border-neutral-200 text-neutral-700 hover:border-red-900/40'
               }`}
             >
-              Critical
+              {t("Critical")}
             </button>
             <button
               onClick={() => setSelectedFilter('advisory')}
@@ -376,7 +377,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
                   : 'bg-white border border-neutral-200 text-neutral-700 hover:border-red-900/40'
               }`}
             >
-              Advisories
+              {t("Advisories")}
             </button>
             <button
               onClick={() => setSelectedFilter('info')}
@@ -386,7 +387,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
                   : 'bg-white border border-neutral-200 text-neutral-700 hover:border-red-900/40'
               }`}
             >
-              Info
+              {t("Info")}
             </button>
           </div>
         </div>
@@ -399,7 +400,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search notifications by keyword, agency, or location..."
+              placeholder={t("Search notifications by keyword, agency, or location...")}
               className="w-full pl-11 pr-4 py-2.5 bg-white border border-neutral-200 rounded-2xl text-xs sm:text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:border-red-900 focus:ring-1 focus:ring-red-900 transition-all shadow-xs"
             />
           </div>
@@ -412,8 +413,8 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
               <div className="w-12 h-12 rounded-2xl bg-neutral-100 text-neutral-400 flex items-center justify-center mx-auto">
                 <Inbox className="w-6 h-6" />
               </div>
-              <p className="text-sm font-bold text-neutral-700">No notifications match your filter</p>
-              <p className="text-xs text-neutral-400">Try clearing the search query or selecting a different category.</p>
+              <p className="text-sm font-bold text-neutral-700">{t("No notifications match your filter")}</p>
+              <p className="text-xs text-neutral-400">{t("Try clearing the search query or selecting a different category.")}</p>
             </div>
           ) : (
             filteredAlerts.map((alert) => {
@@ -436,7 +437,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
                           {alert.title}
                         </h4>
                         {!isRead && (
-                          <span className="w-2 h-2 rounded-full bg-red-900 shrink-0" title="Unread alert" />
+                          <span className="w-2 h-2 rounded-full bg-red-900 shrink-0" title={t("Unread alert")} />
                         )}
                       </div>
 
@@ -522,7 +523,7 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
             Offline Push &amp; Synchronized Message Queue
           </h4>
           <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-medium">
-            Emergency alerts are delivered even when the application is closed, and are queued for the offline inbox when cellular signal is unavailable. Once you reconnect to any network, pending bulletins sync automatically.
+            {t("Emergency alerts are delivered even when the application is closed, and are queued for the offline inbox when cellular signal is unavailable. Once you reconnect to any network, pending bulletins sync automatically.")}
           </p>
         </div>
       </div>
@@ -531,17 +532,17 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
       <div className="rounded-3xl border border-neutral-100/80 bg-white p-6 sm:p-7 text-xs text-neutral-700 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-neutral-500">Offline copy:</span>
+            <span className="font-semibold text-neutral-500">{t("Offline copy:")}</span>
             <span className="font-bold text-red-900 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-900/20">{lastSync ? 'Ready' : 'Not yet synced'}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-neutral-500">Last sync:</span>
+            <span className="font-semibold text-neutral-500">{t("Last sync:")}</span>
             <span className="font-bold text-neutral-900">{syncLabel(lastSync)}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 sm:self-center">
-          <span className="font-semibold text-neutral-500">Push alerts logged:</span>
+          <span className="font-semibold text-neutral-500">{t("Push alerts logged:")}</span>
           <span className="font-bold text-white bg-neutral-900 px-3 py-1 rounded-xl shadow-xs">
             {initialAlerts.length}
           </span>

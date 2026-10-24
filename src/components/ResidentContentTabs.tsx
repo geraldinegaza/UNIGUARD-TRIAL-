@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   HeartHandshake,
@@ -147,19 +148,19 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
         <div className="relative z-10 max-w-3xl space-y-3">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-bold tracking-wider uppercase border border-white/20 backdrop-blur-xs shadow-sm">
             <HeartHandshake className="w-4 h-4 text-white" />
-            <span>Relief Assistance Information</span>
+            <span>{t("Relief Assistance Information")}</span>
           </div>
 
           <p className="text-white/90 text-xs sm:text-sm font-medium leading-relaxed">
-            Per-barangay relief schedules, eligibility, required documents, and the authorized-beneficiary list. Filter by your barangay.
+            {t("Per-barangay relief schedules, eligibility, required documents, and the authorized-beneficiary list. Filter by your barangay.")}
           </p>
 
           <div className="flex flex-wrap items-center gap-2 pt-2 text-xs font-bold text-white">
             <span className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/15 shadow-2xs">
-              🏛️ LGU Lingayen MSWDO
+              {t("🏛️ LGU Lingayen MSWDO")}
             </span>
             <span className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/15 shadow-2xs">
-              📦 DSWD Standard Family Food Packs
+              {t("📦 DSWD Standard Family Food Packs")}
             </span>
             <span className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/15 shadow-2xs">
               📍 {barangays.length} Barangays Monitored
@@ -181,11 +182,11 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
               <MapPin className="w-4 h-4" />
             </div>
             <h3 className="text-xs sm:text-sm font-extrabold text-neutral-900 uppercase tracking-wider">
-              Barangay Relief Filter
+              {t("Barangay Relief Filter")}
             </h3>
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold text-neutral-500">
-            <span>Account Home:</span>
+            <span>{t("Account Home:")}</span>
             <span className="px-3 py-1 rounded-full bg-red-50 border border-red-900/20 text-red-900 font-bold">
               Brgy. {userBarangayName}
             </span>
@@ -230,7 +231,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                     type="text"
                     value={barangaySearchFilter}
                     onChange={(e) => setBarangaySearchFilter(e.target.value)}
-                    placeholder="Search 32 Lingayen barangays..."
+                    placeholder={t("Search 32 Lingayen barangays...")}
                     className="w-full pl-10 pr-4 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-800 placeholder-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-red-900"
                     autoFocus
                   />
@@ -279,7 +280,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                       <span>🏠</span>
                       <span>Barangay {userBarangayName}</span>
                       <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100/70 text-red-900">
-                        Your Registered Barangay
+                        {t("Your Registered Barangay")}
                       </span>
                     </span>
                     {selectedBarangay === userBarangayName && (
@@ -314,7 +315,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                           <span>Barangay {bName}</span>
                           {isUserHome && (
                             <span className="text-[10px] font-bold text-red-900 bg-red-50 px-2 py-0.5 rounded-full border border-red-900/20">
-                              Your Barangay
+                              {t("Your Barangay")}
                             </span>
                           )}
                         </span>
@@ -338,7 +339,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight">
-                Relief Distribution Schedules
+                {t("Relief Distribution Schedules")}
               </h2>
               <p className="text-xs text-neutral-400 font-medium">
                 {selectedBarangay === 'All'
@@ -358,12 +359,12 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
               {isScheduleMinimized ? (
                 <>
                   <ChevronDown className="w-4 h-4" />
-                  <span>Expand List</span>
+                  <span>{t("Expand List")}</span>
                 </>
               ) : (
                 <>
                   <ChevronUp className="w-4 h-4" />
-                  <span>Minimize</span>
+                  <span>{t("Minimize")}</span>
                 </>
               )}
             </button>
@@ -373,13 +374,13 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
               <button
                 onClick={() => setIsViewAllModalOpen(true)}
                 className="w-10 h-10 rounded-xl bg-red-900 hover:bg-red-800 text-white flex items-center justify-center transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-95"
-                title="View All Relief Schedules"
-                aria-label="View All Relief Schedules"
+                title={t("View All Relief Schedules")}
+                aria-label={t("View All Relief Schedules")}
               >
                 <Maximize2 className="w-4 h-4 text-white" />
               </button>
               <span className="text-[10px] text-neutral-400 font-semibold tracking-tight leading-none mt-1 select-none">
-                View All
+                {t("View All")}
               </span>
             </div>
           </div>
@@ -398,13 +399,13 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                   No Active Distribution for {selectedBarangay}
                 </h3>
                 <p className="text-xs sm:text-sm text-neutral-500 max-w-md mx-auto">
-                  Check another barangay or contact your barangay desk for pending schedule advisories.
+                  {t("Check another barangay or contact your barangay desk for pending schedule advisories.")}
                 </p>
                 <button
                   onClick={() => setSelectedBarangay('All')}
                   className="px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
                 >
-                  View All Active Distribution Hubs
+                  {t("View All Active Distribution Hubs")}
                 </button>
               </div>
             ) : (
@@ -449,7 +450,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                     </div>
 
                     <div className="pt-3 border-t border-neutral-100 flex items-center justify-between text-xs">
-                      <span className="text-neutral-400 text-xs">Free Government Aid</span>
+                      <span className="text-neutral-400 text-xs">{t("Free Government Aid")}</span>
                     </div>
                   </div>
                 ))}
@@ -468,7 +469,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
               onClick={() => setIsScheduleMinimized(false)}
               className="text-red-900 font-bold hover:underline cursor-pointer"
             >
-              Expand to View Cards
+              {t("Expand to View Cards")}
             </button>
           </div>
         )}
@@ -486,10 +487,10 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-bold tracking-tight text-white">
-                    All Municipal Relief Distribution Schedules
+                    {t("All Municipal Relief Distribution Schedules")}
                   </h3>
                   <p className="text-xs text-white/80">
-                    Comprehensive schedule overview across Lingayen barangays
+                    {t("Comprehensive schedule overview across Lingayen barangays")}
                   </p>
                 </div>
               </div>
@@ -542,7 +543,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                     </div>
 
                     <div className="pt-3 border-t border-neutral-100 flex items-center justify-between text-xs">
-                      <span className="text-neutral-400 text-xs">Free Government Aid</span>
+                      <span className="text-neutral-400 text-xs">{t("Free Government Aid")}</span>
                     </div>
                   </div>
                 ))}
@@ -556,7 +557,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                 onClick={() => setIsViewAllModalOpen(false)}
                 className="px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all cursor-pointer shadow-md"
               >
-                Close
+                {t("Close")}
               </button>
             </div>
           </div>
@@ -586,7 +587,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                   : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
-              All Requirements
+              {t("All Requirements")}
             </button>
             <button
               type="button"
@@ -597,7 +598,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                   : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
-              Eligibility
+              {t("Eligibility")}
             </button>
             <button
               type="button"
@@ -608,7 +609,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                   : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
-              Required IDs
+              {t("Required IDs")}
             </button>
           </div>
         </div>
@@ -625,13 +626,13 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                   <h4 className="text-sm sm:text-base font-extrabold text-neutral-900">
                     Eligibility & Allocation Criteria
                   </h4>
-                  <p className="text-xs text-neutral-400">Lingayen MSWDO Calamity Guidelines</p>
+                  <p className="text-xs text-neutral-400">{t("Lingayen MSWDO Calamity Guidelines")}</p>
                 </div>
               </div>
 
               <ul className="text-xs sm:text-sm text-neutral-600 space-y-3">
                 {eligibilityList.length === 0 && (
-                  <li className="text-neutral-400">No eligibility criteria published for this barangay yet.</li>
+                  <li className="text-neutral-400">{t("No eligibility criteria published for this barangay yet.")}</li>
                 )}
                 {eligibilityList.map((item) => (
                   <li key={item} className="flex items-start gap-2.5">
@@ -652,15 +653,15 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                 </div>
                 <div>
                   <h4 className="text-sm sm:text-base font-extrabold text-neutral-900">
-                    Required Documents for Claiming
+                    {t("Required Documents for Claiming")}
                   </h4>
-                  <p className="text-xs text-neutral-400">Bring valid proof of residency</p>
+                  <p className="text-xs text-neutral-400">{t("Bring valid proof of residency")}</p>
                 </div>
               </div>
 
               <ul className="text-xs sm:text-sm text-neutral-600 space-y-3">
                 {requiredDocsList.length === 0 && (
-                  <li className="text-neutral-400">No required documents published for this barangay yet.</li>
+                  <li className="text-neutral-400">{t("No required documents published for this barangay yet.")}</li>
                 )}
                 {requiredDocsList.map((item, idx) => (
                   <li key={item} className="flex items-start gap-2.5">
@@ -680,9 +681,9 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
       <div className="rounded-3xl border border-red-950/40 bg-gradient-to-br from-red-800 via-red-900 to-red-950 p-6 sm:p-7 text-white shadow-xl flex items-start gap-4">
         <Info className="w-5 h-5 text-white shrink-0 mt-0.5" />
         <div className="text-xs sm:text-sm space-y-1.5">
-          <p className="font-extrabold text-white">Notice for Authorized Representatives:</p>
+          <p className="font-extrabold text-white">{t("Notice for Authorized Representatives:")}</p>
           <p className="text-red-100/90 leading-relaxed">
-            If you are claiming on behalf of a named beneficiary, the distribution desk will check you against the authorized-names list. Search it from the verification tool above and ensure you have a signed authorization letter and proof of identification ready.
+            {t("If you are claiming on behalf of a named beneficiary, the distribution desk will check you against the authorized-names list. Search it from the verification tool above and ensure you have a signed authorization letter and proof of identification ready.")}
           </p>
         </div>
       </div>
@@ -736,22 +737,22 @@ export const ResidentGuidesView: React.FC = () => {
         <div className="relative z-10 max-w-3xl space-y-2.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 text-white text-[10px] font-black tracking-widest uppercase border border-white/20 backdrop-blur-xs">
             <BookOpen className="w-3.5 h-3.5 text-white" />
-            <span>Disaster Preparedness</span>
+            <span>{t("Disaster Preparedness")}</span>
           </div>
 
           <p className="text-white/90 text-xs sm:text-sm font-medium leading-relaxed">
-            Step-by-step guidance for the hazards that affect Lingayen, Pangasinan. Pick a hazard, then read the Before / During / After tab.
+            {t("Step-by-step guidance for the hazards that affect Lingayen, Pangasinan. Pick a hazard, then read the Before / During / After tab.")}
           </p>
 
           <div className="flex flex-wrap items-center gap-2 pt-2 text-[11px] font-bold text-white">
             <span className="px-2.5 py-1 rounded-lg bg-black/30 border border-white/10">
-              🛡️ 14 Hazard Types Covered
+              {t("🛡️ 14 Hazard Types Covered")}
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-black/30 border border-white/10">
-              ⏱️ 3 Operational Lifecycle Phases
+              {t("⏱️ 3 Operational Lifecycle Phases")}
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-black/30 border border-white/10">
-              📍 Lingayen Localized Protocols
+              {t("📍 Lingayen Localized Protocols")}
             </span>
           </div>
         </div>
@@ -766,26 +767,26 @@ export const ResidentGuidesView: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
           <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-            <span>Preparedness Guides</span>
+            <span>{t("Preparedness Guides")}</span>
           </h3>
           <span className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
             <span>
-              Active Hazard: <strong className="text-[#d00018]">{selectedHazard}</strong>
+              {t("Active Hazard:")} <strong className="text-[#d00018]">{selectedHazard}</strong>
             </span>
             <button
               type="button"
               onClick={() => exportGuidesPdf(guides, selectedHazard).catch(() => {})}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[32px] rounded-full bg-white border border-red-900/20 text-red-900 hover:bg-red-50 font-bold cursor-pointer"
-              title="Save this guide as a PDF to read offline"
+              title={t("Save this guide as a PDF to read offline")}
             >
               <Download className="w-3.5 h-3.5" />
-              <span>PDF</span>
+              <span>{t("PDF")}</span>
             </button>
           </span>
         </div>
 
         <p className="text-xs text-slate-500">
-          Pick a hazard, then read the Before / During / After tab.
+          {t("Pick a hazard, then read the Before / During / After tab.")}
         </p>
 
         {/* Dropdown Selector Component for Picking a Hazard */}
@@ -820,7 +821,7 @@ export const ResidentGuidesView: React.FC = () => {
                     type="text"
                     value={hazardSearchFilter}
                     onChange={(e) => setHazardSearchFilter(e.target.value)}
-                    placeholder="Search hazard type..."
+                    placeholder={t("Search hazard type...")}
                     className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-[#d00018]"
                     autoFocus
                   />
@@ -964,22 +965,22 @@ export const ResidentFaqsView: React.FC = () => {
         <div className="relative z-10 max-w-3xl space-y-2.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 text-white text-[10px] font-black tracking-widest uppercase border border-white/20 backdrop-blur-xs">
             <HelpCircle className="w-3.5 h-3.5 text-white" />
-            <span>Frequently Asked Questions</span>
+            <span>{t("Frequently Asked Questions")}</span>
           </div>
 
           <p className="text-white/90 text-xs sm:text-sm font-medium leading-relaxed">
-            Frequently asked questions answered by the LGU. Clear guidance on emergency alerts, relief distribution, and resident services in Lingayen, Pangasinan.
+            {t("Frequently asked questions answered by the LGU. Clear guidance on emergency alerts, relief distribution, and resident services in Lingayen, Pangasinan.")}
           </p>
 
           <div className="flex flex-wrap items-center gap-2 pt-2 text-[11px] font-bold text-white">
             <span className="px-2.5 py-1 rounded-lg bg-black/30 border border-white/10">
-              🏛️ Official LGU Lingayen Help Desk
+              {t("🏛️ Official LGU Lingayen Help Desk")}
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-black/30 border border-white/10">
               💡 {faqs.length} Verified Answers
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-black/30 border border-white/10">
-              📞 24/7 Operations Support
+              {t("📞 24/7 Operations Support")}
             </span>
           </div>
         </div>
@@ -994,7 +995,7 @@ export const ResidentFaqsView: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
           <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-            <span>Help Center Search</span>
+            <span>{t("Help Center Search")}</span>
           </h3>
           <span className="text-[11px] font-semibold text-slate-500">
             {filteredFaqs.length} {filteredFaqs.length === 1 ? 'article available' : 'articles available'}
@@ -1008,7 +1009,7 @@ export const ResidentFaqsView: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search FAQs..."
+            placeholder={t("Search FAQs...")}
             className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#d00018] focus:border-transparent bg-slate-50"
           />
           {searchQuery && (
@@ -1052,7 +1053,7 @@ export const ResidentFaqsView: React.FC = () => {
             </div>
 
             <h3 className="text-base sm:text-lg font-black text-slate-900">
-              No FAQs yet
+              {t("No FAQs yet")}
             </h3>
 
             <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
@@ -1070,7 +1071,7 @@ export const ResidentFaqsView: React.FC = () => {
                   }}
                   className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all cursor-pointer"
                 >
-                  Clear Search Filter
+                  {t("Clear Search Filter")}
                 </button>
               </div>
             )}
@@ -1126,10 +1127,10 @@ export const ResidentFaqsView: React.FC = () => {
       <div className="rounded-2xl border border-[#4e0009] bg-gradient-to-r from-[#000000] via-[#330006] to-[#68000c] p-4 sm:p-5 text-white shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="space-y-1">
           <p className="font-black text-white text-xs sm:text-sm">
-            Still have questions or need immediate assistance?
+            {t("Still have questions or need immediate assistance?")}
           </p>
           <p className="text-slate-300 text-xs">
-            The Lingayen MDRRMO emergency hotline desk is open 24/7 for resident inquiries.
+            {t("The Lingayen MDRRMO emergency hotline desk is open 24/7 for resident inquiries.")}
           </p>
         </div>
 

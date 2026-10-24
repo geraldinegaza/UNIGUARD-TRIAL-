@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { corroborationText } from '../lib/util';
 import {
   X,
   AlertTriangle,
@@ -180,7 +181,7 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
 
                     <div className="mt-2 pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px] text-slate-400 font-semibold">
                       <span>{getBarangayName(report.barangay_id)}</span>
-                      <span>{report.corroboration_count || 1} Corroborations</span>
+                      <span>{corroborationText(report.corroboration_count || 0)}</span>
                     </div>
                   </div>
                 );
