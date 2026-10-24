@@ -32,6 +32,7 @@ import { LdrrmcOthersReviewView } from './components/LdrrmcOthersReviewView';
 import { ResidentNotificationsView } from './components/ResidentNotificationsView';
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
 import { ResidentHomeDraftView } from './components/ResidentHomeDraftView';
+import { DispatchPortal } from './components/DispatchPortal';
 import { StaffBottomNav } from './components/StaffMobileNav';
 import { ResidentBottomNav, residentTabIndex, useResidentSwipeTabs } from './components/ResidentMobileNav';
 import { BrandLoader, TriadEmblem, portalForRole, useBrandThemeColor } from './brand';
@@ -230,6 +231,28 @@ export default function App() {
         recovery={recovery}
         onRecoveryDone={() => setRecovery(false)}
       />
+    );
+  }
+
+  // Dispatch Team accounts get their own console
+  if (currentUser.role === 'dispatch') {
+    return (
+      <div className="h-full w-full">
+        <DispatchPortal currentUser={currentUser} onSignOut={handleSignOut} />
+        <EmergencyAlertNotificationModal
+          isOpen={isAlertNotificationOpen}
+          onClose={() => setIsAlertNotificationOpen(false)}
+          onAcknowledge={handleAcknowledgeAlert}
+          advisory={notificationAdvisory}
+          portal={portal}
+        />
+        <PWAInstallPrompt />
+        {isSigningOut ? (
+          <BrandLoader portal={portal} process="signout" mode="screen" />
+        ) : (
+          !workspaceReady && workspaceSlow && <BrandLoader portal={portal} process="workspace" mode="screen" />
+        )}
+      </div>
     );
   }
 

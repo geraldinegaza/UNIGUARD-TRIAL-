@@ -8,6 +8,8 @@ const KEY: Record<Portal, string> = {
   resident: 'resident',
   barangay: 'barangay',
   command: 'command',
+  // no dedicated dispatch files yet; exports use the LDRRMO set
+  dispatch: 'command',
 };
 
 export type BrandAssetKind = 'emblem' | 'horizontal' | 'stacked' | 'wordmark';

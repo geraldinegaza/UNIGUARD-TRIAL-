@@ -5,7 +5,7 @@
 // left = barangay, right = LDRRMO command, keel = residents, joined by the
 // beacon hub (alerts). Each portal recolors the same shape in its own palette.
 
-export type Portal = 'auth' | 'resident' | 'barangay' | 'command';
+export type Portal = 'auth' | 'resident' | 'barangay' | 'command' | 'dispatch';
 export type EmblemVariant = 'light' | 'reverse';
 
 /** Map a user role from the database to the portal look it gets. */
@@ -13,6 +13,7 @@ export function portalForRole(role?: string | null): Portal {
   if (!role) return 'auth';
   if (role === 'citizen') return 'resident';
   if (role === 'barangay') return 'barangay';
+  if (role === 'dispatch') return 'dispatch';
   return 'command'; // lgu_admin and every other LGU / LDRRMO staff role
 }
 
@@ -116,6 +117,25 @@ export const THEMES: Record<Portal, PortalTheme> = {
     themeColor: '#18181B',
     accent: '#18181B',
   },
+  // Dispatch Team: warm amber-orange, set apart from resident crimson
+  dispatch: {
+    emblem: {
+      light: { left: '#C2410C', right: '#F59E6B', keel: '#7C2D12', hub: '#FFFFFF', dot: '#EA580C' },
+      reverse: { left: '#FFFFFF', right: '#FED7AA', keel: '#FDBA74', hub: '#C2410C', dot: '#FFFFFF' },
+    },
+    uni: { light: '#3B1607', reverse: '#FFFFFF' },
+    guard: { light: '#EA580C', reverse: '#FED7AA' },
+    tagText: { light: '#9A5A3C', reverse: '#FED7AA' },
+    chip: {
+      light: { bg: '#FFF4EC', text: '#C2410C', border: '#FBD5BC' },
+      reverse: { bg: 'rgba(255,255,255,0.16)', text: '#FFFFFF', border: 'rgba(255,255,255,0.3)' },
+    },
+    solid: '#EA580C',
+    surface: '#FFF7F2',
+    screen: 'linear-gradient(135deg, #FFF7F2 0%, #FDEDE4 55%, #FBE3D6 100%)',
+    themeColor: '#EA580C',
+    accent: '#EA580C',
+  },
 };
 
 /** Which emblem/wordmark variant reads on the portal's loading screen. */
@@ -124,6 +144,7 @@ export const SCREEN_VARIANT: Record<Portal, EmblemVariant> = {
   resident: 'light',
   barangay: 'reverse',
   command: 'light',
+  dispatch: 'light',
 };
 
 export interface BrandContext {
@@ -171,6 +192,12 @@ export const IDENTITY: Record<Portal, PortalIdentity> = {
     descriptor: () => 'Operations Hub · Lingayen',
     tagline: 'LDRRMO Command Center',
   },
+  dispatch: {
+    name: 'Dispatch Team',
+    chip: () => 'Dispatch',
+    descriptor: () => 'Dispatch Team · Lingayen',
+    tagline: 'Dispatch Team · Lingayen',
+  },
 };
 
 /** Everything the system can be busy doing, so each portal can say it in its own words. */
@@ -199,6 +226,7 @@ const plural = (n: number | undefined, one: string, many: string) =>
   `${n ?? 0} ${(n ?? 0) === 1 ? one : many}`;
 
 const COPY: Record<Portal, Partial<Record<BrandProcess, CopyFn>>> = {
+  dispatch: {},
   auth: {
     session: () => ({ title: 'Securing your session', detail: 'Checking your UniGuard account on this device', steps: ['Account', 'Role', 'Portal'] }),
     signin: () => ({ title: 'Signing you in', detail: 'Verifying your account and opening your portal', steps: ['Verify', 'Role', 'Portal'] }),
@@ -232,6 +260,15 @@ const COPY: Record<Portal, Partial<Record<BrandProcess, CopyFn>>> = {
     offline: () => ({ title: 'Operations hub offline', detail: 'Showing the last synced data. Changes sync when the connection returns', steps: ['Cached', 'Waiting', 'Sync'] }),
     signout: () => ({ title: 'Signing you out', detail: 'Closing the operations session', steps: ['Session', 'Cache', 'Done'] }),
   },
+};
+
+COPY.dispatch = {
+  workspace: () => ({ title: 'Opening the dispatch console', detail: 'Loading the call queue, SOS calls and available units across Lingayen', steps: ['Queue', 'SOS', 'Units'] }),
+  refresh: () => ({ title: 'Refreshing the queue', detail: 'Pulling the newest calls and unit status', steps: ['Calls', 'Units', 'Status'] }),
+  sync: (c) => ({ title: 'Syncing dispatch updates', detail: `${plural(c.count, 'update', 'updates')} made offline, now reaching the server`, steps: ['Queued', 'Sending', 'Confirmed'] }),
+  submit: () => ({ title: 'Assigning the unit', detail: 'Recording the dispatch and notifying the responders', steps: ['Call', 'Unit', 'Notified'] }),
+  offline: () => ({ title: 'Dispatch console offline', detail: 'Showing the last synced queue. Changes sync when the connection returns', steps: ['Cached', 'Waiting', 'Sync'] }),
+  signout: () => ({ title: 'Signing you out', detail: 'Closing the dispatch session', steps: ['Session', 'Cache', 'Done'] }),
 };
 
 const FALLBACK: CopyFn = () => ({ title: 'Working on it', detail: 'UniGuard is loading your data', steps: ['Prepare', 'Load', 'Ready'] });
