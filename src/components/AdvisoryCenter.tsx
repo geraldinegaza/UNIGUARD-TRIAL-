@@ -58,7 +58,9 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
   const [advisoryTitle, setAdvisoryTitle] = useState('');
   const [severity, setSeverity] = useState<'Warning' | 'Emergency' | 'Advisory' | 'Notice'>('Warning');
   const [broadcastType, setBroadcastType] = useState<'Emergency' | 'Preparedness'>('Emergency');
-  const [affectedArea, setAffectedArea] = useState<string>('Municipality-wide (Lingayen)');
+  // A barangay official may publish only to their own barangay (enforced by the server)
+  const ownArea = currentUser.role === 'barangay' && currentUser.barangay_name ? currentUser.barangay_name : null;
+  const [affectedArea, setAffectedArea] = useState<string>(ownArea || 'Municipality-wide (Lingayen)');
   const [message, setMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPublishedAdvisory, setSelectedPublishedAdvisory] = useState<Advisory | null>(null);
@@ -111,7 +113,7 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
     setMessage('');
     setSeverity('Warning');
     setBroadcastType('Emergency');
-    setAffectedArea('Municipality-wide (Lingayen)');
+    setAffectedArea(ownArea || 'Municipality-wide (Lingayen)');
   };
 
   const handlePublishBroadcast = async (e: React.FormEvent) => {
@@ -677,12 +679,14 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
                       : 'text-neutral-800 bg-neutral-50/60 border-neutral-200 focus:border-neutral-400'
                   } border rounded-xl p-3 focus:bg-white outline-hidden cursor-pointer`}
                 >
-                  <option value="Municipality-wide (Lingayen)">Municipality-wide (Lingayen)</option>
-                  {barangays.map((b) => (
-                    <option key={b.id} value={b.name}>
-                      {b.name} ({b.city || 'Lingayen'})
-                    </option>
-                  ))}
+                  {!ownArea && <option value="Municipality-wide (Lingayen)">Municipality-wide (Lingayen)</option>}
+                  {barangays
+                    .filter((b) => !ownArea || b.name === ownArea)
+                    .map((b) => (
+                      <option key={b.id} value={b.name}>
+                        {b.name} ({b.city || 'Lingayen'})
+                      </option>
+                    ))}
                 </select>
               </div>
 

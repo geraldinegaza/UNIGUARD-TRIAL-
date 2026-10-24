@@ -7,3 +7,6 @@ coverage/
 .env*
 !.env.example
 dev-dist/
+
+# reference copy of the vanilla build (points at another Supabase project)
+uni-guard-errors_10-24/

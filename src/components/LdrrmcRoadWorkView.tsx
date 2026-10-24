@@ -43,13 +43,14 @@ const AREA_ALL = 'Municipality-wide';
 // road_status.status <-> the passability labels shown in this screen
 const STATUS_LABEL: Record<RoadCondition, RoadWorkPost['status']> = {
   blocked: 'Impassable',
-  caution: 'Passable with Caution',
+  one_lane: 'Passable with Caution',
+  under_repair: 'Under Clearing',
   passable: 'Cleared',
 };
 const STATUS_VALUE: Record<RoadWorkPost['status'], RoadCondition> = {
   Impassable: 'blocked',
-  'Passable with Caution': 'caution',
-  'Under Clearing': 'caution',
+  'Passable with Caution': 'one_lane',
+  'Under Clearing': 'under_repair',
   Cleared: 'passable',
 };
 
@@ -230,7 +231,7 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
     setRoadCondition(id, 'passable', 'Marked road as cleared and safe for vehicular transit');
 
   // Reopen Road Notice
-  const handleReopen = (id: string) => setRoadCondition(id, 'caution', 'Reopened road obstruction notice');
+  const handleReopen = (id: string) => setRoadCondition(id, 'one_lane', 'Reopened road obstruction notice');
 
   // Delete Record
   const handleDelete = async (id: string) => {

@@ -71,6 +71,13 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
 
   const activeRecord = selectedIncident || filteredReports[0] || null;
 
+  // The server allows one step at a time: reported -> verified -> dispatched -> resolved
+  const NEXT_STATUS: Record<string, string | undefined> = {
+    unverified: 'verified',
+    verified: 'dispatched',
+    dispatched: 'resolved',
+  };
+
   const handleUpdateStatus = async (reportId: string, status: 'verified' | 'dispatched' | 'resolved') => {
     try {
       await repo.advanceStatus(reportId, status, 'Updated from the drill-down panel');
@@ -255,7 +262,9 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => handleUpdateStatus(activeRecord.id, 'verified')}
-                      className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                      disabled={NEXT_STATUS[activeRecord.status] !== 'verified'}
+                      title={NEXT_STATUS[activeRecord.status] === 'verified' ? undefined : 'Status moves one step at a time'}
+                      className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 ${
                         activeRecord.status === 'verified'
                           ? 'bg-slate-900 text-white shadow-xs'
                           : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
@@ -266,7 +275,9 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
 
                     <button
                       onClick={() => handleUpdateStatus(activeRecord.id, 'dispatched')}
-                      className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                      disabled={NEXT_STATUS[activeRecord.status] !== 'dispatched'}
+                      title={NEXT_STATUS[activeRecord.status] === 'dispatched' ? undefined : 'Status moves one step at a time'}
+                      className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 ${
                         activeRecord.status === 'dispatched'
                           ? 'bg-slate-800 text-white shadow-xs'
                           : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
@@ -277,7 +288,9 @@ export const DrillDownModal: React.FC<DrillDownModalProps> = ({
 
                     <button
                       onClick={() => handleUpdateStatus(activeRecord.id, 'resolved')}
-                      className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                      disabled={NEXT_STATUS[activeRecord.status] !== 'resolved'}
+                      title={NEXT_STATUS[activeRecord.status] === 'resolved' ? undefined : 'Status moves one step at a time'}
+                      className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 ${
                         activeRecord.status === 'resolved'
                           ? 'bg-[#991B1B] text-white shadow-xs'
                           : 'bg-red-50 text-red-800 hover:bg-red-100'

@@ -4,13 +4,19 @@
 // to the audience the caller names, then hands recipients without a push
 // subscription to sms-fallback.
 //
+// Extended (migration 038+): the audience can be narrowed with
+//   · barangayId  → residents + officials of that barangay (only an LGU may
+//                   broadcast municipality-wide; an official may target only
+//                   their own barangay; the server re-checks here)
+//   · unitId       → only the dispatch team accounts of that unit
+//
 // Deploy:
 //   supabase functions deploy push-dispatch
 //   supabase secrets set VAPID_PUBLIC_KEY=*** VAPID_PRIVATE_KEY=***
 //                        VAPID_SUBJECT=mailto:drrmo@example.gov.ph
 //
-// Only an authenticated LGU / LDRRMC account may call it. Without that check any
-// signed in user could ring every device in the city.
+// Only an authenticated LGU / LDRRMC account may broadcast municipality-wide.
+// A barangay_official may call this with their own barangayId as the audience.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import webpush from 'npm:web-push@3.6.7';
@@ -47,11 +53,9 @@ Deno.serve(async (req: Request) => {
   if (userErr || !userData?.user) return json({ error: 'Not signed in' }, 401);
 
   const { data: profile } = await asCaller
-    .from('profiles').select('role').eq('id', userData.user.id).maybeSingle();
+    .from('profiles').select('role, barangay_id, dispatch_unit_id').eq('id', userData.user.id).maybeSingle();
 
-  if (!profile || profile.role !== 'lgu_ldrrmc') {
-    return json({ error: 'Only LGU / LDRRMC can dispatch an alert' }, 403);
-  }
+  if (!profile) return json({ error: 'Profile not found' }, 403);
 
   // ---- read the request ---------------------------------------------------
   let body: Record<string, unknown> = {};
@@ -61,8 +65,25 @@ Deno.serve(async (req: Request) => {
   const message = String(body.body || '');
   const severity = String(body.severity || 'advisory');
   const advisoryId = (body.advisoryId as string) || null;
-  const area = String(body.area || 'Citywide');
+  const area = String(body.area || 'Municipality-wide');
   const urlTarget = String(body.url || './index.html');
+  const barangayId = (body.barangayId as string) || null;
+  const unitId = (body.unitId as string) || null;
+
+  // audience authorisation
+  //   · LGU can broadcast municipality-wide (no audience) OR target any
+  //     barangay or unit.
+  //   · barangay_official can ONLY target their own barangay.
+  //   · dispatch_team cannot broadcast through this function.
+  if (profile.role === 'dispatch_team') {
+    return json({ error: 'Dispatch teams cannot broadcast through this function' }, 403);
+  }
+  if (barangayId && profile.role === 'barangay_official' && profile.barangay_id !== barangayId) {
+    return json({ error: 'You can only target your own barangay' }, 403);
+  }
+  if (!barangayId && !unitId && profile.role !== 'lgu_ldrrmc') {
+    return json({ error: 'Only LGU / LDRRMC can broadcast municipality-wide' }, 403);
+  }
 
   const payload = JSON.stringify({
     title, body: message, severity, advisory_id: advisoryId, url: urlTarget,
@@ -72,10 +93,27 @@ Deno.serve(async (req: Request) => {
   webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate);
   const admin = createClient(url, service, { auth: { persistSession: false } });
 
-  // ---- send ---------------------------------------------------------------
-  const { data: subs, error } = await admin
-    .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth, user_id');
+  // ---- collect recipients -------------------------------------------------
+  // Build a list of user_ids the audience allows, then join with the push
+  // subscriptions. This way a barangay audience never reaches another
+  // barangay's devices, and a unit audience never reaches another unit.
+  let targetUserIds: string[] | null = null;
+  if (barangayId) {
+    const { data: rows } = await admin.from('profiles')
+      .select('id').eq('barangay_id', barangayId).eq('disabled', false);
+    targetUserIds = (rows ?? []).map((r: { id: string }) => r.id);
+  } else if (unitId) {
+    const { data: rows } = await admin.from('profiles')
+      .select('id').eq('dispatch_unit_id', unitId).eq('role', 'dispatch_team').eq('disabled', false);
+    targetUserIds = (rows ?? []).map((r: { id: string }) => r.id);
+  }
+
+  let subsQuery = admin.from('push_subscriptions').select('id, endpoint, p256dh, auth, user_id');
+  if (targetUserIds) {
+    if (targetUserIds.length === 0) return json({ ok: true, sent: 0, failed: 0, removed: 0, smsQueued: 0 });
+    subsQuery = subsQuery.in('user_id', targetUserIds);
+  }
+  const { data: subs, error } = await subsQuery;
 
   if (error) return json({ error: error.message }, 500);
 
@@ -110,7 +148,7 @@ Deno.serve(async (req: Request) => {
   if (body.alsoSms !== false) {
     try {
       const { data: smsResult } = await admin.functions.invoke('sms-fallback', {
-        body: { title, message, severity, area, advisoryId }
+        body: { title, message, severity, area, advisoryId, barangayId, unitId }
       }) as { data: { queued?: number } | null };
       smsQueued = smsResult?.queued ?? 0;
     } catch {
@@ -122,7 +160,7 @@ Deno.serve(async (req: Request) => {
     action: 'push.dispatched',
     entity: 'advisories',
     entity_id: advisoryId,
-    meta: { sent, failed, removed, smsQueued, area, severity, by: userData.user.id }
+    meta: { sent, failed, removed, smsQueued, area, severity, barangayId, unitId, by: userData.user.id }
   });
 
   return json({ ok: true, sent, failed, removed, smsQueued });

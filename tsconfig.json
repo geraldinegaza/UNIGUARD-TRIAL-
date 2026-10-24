@@ -24,5 +24,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["node_modules", "dist", "dev-dist", "supabase"]
+  "exclude": ["node_modules", "dist", "dev-dist", "supabase", "uni-guard-errors_10-24", "uniguard-brand-kit"]
 }

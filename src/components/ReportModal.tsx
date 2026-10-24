@@ -17,7 +17,8 @@ import { User, Barangay, HazardType, ReportSeverity } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { CONFIG } from '../lib/config';
-import { locate } from '../lib/geo';
+import { locate, classifyCoords, CENTER } from '../lib/geo';
+import { LocationPin } from './LocationPin';
 import { HAZARD_LABELS, classifyHazard, isOtherHazard } from '../lib/hazards';
 import { compressImage } from '../lib/util';
 import { BrandLoader, portalForRole } from '../brand';
@@ -79,22 +80,32 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     );
   }, [reports, hazardType, barangayId]);
 
-  // Request browser geolocation. Without a fix the report is sent with no coordinates.
+  // Every report needs a location inside Lingayen (the server refuses it
+  // otherwise). GPS fills the pin; without a usable fix the resident drags the
+  // pin to the hazard instead.
+  const [pinNote, setPinNote] = useState<string | null>(null);
   const handleGetLocation = async () => {
     setIsLocating(true);
     setLocationSuccess(false);
     setFormError(null);
+    setPinNote(null);
     try {
       const pos = await locate();
-      setLatitude(pos.lat);
-      setLongitude(pos.lng);
-      setLocationSuccess(true);
-      setHasAcquiredLocation(true);
+      if (classifyCoords(pos.lat, pos.lng) === 'ok') {
+        setLatitude(pos.lat);
+        setLongitude(pos.lng);
+        setLocationSuccess(true);
+        setHasAcquiredLocation(true);
+      } else {
+        // a fix outside town: start the pin at the town centre instead
+        setLatitude(CENTER[0]);
+        setLongitude(CENTER[1]);
+        setHasAcquiredLocation(false);
+        setPinNote('Your current location is outside Lingayen. Move the pin to where the hazard is.');
+      }
     } catch (err: any) {
-      setLatitude(null);
-      setLongitude(null);
       setHasAcquiredLocation(false);
-      setFormError(err.message || 'Could not read your location.');
+      setPinNote((err.message || 'We could not read your GPS.') + ' Drag the pin to where the hazard is.');
     } finally {
       setIsLocating(false);
     }
@@ -135,6 +146,15 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     if (!description.trim() || isSubmitting) return;
     if (isOtherHazard(hazardType) && !hazardOther.trim()) {
       setFormError('Tell us what the hazard is before submitting.');
+      return;
+    }
+
+    if (latitude === null || longitude === null || !hasAcquiredLocation) {
+      setFormError('Add the hazard location first: tap Acquire, or drag the pin on the map.');
+      return;
+    }
+    if (classifyCoords(latitude, longitude) !== 'ok') {
+      setFormError('Move the pin inside Lingayen. Reports can only be filed inside the municipality.');
       return;
     }
 
@@ -491,6 +511,22 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     {isLocating ? 'Locating...' : 'Acquire'}
                   </button>
                 </div>
+
+                {/* Pin: GPS places it; residents can drag it or tap the map to correct it */}
+                <LocationPin
+                  lat={latitude}
+                  lng={longitude}
+                  onChange={(la, ln) => {
+                    setLatitude(la);
+                    setLongitude(ln);
+                    setHasAcquiredLocation(true);
+                    setPinNote(null);
+                  }}
+                  onOutside={() => setPinNote('Pin must be inside Lingayen.')}
+                />
+                <p className={`text-[11px] leading-snug ${pinNote ? 'text-red-900 font-semibold' : 'text-neutral-400'}`}>
+                  {pinNote || 'Drag the pin or tap the map to mark exactly where the hazard is. The barangay is set from this point.'}
+                </p>
 
                 {/* Info Rows: Barangay queue & Verification */}
                 <div className="space-y-1.5 pt-1 text-xs">

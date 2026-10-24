@@ -10,6 +10,9 @@ export interface User {
   barangay_name?: string;
   barangay_uuid?: string | null;
   disabled?: boolean;
+  /** dispatch_team accounts: the unit they belong to and their place in it */
+  dispatch_unit_id?: string | null;
+  unit_role?: '' | 'unit_admin' | 'member';
   created_at: string;
 }
 
@@ -53,6 +56,15 @@ export interface IncidentReport {
   updated_at: string;
   resolved_at?: string;
   is_offline_synced?: boolean;
+  /** who verified it: a barangay official, or the LGU as the fallback */
+  verified_by_role?: string | null;
+  verified_by_name?: string | null;
+  /** unverified for more than 30 minutes (escalation policy) */
+  is_stale?: boolean;
+  /** life-safety hazard shown to the LGU without waiting for the barangay */
+  is_severity_bypass?: boolean;
+  /** surfaced in the LGU verification queue */
+  escalates_to_lgu?: boolean;
 }
 
 export interface StatusHistoryEntry {
@@ -111,6 +123,25 @@ export interface EmergencyHotline {
   scope: string;
   description: string;
   active: boolean;
+  category?: string;
+}
+
+/** A proposed change to protected data (hotlines), applied only once the Super Admin approves it. */
+export interface ChangeRequest {
+  id: string;
+  requester_name: string;
+  requester_role: string;
+  requester_barangay: string;
+  target_table: string;
+  target_id: string | null;
+  action: 'add' | 'edit' | 'delete';
+  current_data: Record<string, unknown>;
+  proposed_data: Record<string, unknown>;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  decision_note: string;
+  decided_at: string | null;
+  created_at: string;
 }
 
 export interface SystemAuditLog {
@@ -171,8 +202,14 @@ export interface Beneficiary {
 
 export type GuidePhase = 'before' | 'during' | 'after';
 
+
+// The database keeps one guide per topic with Before / During / After
+// sections; the screens list one entry per phase, so a guide is unpacked into
+// up to three entries that share guide_id.
 export interface PreparednessGuide {
   id: string;
+  guide_id: string;
+  summary?: string;
   hazard_type: string;
   phase: GuidePhase;
   title: string;
@@ -206,7 +243,7 @@ export interface RoadWork {
   created_at: string;
 }
 
-export type RoadCondition = 'passable' | 'caution' | 'blocked';
+export type RoadCondition = 'passable' | 'one_lane' | 'blocked' | 'under_repair';
 
 export interface RoadStatus {
   id: string;

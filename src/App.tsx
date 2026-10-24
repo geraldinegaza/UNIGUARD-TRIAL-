@@ -18,8 +18,6 @@ import { ReportModal } from './components/ReportModal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { UnifiedAuthPortal } from './components/UnifiedAuthPortal';
 import { OfflineSyncCenter } from './components/OfflineSyncCenter';
-import { LdrrmcUsersManagementView } from './components/LdrrmcUsersManagementView';
-import { LdrrmcAuditLogView } from './components/LdrrmcAuditLogView';
 import { ResidentReliefView, ResidentGuidesView, ResidentFaqsView } from './components/ResidentContentTabs';
 import { LdrrmcReliefView } from './components/LdrrmcReliefView';
 import { LdrrmcRoadWorkView } from './components/LdrrmcRoadWorkView';
@@ -575,15 +573,7 @@ export default function App() {
               </div>
             )}
 
-            {/* View 7: Users & Personnel Directory */}
-            {activeTab === 'users' && isLgu && (
-              <LdrrmcUsersManagementView currentUser={currentUser} barangays={barangays} />
-            )}
-
-            {/* View 8: Audit Log Trail */}
-            {activeTab === 'audit_log' && isLgu && (
-              <LdrrmcAuditLogView currentUser={currentUser} />
-            )}
+            {/* Users and the Activity Log moved to the Super Admin console */}
 
             {/* View 9: Analytics Full View */}
             {activeTab === 'analytics' && (

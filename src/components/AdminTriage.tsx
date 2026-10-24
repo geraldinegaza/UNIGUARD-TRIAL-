@@ -246,8 +246,42 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
     }
   };
 
-  const handleVerifyManual = (report: IncidentReport) => {
+  const handleVerifyManual = async (report: IncidentReport) => {
+    // the LGU verifies through its own fallback path so the record shows who did it
+    if (isLgu && report.status === 'unverified') {
+      try {
+        await repo.lguVerify(report.id, `LGU-verified by ${currentUser.full_name}`);
+        setActionNotice('Verified by the LGU');
+        onReportsUpdated?.();
+      } catch (err: any) {
+        setActionNotice(err.message || 'Could not verify the report.');
+      } finally {
+        setTimeout(() => setActionNotice(null), 4000);
+      }
+      return;
+    }
     runStatusChange(report, 'verified', `Manually verified by ${currentUser.full_name}`, 'Status updated to verified');
+  };
+
+  // Escalation (migrations 136/147): unverified reports reach the LGU after 30
+  // minutes, or at once for life-safety hazards, with a reason the LGU can see.
+  const escalation = (r: IncidentReport): { label: string; title: string } | null => {
+    if (r.status !== 'unverified') return null;
+    if (r.is_severity_bypass) return { label: 'Life-safety', title: 'Life-safety hazard: shown to the LGU without waiting for the barangay' };
+    if (r.is_stale) return { label: 'Escalated', title: 'Not verified by the barangay within 30 minutes. The LGU can verify it.' };
+    return null;
+  };
+  const escalationChip = (r: IncidentReport) => {
+    const e = escalation(r);
+    if (!e) return null;
+    return (
+      <span
+        title={e.title}
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200"
+      >
+        {e.label}
+      </span>
+    );
   };
 
   const handleDispatchSubmit = async (e: React.FormEvent) => {
@@ -769,12 +803,13 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
                         {/* Desktop Grid Layout */}
                         <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-4 items-center">
                           {/* 1. STATUS */}
-                          <div className="col-span-2">
+                          <div className="col-span-2 flex flex-wrap items-center gap-1.5">
                             <span
                               className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-medium tracking-wide uppercase ${statusBadgeClass}`}
                             >
                               {statusText}
                             </span>
+                            {escalationChip(report)}
                           </div>
 
                           {/* 2. HAZARD / DESCRIPTION */}
@@ -950,6 +985,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
                               >
                                 {statusText}
                               </span>
+                              {escalationChip(report)}
                               <span className={`text-[10px] font-mono ${isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'}`}>
                                 {incidentCode}
                               </span>

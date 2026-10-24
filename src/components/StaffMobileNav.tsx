@@ -64,8 +64,6 @@ const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
     title: 'Administration',
     items: [
       { id: 'others_review', label: 'Others Review', icon: UserCheck, lguOnly: true },
-      { id: 'users', label: 'Users', icon: Users, lguOnly: true },
-      { id: 'audit_log', label: 'Audit Log', icon: FileText, lguOnly: true },
     ],
   },
   {

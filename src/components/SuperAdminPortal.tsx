@@ -16,7 +16,7 @@ import {
   ChevronRight,
   Activity,
 } from 'lucide-react';
-import { User, UserRole } from '../types';
+import { User, UserRole, ChangeRequest } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { relTime } from '../lib/util';
@@ -28,12 +28,13 @@ import { TriadEmblem } from '../brand';
 // pulse" card on the right with a report chart and a calendar. On tablets and
 // phones the columns stack.
 
-type View = 'overview' | 'accounts' | 'activity';
+type View = 'overview' | 'accounts' | 'activity' | 'requests';
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'accounts', label: 'Accounts' },
   { id: 'activity', label: 'Activity' },
+  { id: 'requests', label: 'Requests' },
 ];
 
 const ROLES: { role: UserRole; label: string; icon: typeof Users }[] = [
@@ -116,7 +117,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   }, []);
 
   useEffect(() => {
-    Promise.all([repo.loadUsers(), repo.loadAudit(100), repo.loadSos()]).catch((e: any) =>
+    Promise.all([repo.loadUsers(), repo.loadAudit(100), repo.loadSos(), repo.loadChangeRequests()]).catch((e: any) =>
       setLoadError(e?.message || 'Some sections could not be loaded.')
     );
   }, []);
@@ -157,6 +158,85 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   );
 
   const initial = (currentUser.full_name || 'S').trim().charAt(0).toUpperCase();
+
+  // change requests: hotline edits proposed by LGU staff and barangay officials
+  const pending = data.changeRequests.filter((c) => c.status === 'pending');
+  const [openRequest, setOpenRequest] = useState<ChangeRequest | null>(null);
+  const [decisionNote, setDecisionNote] = useState('');
+  const [deciding, setDeciding] = useState(false);
+  const [requestNotice, setRequestNotice] = useState<string | null>(null);
+  // account administration (Super Admin only, enforced by the admin-users function)
+  const [editing, setEditing] = useState<User | null>(null);
+  const [editRole, setEditRole] = useState<UserRole>('citizen');
+  const [editBarangay, setEditBarangay] = useState<string>('');
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
+  const openAccount = (u: User) => {
+    setEditing(u);
+    setEditRole(u.role);
+    setEditBarangay(u.barangay_uuid || '');
+    setAccountNotice(null);
+  };
+  const saveAccount = async () => {
+    if (!editing || savingAccount) return;
+    if (editRole === 'barangay' && !editBarangay) {
+      setAccountNotice('Choose the barangay this official serves.');
+      return;
+    }
+    setSavingAccount(true);
+    setAccountNotice(null);
+    try {
+      if (editRole !== editing.role) {
+        await repo.adminUsers({ action: 'set-role', userId: editing.id, role: repo.roleToDb(editRole) });
+      }
+      if (editRole === 'barangay' || editRole === 'citizen') {
+        const target = editBarangay || null;
+        if (target !== (editing.barangay_uuid || null)) {
+          await repo.adminUsers({ action: 'set-barangay', userId: editing.id, barangayId: target });
+        }
+      }
+      setEditing(null);
+    } catch (e: any) {
+      setAccountNotice(e?.message || 'Could not save the account.');
+    } finally {
+      setSavingAccount(false);
+    }
+  };
+  const toggleDisabled = async () => {
+    if (!editing || savingAccount) return;
+    const disable = !editing.disabled;
+    if (disable && !window.confirm(`Disable ${editing.full_name || editing.email}? They are signed out and cannot sign in until enabled again.`)) return;
+    setSavingAccount(true);
+    setAccountNotice(null);
+    try {
+      await repo.adminUsers({ action: 'set-disabled', userId: editing.id, disabled: disable });
+      setEditing(null);
+    } catch (e: any) {
+      setAccountNotice(e?.message || 'Could not change the account status.');
+    } finally {
+      setSavingAccount(false);
+    }
+  };
+
+  const decide = async (approve: boolean) => {
+    if (!openRequest || deciding) return;
+    if (!approve && !decisionNote.trim()) {
+      setRequestNotice('Give a reason when rejecting, so the requester knows why.');
+      return;
+    }
+    setDeciding(true);
+    setRequestNotice(null);
+    try {
+      await repo.decideChangeRequest(openRequest.id, approve, decisionNote.trim());
+      setRequestNotice(approve ? 'Approved. The directory is updated and the requester is notified.' : 'Rejected. The requester is notified.');
+      setOpenRequest(null);
+      setDecisionNote('');
+    } catch (e: any) {
+      setRequestNotice(e?.message || 'Could not record the decision.');
+    } finally {
+      setDeciding(false);
+    }
+  };
 
   /* ---------------------------------------------------------- calendar */
   const calendar = (() => {
@@ -339,7 +419,12 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
         {accounts.map((u) => {
           const role = ROLES.find((r) => r.role === u.role);
           return (
-            <div key={u.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[1.6fr_1fr_1.1fr_0.7fr] gap-x-4 gap-y-1 items-center px-5 md:px-6 py-3.5 border-b border-neutral-50 last:border-0">
+            <button
+              type="button"
+              key={u.id}
+              onClick={() => openAccount(u)}
+              className="w-full text-left grid grid-cols-[1fr_auto] md:grid-cols-[1.6fr_1fr_1.1fr_0.7fr] gap-x-4 gap-y-1 items-center px-5 md:px-6 py-3.5 border-b border-neutral-50 last:border-0 hover:bg-[#FFFBF0] cursor-pointer"
+            >
               <span className="min-w-0 flex items-center gap-3">
                 <span className="w-9 h-9 rounded-full bg-[#FFF3C9] text-[#8A5A00] font-bold flex items-center justify-center shrink-0">
                   {(u.full_name || u.email || '?').trim().charAt(0).toUpperCase()}
@@ -357,11 +442,100 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
               </span>
               <span className="hidden md:block text-[13px] text-neutral-600 truncate">{u.barangay_name || '—'}</span>
               <span className="hidden md:block text-[12px] text-neutral-400">{relTime(u.created_at)}</span>
-            </div>
+            </button>
           );
         })}
         {!accounts.length && <p className="px-6 py-10 text-center text-[13px] text-neutral-400">No accounts match.</p>}
       </div>
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#3A2A08]/40 p-0 sm:p-6" onClick={() => setEditing(null)}>
+          <div
+            role="dialog"
+            aria-label="Manage account"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-t-[26px] sm:rounded-[26px] p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-11 h-11 rounded-full bg-[#FFF3C9] text-[#8A5A00] font-bold flex items-center justify-center shrink-0">
+                {(editing.full_name || editing.email || '?').trim().charAt(0).toUpperCase()}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[15px] font-bold text-neutral-800 truncate">{editing.full_name || 'Unnamed'}</span>
+                <span className="block text-[12px] text-neutral-400 truncate">{editing.email}</span>
+              </span>
+            </div>
+
+            {editing.role === 'dispatch' ? (
+              <p className="mt-5 text-[13px] text-neutral-600 bg-[#FFFBF0] rounded-xl px-4 py-3">
+                Dispatch team accounts belong to a dispatch unit and are managed from the unit, which comes in the next phase.
+              </p>
+            ) : (
+              <>
+                <label className="block mt-5 text-[11px] font-semibold text-neutral-500">Role</label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  className="mt-1.5 w-full h-11 rounded-xl border border-neutral-200 px-3 text-[13px] bg-white focus:outline-none focus:border-[#F2B21B]"
+                >
+                  <option value="citizen">Resident</option>
+                  <option value="barangay">Barangay official</option>
+                  <option value="lgu_admin">LDRRMO staff</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
+                {(editRole === 'barangay' || editRole === 'citizen') && (
+                  <>
+                    <label className="block mt-4 text-[11px] font-semibold text-neutral-500">Barangay</label>
+                    <select
+                      value={editBarangay}
+                      onChange={(e) => setEditBarangay(e.target.value)}
+                      className="mt-1.5 w-full h-11 rounded-xl border border-neutral-200 px-3 text-[13px] bg-white focus:outline-none focus:border-[#F2B21B]"
+                    >
+                      <option value="">{editRole === 'citizen' ? 'Not set' : 'Choose a barangay'}</option>
+                      {data.barangays
+                        .filter((b) => b.uuid)
+                        .map((b) => (
+                          <option key={b.uuid as string} value={b.uuid as string}>
+                            {b.name}
+                          </option>
+                        ))}
+                    </select>
+                  </>
+                )}
+              </>
+            )}
+
+            {accountNotice && <p className="mt-3 text-[12px] text-red-700">{accountNotice}</p>}
+
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={toggleDisabled}
+                disabled={savingAccount || editing.id === currentUser.id}
+                title={editing.id === currentUser.id ? 'You cannot disable your own account' : undefined}
+                className={`flex-1 h-11 rounded-full border text-[13px] font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                  editing.disabled ? 'border-emerald-200 text-emerald-700' : 'border-red-200 text-red-700'
+                }`}
+              >
+                {editing.disabled ? 'Enable account' : 'Disable account'}
+              </button>
+              {editing.role !== 'dispatch' && (
+                <button
+                  type="button"
+                  onClick={saveAccount}
+                  disabled={savingAccount}
+                  className="flex-1 h-11 rounded-full bg-gradient-to-r from-[#F6C445] to-[#F2A50F] text-white text-[13px] font-bold shadow-[0_10px_20px_-10px_rgba(242,165,15,0.9)] cursor-pointer disabled:opacity-50"
+                >
+                  {savingAccount ? 'Saving…' : 'Save'}
+                </button>
+              )}
+            </div>
+            <button type="button" onClick={() => setEditing(null)} className="mt-3 w-full h-10 text-[13px] text-neutral-500 cursor-pointer">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -384,6 +558,135 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
         ))}
         {!data.audit.length && <p className="px-4 py-10 text-center text-[13px] text-neutral-400">No activity recorded yet.</p>}
       </div>
+    </div>
+  );
+
+  const FIELD_LABEL: Record<string, string> = { agency_name: 'Agency', contact_number: 'Contact number', scope: 'Scope', description: 'Description', active: 'Verified' };
+  const fieldText = (v: unknown) => (v === undefined || v === null || v === '' ? '—' : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v));
+
+  const requestsView = (
+    <div className="px-4 sm:px-8 pt-6">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h2 className="text-[20px] font-bold text-neutral-800">Change requests</h2>
+        <span className="text-[12px] font-semibold text-[#8A5A00] bg-[#FFF3C9] rounded-full px-3 py-1">{pending.length} pending</span>
+      </div>
+      {requestNotice && <p className="mb-3 text-[12px] text-[#5C3A0A] bg-[#FFF3C9] rounded-xl px-4 py-2">{requestNotice}</p>}
+      <div className="bg-white rounded-[22px] p-2 shadow-[0_20px_40px_-28px_rgba(58,42,8,0.4)]">
+        {data.changeRequests.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => {
+              setOpenRequest(c);
+              setDecisionNote('');
+              setRequestNotice(null);
+            }}
+            className="w-full text-left flex items-start gap-3 px-4 py-3 rounded-2xl hover:bg-[#FFFBF0] cursor-pointer"
+          >
+            <span className="w-8 h-8 rounded-xl bg-[#FFF3C9] text-[#C98A0B] flex items-center justify-center shrink-0 mt-0.5">
+              <FileText className="w-4 h-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-semibold text-neutral-800 truncate">
+                {c.action === 'add' ? 'Add' : c.action === 'edit' ? 'Edit' : 'Remove'} hotline:{' '}
+                {String(c.proposed_data.agency_name || c.current_data.agency_name || '')}
+              </span>
+              <span className="block text-[11px] text-neutral-400 mt-0.5 truncate">
+                {c.requester_name || 'Unknown'} · {c.requester_role === 'barangay_official' ? `Brgy. ${c.requester_barangay}` : 'LDRRMO'} · {relTime(c.created_at)}
+              </span>
+            </span>
+            <span
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                c.status === 'pending' ? 'bg-[#FFF3C9] text-[#8A5A00]' : c.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+              }`}
+            >
+              {c.status}
+            </span>
+          </button>
+        ))}
+        {!data.changeRequests.length && <p className="px-4 py-10 text-center text-[13px] text-neutral-400">No change requests yet.</p>}
+      </div>
+
+      {openRequest && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#3A2A08]/40 p-0 sm:p-6" onClick={() => setOpenRequest(null)}>
+          <div
+            role="dialog"
+            aria-label="Review change request"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-t-[26px] sm:rounded-[26px] p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+          >
+            <h3 className="text-[17px] font-bold text-neutral-800">
+              {openRequest.action === 'add' ? 'Add a hotline' : openRequest.action === 'edit' ? 'Change a hotline' : 'Remove a hotline'}
+            </h3>
+            <p className="text-[12px] text-neutral-400 mt-1">
+              From {openRequest.requester_name || 'Unknown'}
+              {openRequest.requester_role === 'barangay_official' ? ` (Brgy. ${openRequest.requester_barangay})` : ' (LDRRMO)'} · {relTime(openRequest.created_at)}
+            </p>
+            {openRequest.reason && <p className="mt-3 text-[13px] text-neutral-700 bg-[#FFFBF0] rounded-xl px-4 py-3">“{openRequest.reason}”</p>}
+
+            <div className="mt-4 rounded-2xl border border-neutral-100 overflow-hidden">
+              <div className="grid grid-cols-[1fr_1fr_1fr] gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-neutral-400 bg-neutral-50">
+                <span>Field</span>
+                <span>Current</span>
+                <span>Proposed</span>
+              </div>
+              {Object.keys(FIELD_LABEL)
+                .filter((k) => k in openRequest.current_data || k in openRequest.proposed_data)
+                .map((k) => {
+                  const before = openRequest.current_data[k];
+                  const after = openRequest.action === 'delete' ? undefined : k in openRequest.proposed_data ? openRequest.proposed_data[k] : before;
+                  const changed = fieldText(before) !== fieldText(after);
+                  return (
+                    <div key={k} className="grid grid-cols-[1fr_1fr_1fr] gap-2 px-4 py-2 text-[12px] border-t border-neutral-100">
+                      <span className="text-neutral-500">{FIELD_LABEL[k]}</span>
+                      <span className="text-neutral-700 break-words">{fieldText(before)}</span>
+                      <span className={`break-words ${changed ? 'font-semibold text-[#8A5A00]' : 'text-neutral-700'}`}>{fieldText(after)}</span>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {openRequest.status === 'pending' ? (
+              <>
+                <label className="block mt-4 text-[11px] font-semibold text-neutral-500">Note to the requester (required to reject)</label>
+                <textarea
+                  rows={2}
+                  value={decisionNote}
+                  onChange={(e) => setDecisionNote(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-neutral-200 px-3 py-2 text-[13px] focus:outline-none focus:border-[#F2B21B] resize-none"
+                />
+                {requestNotice && <p className="mt-2 text-[12px] text-red-700">{requestNotice}</p>}
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => decide(false)}
+                    disabled={deciding}
+                    className="flex-1 h-11 rounded-full border border-neutral-200 text-[13px] font-bold text-neutral-700 cursor-pointer disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decide(true)}
+                    disabled={deciding}
+                    className="flex-1 h-11 rounded-full bg-gradient-to-r from-[#F6C445] to-[#F2A50F] text-white text-[13px] font-bold shadow-[0_10px_20px_-10px_rgba(242,165,15,0.9)] cursor-pointer disabled:opacity-50"
+                  >
+                    {deciding ? 'Saving…' : 'Approve'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="mt-4 text-[12px] text-neutral-500">
+                {openRequest.status === 'approved' ? 'Approved' : 'Rejected'} {openRequest.decided_at ? relTime(openRequest.decided_at) : ''}
+                {openRequest.decision_note ? ` · ${openRequest.decision_note}` : ''}
+              </p>
+            )}
+            <button type="button" onClick={() => setOpenRequest(null)} className="mt-3 w-full h-10 text-[13px] text-neutral-500 cursor-pointer">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -473,6 +776,11 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                       }`}
                     >
                       {v.label}
+                      {v.id === 'requests' && pending.length > 0 && (
+                        <span className="ml-1.5 inline-flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full bg-[#F28C0F] text-white text-[10px] font-bold">
+                          {pending.length}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </nav>
@@ -522,9 +830,15 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                 </div>
               ) : (
                 <div className="px-4 sm:px-8 pt-6 pb-8">
-                  <h2 className="text-[26px] font-extrabold text-[#3A2A08]">{view === 'accounts' ? 'Accounts' : 'Activity'}</h2>
+                  <h2 className="text-[26px] font-extrabold text-[#3A2A08]">
+                    {view === 'accounts' ? 'Accounts' : view === 'requests' ? 'Requests' : 'Activity'}
+                  </h2>
                   <p className="text-[13px] text-[#5C3A0A]/80 mt-1">
-                    {view === 'accounts' ? `${totalAccounts} accounts in UniGuard` : 'Every privileged action, newest first'}
+                    {view === 'accounts'
+                      ? `${totalAccounts} accounts in UniGuard`
+                      : view === 'requests'
+                      ? 'Changes to official records wait here for your approval'
+                      : 'Every privileged action, newest first'}
                   </p>
                 </div>
               )}
@@ -532,7 +846,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
 
             {loadError && <p className="mx-4 sm:mx-8 mt-4 text-[12px] text-red-700 bg-red-50 rounded-xl px-4 py-2">{loadError}</p>}
 
-            {view === 'overview' ? overview : view === 'accounts' ? accountsView : activityView}
+            {view === 'overview' ? overview : view === 'accounts' ? accountsView : view === 'requests' ? requestsView : activityView}
 
             {/* on narrower screens the pulse card follows the content */}
             <div className="xl:hidden px-4 sm:px-8 py-6">{pulseCard}</div>

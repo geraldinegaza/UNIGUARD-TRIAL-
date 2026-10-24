@@ -199,7 +199,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
     if (layers.perimeters) {
       store.roadStatus.forEach((road) => {
         if (road.lat === null || road.lng === null) return;
-        const color = road.status === 'blocked' ? '#dc2626' : road.status === 'caution' ? '#f59e0b' : '#00BCD4';
+        const color = road.status === 'blocked' ? '#dc2626' : road.status === 'one_lane' || road.status === 'under_repair' ? '#f59e0b' : '#00BCD4';
         const donutIcon = L.divIcon({
           className: 'bg-transparent',
           html: `<div style="width: 22px; height: 22px; border-radius: 9999px; border: 5px solid ${color}; background: #ffffff; box-shadow: 0 2px 8px rgba(0,188,212,0.6);"></div>`,

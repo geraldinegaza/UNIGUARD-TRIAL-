@@ -4,6 +4,11 @@
 // capable device. Nothing is hard-coded to one vendor: point SMS_GATEWAY_URL at
 // your Philippine gateway and adapt `buildRequest` if its payload differs.
 //
+// Extended (migration 038+): now respects the same audience filters as
+// push-dispatch (barangayId, unitId). When neither is set the function
+// targets the whole municipality (LGU only — the caller is the push-dispatch
+// function, which has already authorised the call).
+//
 // With no gateway configured the function records the messages it would have
 // sent and returns, so the alert pipeline can be tested end to end before a
 // commercial gateway is in place.
@@ -38,7 +43,7 @@ Deno.serve(async (req: Request) => {
 
   const url = Deno.env.get('SUPABASE_URL')!;
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!service) return json({ error: 'Service role key is not configured' }, 500);
+  if (!service) return json({ error: 'Service role key is not configured on this function' }, 500);
 
   const gatewayUrl = Deno.env.get('SMS_GATEWAY_URL') || '';
   const gatewayKey = Deno.env.get('SMS_GATEWAY_KEY') || '';
@@ -52,14 +57,17 @@ Deno.serve(async (req: Request) => {
   const title = String(body.title || 'UniGuard alert');
   const message = String(body.message || '');
   const severity = String(body.severity || 'advisory');
-  const area = String(body.area || 'Citywide');
+  const area = String(body.area || 'Municipality-wide');
+  const barangayId = (body.barangayId as string) || null;
+  const unitId = (body.unitId as string) || null;
 
   // Only accounts with a mobile number, and only for anything above an advisory,
   // so we never burn gateway credit on routine posts.
-  const { data: people, error } = await admin
-    .from('profiles')
-    .select('id, full_name, phone, barangay')
-    .not('phone', 'is', null);
+  let q = admin.from('profiles').select('id, full_name, phone, barangay').not('phone', 'is', null);
+  if (barangayId) q = q.eq('barangay_id', barangayId);
+  else if (unitId) q = q.eq('dispatch_unit_id', unitId).eq('role', 'dispatch_team');
+
+  const { data: people, error } = await q;
 
   if (error) return json({ error: error.message }, 500);
 
@@ -69,7 +77,7 @@ Deno.serve(async (req: Request) => {
   if (!gatewayUrl || !gatewayKey) {
     await admin.from('audit_log').insert({
       action: 'sms.skipped_no_gateway', entity: 'advisories', entity_id: (body.advisoryId as string) || null,
-      meta: { wouldSend: recipients.length, severity, text }
+      meta: { wouldSend: recipients.length, severity, text, barangayId, unitId }
     });
     return json({ ok: true, queued: 0, wouldSend: recipients.length, note: 'No SMS gateway configured' });
   }
@@ -86,7 +94,7 @@ Deno.serve(async (req: Request) => {
 
   await admin.from('audit_log').insert({
     action: 'sms.dispatched', entity: 'advisories', entity_id: (body.advisoryId as string) || null,
-    meta: { queued, failed, severity, area }
+    meta: { queued, failed, severity, area, barangayId, unitId }
   });
 
   return json({ ok: true, queued, failed });

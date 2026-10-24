@@ -621,37 +621,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   </button>
                 )}
 
-                {/* Users Management */}
-                {isLgu && (
-                  <button
-                    onClick={() => {
-                      setActiveTab('users');
-                      setIsMenuOpen(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
-                      isBarangay ? 'text-[#011025] hover:bg-[#C2E8FF]/30' : 'text-neutral-700 hover:bg-neutral-100'
-                    }`}
-                  >
-                    <Users className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
-                    <span>Users</span>
-                  </button>
-                )}
-
-                {/* Audit Log */}
-                {isLgu && (
-                  <button
-                    onClick={() => {
-                      setActiveTab('audit_log');
-                      setIsMenuOpen(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
-                      isBarangay ? 'text-[#011025] hover:bg-[#C2E8FF]/30' : 'text-neutral-700 hover:bg-neutral-100'
-                    }`}
-                  >
-                    <FileText className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
-                    <span>Audit Log</span>
-                  </button>
-                )}
+                {/* Users and the Activity Log are Super Admin screens, in the Super Admin console */}
 
                 {/* Offline Sync */}
                 <button

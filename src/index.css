@@ -66,3 +66,8 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Report location pin */
+.ug-pin-pulse { animation: ug-pin-pulse 1.6s ease-out infinite; }
+@keyframes ug-pin-pulse { from { transform: scale(0.6); opacity: 0.9; } to { transform: scale(1.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ug-pin-pulse { animation: none; } }

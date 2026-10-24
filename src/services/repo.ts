@@ -31,6 +31,7 @@ import {
   ReportSeverity,
   Responder,
   RoadCondition,
+  ChangeRequest,
   RoadStatus,
   RoadWork,
   SosEntry,
@@ -69,6 +70,7 @@ export interface RepoState {
   users: User[];
   audit: SystemAuditLog[];
   responders: Responder[];
+  changeRequests: ChangeRequest[];
 }
 
 const fallbackBarangays = (): Barangay[] =>
@@ -100,6 +102,7 @@ let state: RepoState = {
   users: [],
   audit: [],
   responders: [],
+  changeRequests: [],
 };
 
 const listeners = new Set<() => void>();
@@ -133,13 +136,14 @@ const ROLE_FROM_DB: Record<string, UserRole> = {
   barangay_official: 'barangay',
   lgu_ldrrmc: 'lgu_admin',
   dispatch_team: 'dispatch',
-  super_admin: 'super_admin',
 };
 const ROLE_TO_DB: Record<UserRole, string> = {
   citizen: 'citizen',
   barangay: 'barangay_official',
   lgu_admin: 'lgu_ldrrmc',
   dispatch: 'dispatch_team',
+  // the Super Admin is lgu_ldrrmc + profiles.is_super_admin; admin-users
+  // accepts 'super_admin' as its name for that combination
   super_admin: 'super_admin',
 };
 export const roleToDb = (role: UserRole) => ROLE_TO_DB[role];
@@ -153,11 +157,14 @@ export function toUser(p: Row, email?: string): User {
     full_name: p.full_name || (email ? email.split('@')[0] : ''),
     email: p.email || email || '',
     phone: p.phone || '',
-    role: ROLE_FROM_DB[p.role] || 'citizen',
+    // the Super Admin is an LGU account carrying the is_super_admin flag
+    role: p.role === 'lgu_ldrrmc' && p.is_super_admin ? 'super_admin' : ROLE_FROM_DB[p.role] || 'citizen',
     barangay_id: p.barangay ? barangaySlug(p.barangay) : undefined,
     barangay_name: p.barangay || '',
     barangay_uuid: p.barangay_id || null,
     disabled: !!p.disabled,
+    dispatch_unit_id: p.dispatch_unit_id || null,
+    unit_role: p.unit_role || '',
     created_at: p.created_at || new Date().toISOString(),
   };
 }
@@ -169,7 +176,8 @@ function toReport(r: Row, units = 0): IncidentReport {
     id: r.id,
     code: r.code || String(r.id).slice(0, 8),
     reporter_id: r.reporter_id || null,
-    is_mine: !!state.user && r.reporter_id === state.user.id,
+    // reports_feed carries is_mine and no reporter id; the fallback covers older rows
+    is_mine: typeof r.is_mine === 'boolean' ? r.is_mine : !!state.user && r.reporter_id === state.user.id,
     barangay_id: barangaySlug(r.barangay || ''),
     barangay_name: r.barangay || '',
     hazard_type: hazardDisplayLabel(r.hazard_type, r.hazard_other_text),
@@ -189,6 +197,11 @@ function toReport(r: Row, units = 0): IncidentReport {
     updated_at: r.updated_at || r.created_at,
     resolved_at: r.resolved_at || undefined,
     is_offline_synced: true,
+    verified_by_role: r.verified_by_role || null,
+    verified_by_name: r.verified_by_name || null,
+    is_stale: !!r.is_stale,
+    is_severity_bypass: !!r.is_severity_bypass,
+    escalates_to_lgu: !!r.escalates_to_lgu,
   };
 }
 
@@ -301,15 +314,30 @@ const toBeneficiary = (b: Row): Beneficiary => ({
   active: b.active !== false,
 });
 
-const toGuide = (g: Row): PreparednessGuide => ({
-  id: g.id,
-  hazard_type: g.hazard_type || '',
-  phase: (g.phase || 'before') as GuidePhase,
-  title: g.title || '',
-  body: g.body || '',
-  sort_order: g.sort_order || 0,
-  active: g.active !== false,
-});
+const PHASES: GuidePhase[] = ['before', 'during', 'after'];
+const PHASE_COLUMN: Record<GuidePhase, string> = { before: 'body_before', during: 'body_during', after: 'body_after' };
+
+// One database guide becomes one entry per phase that has text. A legacy
+// single-phase row (phase before/during/after, text in body) stays one entry.
+const toGuides = (g: Row): PreparednessGuide[] => {
+  const base = {
+    guide_id: g.id,
+    hazard_type: g.hazard_type || '',
+    title: g.title || '',
+    summary: g.summary || '',
+    sort_order: g.sort_order || 0,
+    active: g.active !== false,
+  };
+  if (g.phase && g.phase !== 'all') {
+    return [{ ...base, id: g.id, phase: g.phase as GuidePhase, body: g.body || '' }];
+  }
+  return PHASES.filter((ph) => (g[PHASE_COLUMN[ph]] || '').trim()).map((ph) => ({
+    ...base,
+    id: `${g.id}:${ph}`,
+    phase: ph,
+    body: g[PHASE_COLUMN[ph]],
+  }));
+};
 
 const toFaq = (f: Row): Faq => ({
   id: f.id,
@@ -340,7 +368,8 @@ const toRoadStatus = (r: Row): RoadStatus => ({
   id: r.id,
   road_name: r.road_name || '',
   barangay: r.barangay || '',
-  status: (r.status || 'passable') as RoadCondition,
+  // 'caution' was renamed 'one_lane' by the road status migration
+  status: (r.status === 'caution' ? 'one_lane' : r.status || 'passable') as RoadCondition,
   note: r.note || '',
   lat: num(r.lat),
   lng: num(r.lng),
@@ -441,7 +470,7 @@ export async function loadAll(): Promise<void> {
     if (!notifications.error) patch.notifications = (notifications.data || []).map(toNotification);
     if (!relief.error) patch.relief = (relief.data || []).map(toRelief);
     if (!beneficiaries.error) patch.beneficiaries = (beneficiaries.data || []).map(toBeneficiary);
-    if (!guides.error) patch.guides = (guides.data || []).map(toGuide);
+    if (!guides.error) patch.guides = (guides.data || []).flatMap(toGuides);
     if (!faqs.error) patch.faqs = (faqs.data || []).map(toFaq);
     if (!roadWork.error) patch.roadWork = (roadWork.data || []).map(toRoadWork);
     if (!roadStatus.error) patch.roadStatus = (roadStatus.data || []).map(toRoadStatus);
@@ -551,7 +580,8 @@ async function insertReport(input: ReportInput, folder: string): Promise<Row> {
   const { data, error } = await c
     .from('reports')
     .insert({
-      hazard_type: input.hazard_type,
+      // the key ('fire') is the stored form; the app shows the label
+      hazard_type: classifyHazard(input.hazard_type).key,
       hazard_other_text: input.hazard_other_text || null,
       barangay: input.barangay,
       description: input.description,
@@ -604,6 +634,14 @@ export async function advanceStatus(reportId: string, next: IncidentStatus, note
     p_next: next === 'unverified' ? 'reported' : next,
     p_note: note,
   });
+  if (error) fail(error);
+  await loadAll();
+}
+
+// LGU fallback verification for a report the barangay has not verified. Moves it
+// to verified like the official path, but records the LGU as the verifier.
+export async function lguVerify(reportId: string, note = ''): Promise<void> {
+  const { error } = await client().rpc('lgu_verify_report', { p_report_id: reportId, p_note: note });
   if (error) fail(error);
   await loadAll();
 }
@@ -671,9 +709,12 @@ export async function createAdvisory(input: AdvisoryInput): Promise<void> {
   }
   await c.rpc('fanout_advisory', { p_advisory_id: data.id });
   await loadAll();
-  // Web push to subscribed devices. The gateway only accepts LGU callers, and
-  // the in-app notification above has already been delivered either way.
-  if (state.user && state.user.role === 'lgu_admin') {
+  // Web push to subscribed devices. LGU accounts may push municipality-wide; a
+  // targeted advisory reaches only that barangay's devices, which is also the
+  // only audience a barangay official may push to. The in-app notification
+  // above has already been delivered either way.
+  const role = state.user ? state.user.role : null;
+  if (role === 'lgu_admin' || role === 'super_admin' || (role === 'barangay' && target && target.uuid)) {
     c.functions
       .invoke('push-dispatch', {
         body: {
@@ -682,6 +723,7 @@ export async function createAdvisory(input: AdvisoryInput): Promise<void> {
           severity: SEVERITY_TO_DB[input.severity],
           advisoryId: data.id,
           area: target ? target.name : PLACE.areaAll,
+          barangayId: target && target.uuid ? target.uuid : null,
         },
       })
       .then(() => {}, () => {});
@@ -777,6 +819,69 @@ export async function updateHotline(id: string, patch: Partial<HotlineInput> & {
   await loadAll();
 }
 
+/* --------------------------------------------------------- change requests */
+// Hotlines are official records: LGU staff and barangay officials propose a
+// change, and it reaches the directory only when the Super Admin approves it.
+const toChangeRequest = (c: Row): ChangeRequest => ({
+  id: c.id,
+  requester_name: c.requester_name || '',
+  requester_role: c.requester_role || '',
+  requester_barangay: c.requester_barangay || '',
+  target_table: c.target_table || '',
+  target_id: c.target_id || null,
+  action: c.action,
+  current_data: c.current_data || {},
+  proposed_data: c.proposed_data || {},
+  reason: c.reason || '',
+  status: c.status || 'pending',
+  decision_note: c.decision_note || '',
+  decided_at: c.decided_at || null,
+  created_at: c.created_at,
+});
+
+export async function loadChangeRequests(): Promise<void> {
+  if (!supabase) return;
+  const { data, error } = await supabase.from('change_requests').select('*').order('created_at', { ascending: false }).limit(200);
+  if (error) fail(error);
+  set({ changeRequests: (data || []).map(toChangeRequest) });
+}
+
+export async function submitHotlineRequest(
+  action: 'add' | 'edit' | 'delete',
+  hotline: EmergencyHotline | null,
+  proposed: Partial<HotlineInput> & { active?: boolean },
+  reason = ''
+): Promise<void> {
+  const current = hotline
+    ? { agency_name: hotline.agency_name, contact_number: hotline.contact_number, scope: hotline.scope, active: hotline.active }
+    : {};
+  const { error } = await client().rpc('submit_change_request', {
+    p_target_table: 'emergency_hotlines',
+    p_action: action,
+    p_target_id: hotline ? hotline.id : null,
+    p_current_data: current,
+    p_proposed_data: proposed,
+    p_reason: reason,
+  });
+  if (error) fail(error);
+  await loadChangeRequests().catch(() => undefined);
+}
+
+export async function decideChangeRequest(id: string, approve: boolean, note = ''): Promise<void> {
+  const { error } = await client().rpc(approve ? 'approve_change_request' : 'reject_change_request', {
+    p_request_id: id,
+    p_decision_note: note,
+  });
+  if (error) fail(error);
+  await Promise.all([loadChangeRequests(), loadAll()]);
+}
+
+export async function deleteHotline(id: string): Promise<void> {
+  const { error } = await client().from('emergency_hotlines').delete().eq('id', id);
+  if (error) fail(error);
+  await loadAll();
+}
+
 /* ---------------------------------------------------------- notifications */
 export async function markRead(id: string): Promise<void> {
   if (supabase) {
@@ -845,14 +950,52 @@ export async function deleteBeneficiary(id: string): Promise<void> {
 /* ------------------------------------------------------------ guides / faqs */
 export type GuideInput = Pick<PreparednessGuide, 'hazard_type' | 'phase' | 'title' | 'body'>;
 
+// A new phase entry joins the guide with the same hazard and title, or starts
+// a new guide, so each topic stays one row with three sections.
 export async function createGuide(input: GuideInput): Promise<void> {
-  const { error } = await client().from('preparedness_guides').insert(input);
-  if (error) fail(error);
+  const c = client();
+  const { data: existing } = await c
+    .from('preparedness_guides')
+    .select('id')
+    .eq('hazard_type', input.hazard_type)
+    .eq('phase', 'all')
+    .ilike('title', input.title.trim())
+    .limit(1);
+  const column = PHASE_COLUMN[input.phase];
+  if (existing && existing.length) {
+    const { error } = await c.from('preparedness_guides').update({ [column]: input.body }).eq('id', existing[0].id);
+    if (error) fail(error);
+  } else {
+    const { data: userData } = await c.auth.getUser();
+    const { error } = await c.from('preparedness_guides').insert({
+      hazard_type: input.hazard_type,
+      phase: 'all',
+      title: input.title.trim(),
+      body: input.body,
+      summary: input.body.slice(0, 160),
+      [column]: input.body,
+      author_id: userData && userData.user ? userData.user.id : null,
+    });
+    if (error) fail(error);
+  }
   await loadAll();
 }
 
+// id is a phase entry id ("<guide id>:<phase>"), or a legacy row id
 export async function updateGuide(id: string, patch: Partial<GuideInput>): Promise<void> {
-  const { error } = await client().from('preparedness_guides').update(patch).eq('id', id);
+  const [guideId, phase] = id.split(':') as [string, GuidePhase | undefined];
+  const row: Row = {};
+  if (patch.title !== undefined) row.title = patch.title.trim();
+  if (patch.hazard_type !== undefined) row.hazard_type = patch.hazard_type;
+  if (phase && patch.phase && patch.phase !== phase && patch.body !== undefined) {
+    // moved to another phase: clear the old section, write the new one
+    row[PHASE_COLUMN[phase]] = '';
+    row[PHASE_COLUMN[patch.phase]] = patch.body;
+  } else if (patch.body !== undefined) {
+    row[phase ? PHASE_COLUMN[phase] : 'body'] = patch.body;
+    if (!phase && patch.phase) row.phase = patch.phase;
+  }
+  const { error } = await client().from('preparedness_guides').update(row).eq('id', guideId);
   if (error) fail(error);
   await loadAll();
 }

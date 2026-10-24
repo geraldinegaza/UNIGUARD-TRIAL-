@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { EmergencyHotline, User } from '../types';
 import * as repo from '../services/repo';
+import { useRepo } from '../hooks/useRepo';
+import { relTime } from '../lib/util';
 import { download, toCSV } from '../lib/util';
 import {
   Phone,
@@ -38,6 +40,15 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
   const [editAgency, setEditAgency] = useState('');
   const [editNumber, setEditNumber] = useState('');
   const [editScope, setEditScope] = useState('');
+  const [editReason, setEditReason] = useState('');
+
+  // The directory is an official record: changes from LGU staff and barangay
+  // officials go to the Super Admin as requests and apply once approved.
+  const { changeRequests } = useRepo();
+  const myRequests = changeRequests.filter((c) => c.target_table === 'emergency_hotlines').slice(0, 6);
+  useEffect(() => {
+    repo.loadChangeRequests().catch(() => undefined);
+  }, []);
 
   // A hotline is verified while it is marked active in the directory
   const verifiedIds: Record<string, boolean> = Object.fromEntries(hotlines.map((h) => [h.id, h.active]));
@@ -55,12 +66,12 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
     if (!newAgency.trim() || !newContactNumber.trim()) return;
 
     try {
-      await repo.createHotline({
+      await repo.submitHotlineRequest('add', null, {
         agency_name: newAgency.trim(),
         contact_number: newContactNumber.trim(),
-        scope: newScope.trim(),
+        scope: newScope.trim() || 'Municipality-wide',
       });
-      showNotice(`Added ${newAgency.trim()} to municipal directory`);
+      showNotice(`Request sent: ${newAgency.trim()} will be added once the Super Admin approves it`);
 
       // Reset Form
       setNewAgency('');
@@ -68,7 +79,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
       setNewScope('');
       if (onHotlinesUpdated) onHotlinesUpdated();
     } catch (err: any) {
-      showNotice(err.message || 'Could not add the hotline.');
+      showNotice(err.message || 'Could not send the request.');
     }
   };
 
@@ -78,6 +89,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
     setEditAgency(h.agency_name);
     setEditNumber(h.contact_number);
     setEditScope(h.scope);
+    setEditReason('');
   };
 
   // Save Edit
@@ -86,26 +98,41 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
     if (!editingHotline) return;
 
     try {
-      await repo.updateHotline(editingHotline.id, {
-        agency_name: editAgency.trim(),
-        contact_number: editNumber.trim(),
-        scope: editScope.trim(),
-      });
+      await repo.submitHotlineRequest(
+        'edit',
+        editingHotline,
+        { agency_name: editAgency.trim(), contact_number: editNumber.trim(), scope: editScope.trim() },
+        editReason.trim()
+      );
       setEditingHotline(null);
-      showNotice(`Updated hotline information for ${editAgency.trim()}`);
+      showNotice(`Change request sent for ${editAgency.trim()}. It applies once the Super Admin approves it.`);
       if (onHotlinesUpdated) onHotlinesUpdated();
     } catch (err: any) {
-      showNotice(err.message || 'Could not update the hotline.');
+      showNotice(err.message || 'Could not send the request.');
     }
   };
 
   // Verify Hotline Action
   const handleVerify = async (id: string, name: string) => {
+    const hotline = hotlines.find((h) => h.id === id) || null;
     try {
-      await repo.updateHotline(id, { active: true });
-      showNotice(`Verified line active: ${name}`);
+      await repo.submitHotlineRequest('edit', hotline, { active: true }, 'Line confirmed working');
+      showNotice(`Request sent to mark ${name} as verified`);
     } catch (err: any) {
-      showNotice(err.message || 'Could not verify the hotline.');
+      showNotice(err.message || 'Could not send the request.');
+    }
+  };
+
+  // Ask the Super Admin to remove a line from the directory
+  const handleRequestRemoval = async () => {
+    if (!editingHotline) return;
+    if (!window.confirm(`Ask the Super Admin to remove ${editingHotline.agency_name} from the directory?`)) return;
+    try {
+      await repo.submitHotlineRequest('delete', editingHotline, {}, editReason.trim());
+      setEditingHotline(null);
+      showNotice(`Removal request sent for ${editingHotline.agency_name}`);
+    } catch (err: any) {
+      showNotice(err.message || 'Could not send the request.');
     }
   };
 
@@ -291,14 +318,14 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                         {/* Edit Button */}
                         <button
                           onClick={() => handleOpenEdit(hotline)}
-                          className={`w-20 h-8 ${
+                          className={`h-8 px-3 whitespace-nowrap ${
                             isBarangay
                               ? 'bg-white hover:bg-[#C2E8FF]/30 border border-[#7EA0C5]/40 text-[#052659]'
                               : 'bg-white hover:bg-neutral-100 border border-neutral-200/80 text-neutral-700'
                           } text-xs font-medium rounded-full inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0 text-center`}
                         >
                           <Edit2 className={`w-3.5 h-3.5 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`} />
-                          <span>Edit</span>
+                          <span>Request edit</span>
                         </button>
 
                         {/* Verify Button */}
@@ -328,10 +355,10 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
         {/* Card Header Bar */}
         <div className={`px-6 py-4.5 ${isBarangay ? 'bg-[#C2E8FF]/15 border-[#7EA0C5]/30' : 'bg-neutral-50/50 border-neutral-100'} border-b flex items-center justify-between`}>
           <h2 className={`text-sm font-semibold uppercase tracking-wide ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-            Add Hotline
+            Request a New Hotline
           </h2>
           <span className={`text-[11px] font-medium ${isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'}`}>
-            Immediate Offline Cache Sync
+            Added once the Super Admin approves it
           </span>
         </div>
 
@@ -405,12 +432,52 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                 } text-white rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs active:scale-95`}
               >
                 <Plus className="w-4 h-4" />
-                <span>Add</span>
+                <span>Request</span>
               </button>
             </div>
           </div>
         </form>
       </div>
+
+      {/* Requests this account has sent, with their outcome */}
+      {myRequests.length > 0 && (
+        <div className={`bg-white rounded-[24px] border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/70'} shadow-xs overflow-hidden`}>
+          <div className={`px-6 py-4 ${isBarangay ? 'bg-[#C2E8FF]/15 border-[#7EA0C5]/30' : 'bg-neutral-50/50 border-neutral-100'} border-b`}>
+            <h2 className={`text-sm font-semibold uppercase tracking-wide ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
+              Your Change Requests
+            </h2>
+          </div>
+          <ul className={`divide-y ${isBarangay ? 'divide-[#7EA0C5]/20' : 'divide-neutral-100'}`}>
+            {myRequests.map((c) => (
+              <li key={c.id} className="px-6 py-3 flex items-center justify-between gap-3">
+                <span className="min-w-0">
+                  <span className={`block text-xs font-semibold truncate ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
+                    {c.action === 'add' ? 'Add' : c.action === 'edit' ? 'Edit' : 'Remove'}{' '}
+                    {String(c.proposed_data.agency_name || c.current_data.agency_name || 'hotline')}
+                  </span>
+                  <span className={`block text-[11px] truncate ${isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'}`}>
+                    {relTime(c.created_at)}
+                    {c.decision_note ? ` · ${c.decision_note}` : ''}
+                  </span>
+                </span>
+                <span
+                  className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                    c.status === 'approved'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : c.status === 'rejected'
+                      ? 'bg-red-50 text-red-700 border border-red-200'
+                      : isBarangay
+                      ? 'bg-[#C2E8FF]/50 text-[#052659] border border-[#7EA0C5]/40'
+                      : 'bg-neutral-100 text-neutral-700 border border-neutral-200'
+                  }`}
+                >
+                  {c.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Modal: Edit Hotline */}
       {editingHotline && (
@@ -418,7 +485,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
           <div className={`bg-white rounded-[24px] max-w-md w-full p-6 shadow-2xl border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/80'} animate-in zoom-in-95 duration-200`}>
             <div className={`flex items-center justify-between pb-3.5 border-b ${isBarangay ? 'border-[#7EA0C5]/30' : 'border-neutral-100'}`}>
               <h3 className={`font-semibold text-base ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-                Edit Emergency Hotline
+                Request a Hotline Change
               </h3>
               <button
                 onClick={() => setEditingHotline(null)}
@@ -481,8 +548,31 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                 />
               </div>
 
+              <div>
+                <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
+                  Reason (shown to the Super Admin)
+                </label>
+                <textarea
+                  rows={2}
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  placeholder="e.g. The agency changed its trunk line"
+                  className={`w-full text-xs font-medium p-2.5 rounded-xl shadow-2xs transition-all resize-none ${
+                    isBarangay
+                      ? 'border border-[#7EA0C5]/40 bg-white hover:bg-[#C2E8FF]/15 focus:bg-white text-[#011025] focus:outline-hidden focus:border-[#052659] focus:ring-2 focus:ring-[#052659]/15'
+                      : 'bg-neutral-50/70 hover:bg-neutral-50 focus:bg-white border border-neutral-200 focus:outline-hidden focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200/50'
+                  }`}
+                />
+              </div>
+
               <div className={`flex items-center justify-between pt-3 border-t ${isBarangay ? 'border-[#7EA0C5]/30' : 'border-neutral-100'}`}>
-                <span />
+                <button
+                  type="button"
+                  onClick={handleRequestRemoval}
+                  className="px-3 py-2 text-xs font-medium rounded-full cursor-pointer text-red-700 hover:bg-red-50 transition-colors"
+                >
+                  Request removal
+                </button>
 
                 <div className="flex items-center gap-2">
                   <button
@@ -500,7 +590,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                       isBarangay ? 'bg-[#052659] hover:bg-[#5482B4] border border-[#011025]' : 'bg-[#18181b] hover:bg-neutral-800'
                     } rounded-full shadow-xs cursor-pointer transition-colors`}
                   >
-                    Save Changes
+                    Send Request
                   </button>
                 </div>
               </div>
