@@ -1,0 +1,16 @@
+{
+  // Editor-only settings for the Supabase Edge Functions. They run on Deno,
+  // not in the browser app, so VS Code needs to know about Deno's globals and
+  // its npm: imports (see deno-env.d.ts). Supabase deploys ignore this file.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "strict": false,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["**/*.ts"]
+}
