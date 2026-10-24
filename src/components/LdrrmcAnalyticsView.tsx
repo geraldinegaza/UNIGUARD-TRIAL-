@@ -21,6 +21,7 @@ import {
 
 import { HAZARD_LABELS, classifyHazard } from '../lib/hazards';
 import { download, toCSV } from '../lib/util';
+import { AnalyticsDetailCards } from './AnalyticsDetailCards';
 
 export interface LdrrmcAnalyticsViewProps {
   reports: IncidentReport[];
@@ -486,6 +487,11 @@ export const LdrrmcAnalyticsView: React.FC<LdrrmcAnalyticsViewProps> = ({
           ))}
         </div>
       </div>
+
+      {/* 5. The nine detail cards with the shared range filter */}
+      {currentUser && (
+        <AnalyticsDetailCards currentUser={currentUser} barangays={barangays} reports={reports} centers={evacuationCenters} />
+      )}
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { Barangay, User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { classifyCoords, coordMessage, locate } from '../lib/geo';
-import { RoadCondition } from '../types';
+import { RoadCause, RoadCondition } from '../types';
 import {
   Construction,
   Megaphone,
@@ -36,7 +36,27 @@ export interface RoadWorkPost {
   status: 'Impassable' | 'Passable with Caution' | 'Under Clearing' | 'Cleared';
   createdAt: string;
   authorName: string;
+  segment: string;
+  cause: string;
+  severity: string;
+  reopensAt: string | null;
 }
+
+const CAUSES: { value: RoadCause; label: string }[] = [
+  { value: '', label: 'Not specified' },
+  { value: 'flood', label: 'Flooding' },
+  { value: 'landslide', label: 'Landslide' },
+  { value: 'repair', label: 'Road repair' },
+  { value: 'accident', label: 'Accident' },
+  { value: 'other', label: 'Other' },
+];
+const CAUSE_LABEL = Object.fromEntries(CAUSES.map((c) => [c.value, c.label])) as Record<string, string>;
+const SEVERITIES = ['Minor', 'Moderate', 'Major', 'Critical'];
+const whenText = (iso: string | null) => {
+  if (!iso) return '';
+  const t = Date.parse(iso);
+  return isNaN(t) ? '' : new Date(t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
 
 const AREA_ALL = 'Municipality-wide';
 
@@ -92,7 +112,11 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
           durationHours: hours,
           status: STATUS_LABEL[rs.status],
           createdAt: rs.updated_at || '',
-          authorName: '',
+          authorName: rs.updater_name || '',
+          segment: rs.segment_from || rs.segment_to ? `${rs.segment_from || '—'} → ${rs.segment_to || '—'}` : '',
+          cause: rs.cause ? CAUSE_LABEL[rs.cause] || rs.cause : '',
+          severity: rs.severity || '',
+          reopensAt: rs.status === 'passable' ? null : rs.estimated_reopen || null,
         };
       }),
     [store.roadStatus, store.roadWork]
@@ -107,6 +131,10 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
   const [longitude, setLongitude] = useState<string>('');
   const [durationHours, setDurationHours] = useState<string>('6');
   const [status, setStatus] = useState<RoadWorkPost['status']>('Passable with Caution');
+  const [segmentFrom, setSegmentFrom] = useState('');
+  const [segmentTo, setSegmentTo] = useState('');
+  const [cause, setCause] = useState<RoadCause>('');
+  const [severity, setSeverity] = useState('');
 
   // UI state
   const [actionNotice, setActionNotice] = useState<string | null>(null);
@@ -189,6 +217,7 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
         citywide,
       });
       if (roadName.trim()) {
+        const cleared = STATUS_VALUE[status] === 'passable';
         await repo.createRoadStatus({
           road_name: roadName.trim(),
           barangay: citywide ? '' : barangay,
@@ -196,6 +225,12 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
           note: title.trim(),
           lat,
           lng,
+          segment_from: segmentFrom.trim(),
+          segment_to: segmentTo.trim(),
+          cause,
+          severity,
+          started_at: new Date().toISOString(),
+          estimated_reopen: cleared ? null : new Date(Date.now() + hours * 3600000).toISOString(),
         });
       }
       flash(`Road work published and residents notified: "${title.trim()}"`, 4500);
@@ -215,6 +250,10 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
     setLongitude('');
     setDurationHours('6');
     setStatus('Passable with Caution');
+    setSegmentFrom('');
+    setSegmentTo('');
+    setCause('');
+    setSeverity('');
   };
 
   const setRoadCondition = async (id: string, next: RoadCondition, message: string) => {
@@ -404,6 +443,77 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
             </div>
           </div>
 
+          {/* Road status details: the affected segment, cause and severity */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
+                isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'
+              }`}>
+                SEGMENT FROM
+              </label>
+              <input type="text" value={segmentFrom} onChange={(e) => setSegmentFrom(e.target.value)} placeholder="Corner Avenida Rizal" className={`w-full text-xs font-medium p-3 rounded-xl focus:outline-hidden transition-all shadow-2xs ${
+                  isBarangay
+                    ? 'border border-[#7EA0C5]/30 bg-[#C2E8FF]/10 hover:bg-[#C2E8FF]/20 focus:bg-white text-[#011025] placeholder-[#5482B4]/60 focus:border-[#052659] focus:ring-2 focus:ring-[#C2E8FF]'
+                    : 'border border-neutral-200 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-white text-neutral-800 placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200/50'
+                }`} />
+            </div>
+            <div>
+              <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
+                isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'
+              }`}>
+                SEGMENT TO
+              </label>
+              <input type="text" value={segmentTo} onChange={(e) => setSegmentTo(e.target.value)} placeholder="Libsong bridge" className={`w-full text-xs font-medium p-3 rounded-xl focus:outline-hidden transition-all shadow-2xs ${
+                  isBarangay
+                    ? 'border border-[#7EA0C5]/30 bg-[#C2E8FF]/10 hover:bg-[#C2E8FF]/20 focus:bg-white text-[#011025] placeholder-[#5482B4]/60 focus:border-[#052659] focus:ring-2 focus:ring-[#C2E8FF]'
+                    : 'border border-neutral-200 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-white text-neutral-800 placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200/50'
+                }`} />
+            </div>
+            <div>
+              <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
+                isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'
+              }`}>
+                CAUSE
+              </label>
+              <div className="relative">
+                <select value={cause} onChange={(e) => setCause(e.target.value as RoadCause)} className={`w-full text-xs font-medium rounded-xl p-3 appearance-none focus:outline-hidden shadow-2xs cursor-pointer transition-all ${
+                    isBarangay
+                      ? 'text-[#011025] bg-[#C2E8FF]/10 hover:bg-[#C2E8FF]/20 focus:bg-white border border-[#7EA0C5]/30 focus:border-[#052659] focus:ring-2 focus:ring-[#C2E8FF]'
+                      : 'text-neutral-800 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-white border border-neutral-200 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200/50'
+                  }`}>
+                  {CAUSES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+                <ChevronDown className={`w-4 h-4 absolute right-3.5 top-3.5 pointer-events-none ${
+                  isBarangay ? 'text-[#5482B4]' : 'text-neutral-400'
+                }`} />
+              </div>
+            </div>
+            <div>
+              <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
+                isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'
+              }`}>
+                SEVERITY
+              </label>
+              <div className="relative">
+                <select value={severity} onChange={(e) => setSeverity(e.target.value)} className={`w-full text-xs font-medium rounded-xl p-3 appearance-none focus:outline-hidden shadow-2xs cursor-pointer transition-all ${
+                    isBarangay
+                      ? 'text-[#011025] bg-[#C2E8FF]/10 hover:bg-[#C2E8FF]/20 focus:bg-white border border-[#7EA0C5]/30 focus:border-[#052659] focus:ring-2 focus:ring-[#C2E8FF]'
+                      : 'text-neutral-800 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-white border border-neutral-200 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200/50'
+                  }`}>
+                  <option value="">Not specified</option>
+                  {SEVERITIES.map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+                <ChevronDown className={`w-4 h-4 absolute right-3.5 top-3.5 pointer-events-none ${
+                  isBarangay ? 'text-[#5482B4]' : 'text-neutral-400'
+                }`} />
+              </div>
+            </div>
+          </div>
+
           {/* Grid Row 2: LATITUDE, LONGITUDE, & My Location Button */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
             <div className="md:col-span-5">
@@ -502,7 +612,8 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
                   }`}
                 >
                   <option value="Impassable">Impassable (Closed Road)</option>
-                  <option value="Passable with Caution">Passable with Caution</option>
+                  <option value="Passable with Caution">Passable with Caution (One Lane)</option>
+                  <option value="Under Clearing">Under Clearing / Repair</option>
                   <option value="Cleared">Cleared (Open)</option>
                 </select>
                 <ChevronDown className={`w-4 h-4 absolute right-3.5 top-3.5 pointer-events-none ${
@@ -701,14 +812,49 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
                       {/* Progressive Disclosure: Description and GPS reveal on hover or click */}
                       <div className={`overflow-hidden transition-all duration-200 space-y-1.5 ${
                         isExpanded
-                          ? 'max-h-48 pt-2.5 border-t border-neutral-200/80 opacity-100'
-                          : 'max-h-0 group-hover:max-h-48 group-hover:pt-2.5 group-hover:border-t group-hover:border-neutral-100 opacity-0 group-hover:opacity-100'
+                          ? 'max-h-96 pt-2.5 border-t border-neutral-200/80 opacity-100'
+                          : 'max-h-0 group-hover:max-h-96 group-hover:pt-2.5 group-hover:border-t group-hover:border-neutral-100 opacity-0 group-hover:opacity-100'
                       }`}>
                         <p className={`text-xs leading-relaxed font-normal ${
                           isBarangay ? 'text-[#5482B4]' : 'text-neutral-600'
                         }`}>
                           {post.description}
                         </p>
+
+                        {(post.segment || post.cause || post.severity || post.reopensAt) && (
+                          <dl className={`grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] ${isBarangay ? 'text-[#011025]' : 'text-neutral-700'}`}>
+                            {post.segment && (
+                              <div className="col-span-2 min-w-0">
+                                <dt className="inline font-semibold">Segment: </dt>
+                                <dd className="inline break-words">{post.segment}</dd>
+                              </div>
+                            )}
+                            {post.cause && (
+                              <div>
+                                <dt className="inline font-semibold">Cause: </dt>
+                                <dd className="inline">{post.cause}</dd>
+                              </div>
+                            )}
+                            {post.severity && (
+                              <div>
+                                <dt className="inline font-semibold">Severity: </dt>
+                                <dd className="inline">{post.severity}</dd>
+                              </div>
+                            )}
+                            {post.reopensAt && (
+                              <div className="col-span-2">
+                                <dt className="inline font-semibold">Expected to reopen: </dt>
+                                <dd className="inline">{whenText(post.reopensAt)}</dd>
+                              </div>
+                            )}
+                            {post.authorName && (
+                              <div className="col-span-2">
+                                <dt className="inline font-semibold">Updated by: </dt>
+                                <dd className="inline">{post.authorName}</dd>
+                              </div>
+                            )}
+                          </dl>
+                        )}
 
                         <div className={`flex items-center justify-between font-mono text-[10px] pt-1 ${
                           isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'

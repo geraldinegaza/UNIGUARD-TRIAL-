@@ -39,6 +39,12 @@ import {
   UnitRequest,
   HospitalCapacity,
   UnitType,
+  InventoryItem,
+  DistributionLogEntry,
+  DamageAssessment,
+  SituationReport,
+  OverdueReport,
+  ShelterTrendPoint,
   RoadStatus,
   RoadWork,
   SosEntry,
@@ -87,6 +93,13 @@ export interface RepoState {
   personnel: UnitPersonnel[];
   equipment: UnitEquipment[];
   capacity: HospitalCapacity | null;
+  // Phase 3 operations data, loaded by the screens that use it
+  inventory: InventoryItem[];
+  distributionLog: DistributionLogEntry[];
+  assessments: DamageAssessment[];
+  sitreps: SituationReport[];
+  overdue: OverdueReport[];
+  shelterTrend: ShelterTrendPoint[];
 }
 
 const fallbackBarangays = (): Barangay[] =>
@@ -127,6 +140,12 @@ let state: RepoState = {
   personnel: [],
   equipment: [],
   capacity: null,
+  inventory: [],
+  distributionLog: [],
+  assessments: [],
+  sitreps: [],
+  overdue: [],
+  shelterTrend: [],
 };
 
 const listeners = new Set<() => void>();
@@ -273,6 +292,13 @@ function toCenter(c: Row): EvacuationCenter {
     latitude: located ? c.lat : CENTER[0],
     longitude: located ? c.lng : CENTER[1],
     notes: c.note || '',
+    facilities: Array.isArray(c.facilities)
+      ? c.facilities
+      : typeof c.facilities === 'string' && c.facilities.trim()
+      ? c.facilities.split(',').map((f: string) => f.trim()).filter(Boolean)
+      : [],
+    contact_person: c.contact_person || '',
+    contact_phone: c.contact_phone || '',
   };
 }
 
@@ -398,6 +424,13 @@ const toRoadStatus = (r: Row): RoadStatus => ({
   lat: num(r.lat),
   lng: num(r.lng),
   updated_at: r.updated_at || null,
+  segment_from: r.segment_from || '',
+  segment_to: r.segment_to || '',
+  cause: r.cause || '',
+  severity: r.severity || '',
+  started_at: r.started_at || null,
+  estimated_reopen: r.estimated_reopen || null,
+  updater_name: r.updater_name || '',
 });
 
 /* ------------------------------------------------------------- hydration */
@@ -784,9 +817,13 @@ export function acknowledgeAlert(advisoryId: string) {
 /* ----------------------------------------------------------------- centres */
 export async function updateCenter(
   id: string,
-  updates: Partial<Pick<EvacuationCenter, 'status' | 'current_occupancy' | 'capacity'>>
+  updates: Partial<Pick<EvacuationCenter, 'status' | 'current_occupancy' | 'capacity' | 'facilities' | 'contact_person' | 'contact_phone' | 'notes'>>
 ): Promise<void> {
   const patch: Row = {};
+  if (updates.facilities !== undefined) patch.facilities = updates.facilities;
+  if (updates.contact_person !== undefined) patch.contact_person = updates.contact_person;
+  if (updates.contact_phone !== undefined) patch.contact_phone = updates.contact_phone;
+  if (updates.notes !== undefined) patch.note = updates.notes;
   if (updates.status !== undefined) patch.status = updates.status;
   if (updates.capacity !== undefined) patch.capacity = updates.capacity;
   if (updates.current_occupancy !== undefined) patch.occupancy = updates.current_occupancy;
@@ -804,6 +841,9 @@ export interface CenterInput {
   lat: number | null;
   lng: number | null;
   notes?: string;
+  facilities?: string[];
+  contact_person?: string;
+  contact_phone?: string;
 }
 
 export async function createCenter(input: CenterInput): Promise<void> {
@@ -819,6 +859,9 @@ export async function createCenter(input: CenterInput): Promise<void> {
     note: input.notes || '',
     lat: input.lat,
     lng: input.lng,
+    facilities: input.facilities || [],
+    contact_person: input.contact_person || '',
+    contact_phone: input.contact_phone || '',
   });
   if (error) fail(error);
   await loadAll();
@@ -1074,7 +1117,8 @@ export async function createRoadWork(input: RoadWorkInput): Promise<void> {
   await loadAll();
 }
 
-export type RoadStatusInput = Pick<RoadStatus, 'road_name' | 'barangay' | 'status' | 'note' | 'lat' | 'lng'>;
+export type RoadStatusInput = Pick<RoadStatus, 'road_name' | 'barangay' | 'status' | 'note' | 'lat' | 'lng'> &
+  Partial<Pick<RoadStatus, 'segment_from' | 'segment_to' | 'cause' | 'severity' | 'started_at' | 'estimated_reopen'>>;
 
 export async function createRoadStatus(input: RoadStatusInput): Promise<void> {
   const c = client();
@@ -1186,6 +1230,26 @@ export async function adminUsers(payload: AdminAction): Promise<void> {
 
 export async function loadAudit(limit = 200): Promise<void> {
   const c = client();
+  // audit_log_with_actor (migration 145) carries the actor's role and barangay
+  const viewed = await c.from('audit_log_with_actor').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (!viewed.error) {
+    set({
+      audit: (viewed.data || []).map((a: Row) => ({
+        id: a.id,
+        timestamp: a.created_at,
+        event_type: a.action || '',
+        entity: a.entity || '',
+        target_id: a.entity_id || '',
+        actor_id: a.actor_id || null,
+        actor_name: a.actor_id ? a.actor_name || String(a.actor_id).slice(0, 8) : 'system',
+        actor_role: a.actor_role || '',
+        actor_barangay: a.actor_barangay || '',
+        meta: a.meta || {},
+        description: describeAudit(a),
+      })),
+    });
+    return;
+  }
   const { data, error } = await c.from('audit_log').select('*').order('created_at', { ascending: false }).limit(limit);
   if (error) fail(error);
   const actorIds = Array.from(new Set((data || []).map((a: Row) => a.actor_id).filter(Boolean)));
@@ -1210,6 +1274,23 @@ export async function loadAudit(limit = 200): Promise<void> {
   });
 }
 
+const AUDIT_RECORD: Record<string, string> = {
+  evacuation_centers: 'Shelter',
+  emergency_hotlines: 'Hotline',
+  road_status: 'Road status',
+  road_work_posts: 'Road work post',
+  relief_distributions: 'Relief schedule',
+  relief_inventory: 'Relief stock item',
+  relief_distribution_log: 'Relief distribution',
+  damage_assessments: 'Damage assessment',
+  situation_reports: 'Situation report',
+  advisories: 'Advisory',
+  preparedness_guides: 'Guide',
+  faqs: 'FAQ',
+  dispatch_units: 'Dispatch unit',
+  profiles: 'Account',
+};
+
 function describeAudit(a: Row): string {
   const meta: Row = a.meta && typeof a.meta === 'object' ? a.meta : {};
   switch (a.action) {
@@ -1232,6 +1313,14 @@ function describeAudit(a: Row): string {
     case 'sos.received':
       return `SOS received${meta.reach != null ? `, ${meta.reach} duty officers notified` : ''}`;
     default: {
+      // rows written by the audit_row_change trigger: "<table>.<insert|update|delete>"
+      const m = /^([a-z_]+)\.(insert|update|delete)$/.exec(a.action || '');
+      if (m) {
+        const what = AUDIT_RECORD[m[1]] || m[1].replace(/_/g, ' ');
+        const did = m[2] === 'insert' ? 'added' : m[2] === 'update' ? 'updated' : 'removed';
+        const name = meta.name || meta.title || meta.road_name || meta.agency_name || '';
+        return `${what} ${did}${name ? `: ${name}` : ''}`;
+      }
       const detail = Object.keys(meta)
         .map((k) => `${k}: ${typeof meta[k] === 'object' ? JSON.stringify(meta[k]) : meta[k]}`)
         .join(' · ');
@@ -1660,4 +1749,244 @@ export async function setHospitalCapacity(input: HospitalCapacity): Promise<void
     p_accepting: input.accepting,
   });
   await loadMyUnit();
+}
+
+/* ============================================== Phase 3: operations data */
+const int = (v: unknown) => {
+  const n = Number(v);
+  return isFinite(n) ? n : 0;
+};
+
+/* ------------------------------------------- one-hour verification queue */
+// Reports still awaiting barangay verification an hour after they were filed
+// (lgu_escalation_queue, migrations 147 and 151).
+export async function loadOverdue(): Promise<void> {
+  const { data, error } = await client().from('lgu_escalation_queue').select('*').limit(200);
+  if (error) fail(error);
+  set({
+    overdue: (data || []).map((r: Row) => ({
+      id: r.id,
+      code: r.code || '',
+      hazard_type: r.hazard_type || '',
+      barangay: r.barangay || '',
+      severity: r.severity || '',
+      description: r.description || '',
+      created_at: r.created_at,
+      minutes: Math.round(int(r.minutes_since_submission)),
+    })),
+  });
+}
+
+export async function verifyOverdue(reportId: string): Promise<void> {
+  const { error } = await client().rpc('lgu_verify_overdue_report', { p_report_id: reportId });
+  if (error) fail(error);
+  await Promise.all([loadOverdue(), loadAll()]);
+}
+
+/* ------------------------------------------------------ relief inventory */
+const toInventory = (r: Row): InventoryItem => ({
+  id: r.id,
+  name: r.name || '',
+  category: r.category === 'Shelter' ? 'Shelter Supplies' : r.category || 'Food',
+  unit: r.unit || 'units',
+  stock: int(r.stock),
+  reorder: int(r.reorder),
+  location: r.location || '',
+  supplier: r.supplier || '',
+  updated_at: r.updated_at || null,
+});
+
+const toDistribution = (r: Row): DistributionLogEntry => ({
+  id: r.id,
+  item_id: r.item_id || null,
+  item_name: r.item_name || '',
+  qty: int(r.qty),
+  barangay: r.barangay || '',
+  family: r.family || '',
+  distributed_by: r.distributed_by || '',
+  distributed_at: r.distributed_at || r.created_at,
+});
+
+export async function loadInventory(): Promise<void> {
+  const c = client();
+  const [items, log] = await Promise.all([
+    c.from('relief_inventory').select('*').order('category').order('name'),
+    c.from('relief_distribution_log').select('*').order('distributed_at', { ascending: false }).limit(300),
+  ]);
+  if (items.error) fail(items.error);
+  set({
+    inventory: (items.data || []).map(toInventory),
+    distributionLog: log.error ? [] : (log.data || []).map(toDistribution),
+  });
+}
+
+export type InventoryInput = Omit<InventoryItem, 'id' | 'updated_at'>;
+
+export async function saveInventoryItem(id: string | null, input: InventoryInput): Promise<void> {
+  const c = client();
+  const row = { ...input, stock: Math.max(0, Math.round(input.stock)), reorder: Math.max(0, Math.round(input.reorder)) };
+  const { error } = id
+    ? await c.from('relief_inventory').update({ ...row, updated_at: new Date().toISOString() }).eq('id', id)
+    : await c.from('relief_inventory').insert(row);
+  if (error) fail(error);
+  await loadInventory();
+}
+
+export async function deleteInventoryItem(id: string): Promise<void> {
+  const { error } = await client().from('relief_inventory').delete().eq('id', id);
+  if (error) fail(error);
+  await loadInventory();
+}
+
+// Records goods handed out and lowers the stock in one server step (migration 151).
+export async function logDistribution(input: { item_id: string; qty: number; barangay: string; family: string }): Promise<void> {
+  const { error } = await client().rpc('log_relief_distribution', {
+    p_item_id: input.item_id,
+    p_qty: Math.round(input.qty),
+    p_barangay: input.barangay,
+    p_family: input.family,
+  });
+  if (error) fail(error);
+  await loadInventory();
+}
+
+/* ------------------------------------- damage assessments and situation reports */
+const toAssessment = (d: Row): DamageAssessment => ({
+  id: d.id,
+  barangay: d.barangay || '',
+  barangay_uuid: d.barangay_id || null,
+  report_id: d.report_id || null,
+  report_code: d.report_code || '',
+  event_name: d.event_name || '',
+  hazard_type: d.hazard_type || '',
+  assessed_on: d.assessed_on || '',
+  affected_families: int(d.affected_families),
+  affected_persons: int(d.affected_persons),
+  displaced_families: int(d.displaced_families),
+  displaced_persons: int(d.displaced_persons),
+  dead: int(d.dead),
+  injured: int(d.injured),
+  missing: int(d.missing),
+  houses_totally: int(d.houses_totally),
+  houses_partially: int(d.houses_partially),
+  infra_damage_php: int(d.infra_damage_php),
+  agri_damage_php: int(d.agri_damage_php),
+  infra_notes: d.infra_notes || '',
+  agri_notes: d.agri_notes || '',
+  power_status: d.power_status || 'Not assessed',
+  water_status: d.water_status || 'Not assessed',
+  comms_status: d.comms_status || 'Not assessed',
+  needs: Array.isArray(d.needs) ? d.needs : [],
+  needs_notes: d.needs_notes || '',
+  remarks: d.remarks || '',
+  status: d.status || 'draft',
+  assessed_by_name: d.assessed_by_name || '',
+  updated_at: d.updated_at || null,
+});
+
+const toSitrep = (r: Row): SituationReport => ({
+  id: r.id,
+  sitrep_no: int(r.sitrep_no),
+  event_name: r.event_name || '',
+  period_from: r.period_from || null,
+  period_to: r.period_to || null,
+  barangay: r.barangay || '',
+  summary: r.summary && typeof r.summary === 'object' ? r.summary : {},
+  remarks: r.remarks || '',
+  prepared_by_name: r.prepared_by_name || '',
+  created_at: r.created_at,
+});
+
+export async function loadDocumentation(): Promise<void> {
+  const c = client();
+  const [dna, sitreps] = await Promise.all([
+    c.from('damage_assessments').select('*').order('assessed_on', { ascending: false }).limit(500),
+    c.from('situation_reports').select('*').order('created_at', { ascending: false }).limit(100),
+  ]);
+  if (dna.error) fail(dna.error);
+  set({
+    assessments: (dna.data || []).map(toAssessment),
+    sitreps: sitreps.error ? [] : (sitreps.data || []).map(toSitrep),
+  });
+}
+
+export type AssessmentInput = Omit<DamageAssessment, 'id' | 'barangay_uuid' | 'updated_at'>;
+
+export async function saveAssessment(id: string | null, input: AssessmentInput): Promise<void> {
+  const brgy = state.barangays.find((b) => b.name === input.barangay);
+  const row: Row = { ...input, barangay_id: brgy ? brgy.uuid : null, report_id: input.report_id || null };
+  const c = client();
+  const { error } = id ? await c.from('damage_assessments').update(row).eq('id', id) : await c.from('damage_assessments').insert(row);
+  if (error) fail(error);
+  await loadDocumentation();
+}
+
+export async function deleteAssessment(id: string): Promise<void> {
+  const { error } = await client().from('damage_assessments').delete().eq('id', id);
+  if (error) fail(error);
+  await loadDocumentation();
+}
+
+export async function saveSitrep(input: Omit<SituationReport, 'id' | 'created_at'>): Promise<void> {
+  const brgy = input.barangay ? state.barangays.find((b) => b.name === input.barangay) : null;
+  const { error } = await client()
+    .from('situation_reports')
+    .insert({ ...input, barangay_id: brgy ? brgy.uuid : null });
+  if (error) fail(error);
+  await loadDocumentation();
+}
+
+/* -------------------------------------------------- shelter occupancy trend */
+export async function loadShelterTrend(): Promise<void> {
+  const { data, error } = await client().from('analytics_shelter_trend').select('*').order('day').limit(60);
+  if (error) {
+    set({ shelterTrend: [] });
+    return;
+  }
+  set({
+    shelterTrend: (data || []).map((d: Row) => ({ day: d.day, occupancy: int(d.occupancy), capacity: int(d.capacity) })),
+  });
+}
+
+/* ------------------------------------------- dispatches for the documents */
+export interface DispatchLogRow {
+  report_id: string;
+  report_code: string;
+  barangay: string;
+  team: string;
+  status: string;
+  dispatched_at: string;
+  eta: string | null;
+  instructions: string;
+  after_action: string;
+  report_created_at: string | null;
+}
+
+export async function dispatchLog(opts: { from?: string; to?: string; reportId?: string }): Promise<DispatchLogRow[]> {
+  if (!supabase) return [];
+  let q = supabase
+    .from('report_dispatches')
+    .select('report_id, team, dispatch_status, dispatched_at, eta, instructions, after_action, report:reports(code, barangay, created_at)')
+    .order('dispatched_at', { ascending: false })
+    .limit(500);
+  if (opts.reportId) q = q.eq('report_id', opts.reportId);
+  if (opts.from) q = q.gte('dispatched_at', `${opts.from}T00:00:00`);
+  if (opts.to) q = q.lte('dispatched_at', `${opts.to}T23:59:59`);
+  const { data, error } = await q;
+  if (error) return [];
+  return (data || []).map((d: Row) => {
+    const rep: Row = Array.isArray(d.report) ? d.report[0] || {} : d.report || {};
+    return {
+      report_id: d.report_id,
+      report_code: rep.code || '',
+      barangay: rep.barangay || '',
+      team: d.team || '',
+      status: d.dispatch_status || 'sent',
+      dispatched_at: d.dispatched_at,
+      eta: d.eta || null,
+      instructions: d.instructions || '',
+      after_action: d.after_action || '',
+      report_created_at: rep.created_at || null,
+    };
+  });
 }

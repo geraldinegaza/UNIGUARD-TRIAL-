@@ -26,6 +26,7 @@ import {
 
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
+import { ReliefStockPanel } from './ReliefStockPanel';
 
 export interface DistributionDrive {
   id: string;
@@ -549,6 +550,9 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Relief stock on hand and the distribution log */}
+      <ReliefStockPanel currentUser={currentUser} barangays={barangays} />
 
       {/* Modal 1: Add Distribution Schedule */}
       {isAddDistributionOpen && (

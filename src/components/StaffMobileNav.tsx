@@ -52,6 +52,7 @@ const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
       { id: 'road_work', label: 'Road Work', icon: Construction },
       { id: 'hotlines', label: 'Hotlines', icon: PhoneCall },
       { id: 'analytics', label: 'Analytics', icon: Layers },
+      { id: 'reports', label: 'Reports & Documents', icon: FileText },
       { id: 'dispatch_units', label: 'Dispatch Units', icon: Truck, lguOnly: true },
     ],
   },

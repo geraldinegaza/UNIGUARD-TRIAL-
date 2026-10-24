@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useRepo } from '../hooks/useRepo';
+import { telHref } from '../lib/util';
 import {
   EvacuationCenter,
   User,
@@ -30,8 +32,12 @@ import {
   ChevronUp,
   ChevronRight,
   ShieldAlert,
-  Bell
+  Bell,
+  TrendingUp
 } from 'lucide-react';
+
+// Facilities offered as one-tap choices; anything else goes in "Other facilities"
+const FACILITY_PRESETS = ['Toilets', 'Drinking water', 'Generator', 'Kitchen', 'Medical station', 'PWD access', 'Breastfeeding area', 'Pet area'];
 
 interface EvacuationDirectoryProps {
   evacuationCenters: EvacuationCenter[];
@@ -57,6 +63,15 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
   const [editingCenter, setEditingCenter] = useState<EvacuationCenter | null>(null);
   const [editOccupancy, setEditOccupancy] = useState<number>(0);
   const [editStatus, setEditStatus] = useState<EvacuationStatus>('open');
+  const [editFacilities, setEditFacilities] = useState<string[]>([]);
+  const [editOtherFacilities, setEditOtherFacilities] = useState('');
+  const [editContactPerson, setEditContactPerson] = useState('');
+  const [editContactPhone, setEditContactPhone] = useState('');
+  const { shelterTrend } = useRepo();
+  const staffView = currentUser?.role !== 'citizen';
+  useEffect(() => {
+    if (staffView) repo.loadShelterTrend().catch(() => {});
+  }, [staffView]);
 
   // Live counts for status pills (2 open, 1 full, 2 closed matching initial draft)
   const counts = useMemo(() => {
@@ -114,6 +129,11 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
     setEditingCenter(center);
     setEditOccupancy(center.current_occupancy);
     setEditStatus(center.status);
+    const facilities = center.facilities || [];
+    setEditFacilities(facilities.filter((f) => FACILITY_PRESETS.includes(f)));
+    setEditOtherFacilities(facilities.filter((f) => !FACILITY_PRESETS.includes(f)).join(', '));
+    setEditContactPerson(center.contact_person || '');
+    setEditContactPhone(center.contact_phone || '');
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -121,11 +141,16 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
     if (!editingCenter) return;
 
     try {
+      const others = editOtherFacilities.split(',').map((f) => f.trim()).filter(Boolean);
       await repo.updateCenter(editingCenter.id, {
         current_occupancy: Number(editOccupancy),
         status: editStatus,
+        facilities: Array.from(new Set([...editFacilities, ...others])),
+        contact_person: editContactPerson.trim(),
+        contact_phone: editContactPhone.trim(),
       });
-      flash(`Updated capacity for ${editingCenter.name}`);
+      flash(`Updated ${editingCenter.name}`);
+      repo.loadShelterTrend().catch(() => {});
       setEditingCenter(null);
     } catch (err: any) {
       flash(err.message || 'Could not update the shelter');
@@ -164,6 +189,9 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
         occupied: c.current_occupancy,
         capacity: c.capacity,
         notes: c.notes || '',
+        facilities: c.facilities || [],
+        contact_person: c.contact_person || '',
+        contact_phone: c.contact_phone || '',
         latitude: c.latitude,
         longitude: c.longitude,
       })),
@@ -408,6 +436,26 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                         <p className="text-xs text-neutral-500 leading-relaxed line-clamp-2">
                           {s.notes}
                         </p>
+
+                        {s.facilities.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {s.facilities.map((f) => (
+                              <span key={f} className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-900 border border-red-900/10">
+                                {f}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {s.contact_phone && (
+                          <a
+                            href={telHref(s.contact_phone)}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-900 hover:underline"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                            <span>{s.contact_person ? `${s.contact_person} · ` : ''}{s.contact_phone}</span>
+                          </a>
+                        )}
                       </div>
 
                       {/* Card Action Buttons */}
@@ -610,6 +658,51 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
         </div>
       </div>
 
+      {/* Occupancy over time, from shelter_occupancy_log */}
+      {shelterTrend.length > 1 && (() => {
+        const points = shelterTrend.slice(-14);
+        const peak = Math.max(1, ...points.map((p) => Math.max(p.occupancy, p.capacity)));
+        const last = points[points.length - 1];
+        return (
+          <div className={`bg-white rounded-[24px] border overflow-hidden ${isBarangay ? 'border-[#7EA0C5]/30' : 'border-neutral-200/70'}`}>
+            <div className={`px-5 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2 border-b ${
+              isBarangay ? 'bg-[#C2E8FF]/10 border-[#7EA0C5]/20' : 'bg-neutral-50/50 border-neutral-100'
+            }`}>
+              <h2 className={`text-sm font-semibold uppercase tracking-wide flex items-center gap-2 ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
+                <TrendingUp className="w-4 h-4" />
+                Occupancy Trend
+              </h2>
+              <span className={`text-[11px] font-mono ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
+                {last.occupancy} of {last.capacity} places used on the latest day
+              </span>
+            </div>
+            <div className="px-5 sm:px-6 py-4">
+              <div className="h-28 flex items-end gap-1.5" role="img" aria-label="Daily evacuees against capacity">
+                {points.map((p) => (
+                  <div key={p.day} className="flex-1 h-full flex items-end relative group" title={`${p.day}: ${p.occupancy} of ${p.capacity}`}>
+                    <div
+                      className={`absolute bottom-0 inset-x-0 rounded-t-md ${isBarangay ? 'bg-[#C2E8FF]/50' : 'bg-neutral-100'}`}
+                      style={{ height: `${(p.capacity / peak) * 100}%` }}
+                    />
+                    <div
+                      className={`relative w-full rounded-t-md ${isBarangay ? 'bg-[#052659]' : 'bg-[#18181b]'}`}
+                      style={{ height: `${Math.max(2, (p.occupancy / peak) * 100)}%` }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className={`mt-2 flex justify-between text-[10px] font-mono ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-400'}`}>
+                <span>{points[0].day}</span>
+                <span>{last.day}</span>
+              </div>
+              <p className={`mt-2 text-[11px] ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
+                Dark bars are evacuees each day; the light bars behind them are the total capacity.
+              </p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 3. Shelter Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {filteredCenters.map((center) => {
@@ -736,6 +829,33 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 }`}>
                   {center.notes}
                 </p>
+
+                {(center.facilities || []).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {(center.facilities || []).map((f) => (
+                      <span
+                        key={f}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                          isBarangay ? 'bg-[#C2E8FF]/30 text-[#052659] border-[#7EA0C5]/40' : 'bg-neutral-100 text-neutral-700 border-neutral-200'
+                        }`}
+                      >
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {(center.contact_person || center.contact_phone) && (
+                  <div className={`flex items-center gap-1.5 text-[11px] ${isBarangay ? 'text-[#011025]' : 'text-neutral-700'}`}>
+                    <Phone className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{center.contact_person || 'Contact'}</span>
+                    {center.contact_phone && (
+                      <a href={telHref(center.contact_phone)} className="font-mono font-semibold hover:underline shrink-0">
+                        {center.contact_phone}
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Bottom Actions: 3-Segment Status Switcher + Navigate with Waze */}
@@ -800,7 +920,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                     }`}
                   >
                     <Edit3 className="w-3 h-3" />
-                    <span>Edit Occupants</span>
+                    <span>Edit Shelter</span>
                   </button>
 
                   {onSelectOnMap && (
@@ -835,13 +955,13 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
       {/* Admin Update Evacuation Stats Modal */}
       {editingCenter && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={`bg-white rounded-[24px] max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95 ${
+          <div className={`bg-white rounded-[24px] max-w-md w-full max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 shadow-2xl animate-in zoom-in-95 ${
             isBarangay ? 'border border-[#7EA0C5]/40' : 'border border-neutral-200/80'
           }`}>
             <h3 className={`font-semibold text-base mb-1 ${
               isBarangay ? 'text-[#011025]' : 'text-neutral-900'
             }`}>
-              Update Evacuation Shelter Capacity
+              Update Evacuation Shelter
             </h3>
             <p className={`text-xs mb-4 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
               {editingCenter.name}
@@ -885,6 +1005,66 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                       : 'bg-neutral-50/70 border border-neutral-200 focus:bg-white focus:border-neutral-400'
                   }`}
                 />
+              </div>
+
+              <div>
+                <span className={`block text-xs font-semibold mb-1 ${
+                  isBarangay ? 'text-[#052659]' : 'text-neutral-700'
+                }`}>Facilities</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {FACILITY_PRESETS.map((f) => {
+                    const on = editFacilities.includes(f);
+                    return (
+                      <button
+                        key={f}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setEditFacilities((cur) => (on ? cur.filter((x) => x !== f) : [...cur, f]))}
+                        className={`px-3 py-1.5 min-h-[32px] rounded-full text-[11px] font-medium border cursor-pointer transition-colors ${
+                          on
+                            ? isBarangay ? 'bg-[#052659] text-white border-[#052659]' : 'bg-[#18181b] text-white border-[#18181b]'
+                            : isBarangay ? 'bg-white text-[#052659] border-[#7EA0C5]/40' : 'bg-white text-neutral-700 border-neutral-200'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input
+                  type="text"
+                  value={editOtherFacilities}
+                  onChange={(e) => setEditOtherFacilities(e.target.value)}
+                  placeholder="Other facilities, separated by commas"
+                  className={`mt-2 w-full text-xs p-2.5 rounded-xl outline-hidden transition-all ${
+                    isBarangay
+                      ? 'bg-[#C2E8FF]/10 text-[#011025] border border-[#7EA0C5]/40 focus:bg-white focus:border-[#052659]'
+                      : 'bg-neutral-50/70 border border-neutral-200 focus:bg-white focus:border-neutral-400'
+                  }`}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-xs font-semibold mb-1 ${
+                  isBarangay ? 'text-[#052659]' : 'text-neutral-700'
+                }`}>Contact person</label>
+                  <input type="text" value={editContactPerson} onChange={(e) => setEditContactPerson(e.target.value)} placeholder="Camp manager" className={`w-full text-xs p-2.5 rounded-xl outline-hidden transition-all ${
+                    isBarangay
+                      ? 'bg-[#C2E8FF]/10 text-[#011025] border border-[#7EA0C5]/40 focus:bg-white focus:border-[#052659]'
+                      : 'bg-neutral-50/70 border border-neutral-200 focus:bg-white focus:border-neutral-400'
+                  }`} />
+                </div>
+                <div>
+                  <label className={`block text-xs font-semibold mb-1 ${
+                  isBarangay ? 'text-[#052659]' : 'text-neutral-700'
+                }`}>Contact number</label>
+                  <input type="tel" inputMode="tel" value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)} placeholder="0917 000 0000" className={`w-full text-xs p-2.5 rounded-xl outline-hidden transition-all ${
+                    isBarangay
+                      ? 'bg-[#C2E8FF]/10 text-[#011025] border border-[#7EA0C5]/40 focus:bg-white focus:border-[#052659]'
+                      : 'bg-neutral-50/70 border border-neutral-200 focus:bg-white focus:border-neutral-400'
+                  }`} />
+                </div>
               </div>
 
               <div className={`flex items-center justify-end gap-2.5 pt-2 border-t ${

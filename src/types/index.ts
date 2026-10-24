@@ -114,6 +114,9 @@ export interface EvacuationCenter {
   latitude: number;
   longitude: number;
   notes?: string;
+  facilities?: string[];
+  contact_person?: string;
+  contact_phone?: string;
 }
 
 export interface EmergencyHotline {
@@ -153,6 +156,9 @@ export interface SystemAuditLog {
   target_id: string;
   entity: string;
   meta: Record<string, unknown>;
+  actor_id?: string | null;
+  actor_role?: string;
+  actor_barangay?: string;
 }
 
 export type NotificationTone = 'emergency' | 'warning' | 'advisory' | 'prepared';
@@ -254,7 +260,16 @@ export interface RoadStatus {
   lat: number | null;
   lng: number | null;
   updated_at: string | null;
+  segment_from?: string;
+  segment_to?: string;
+  cause?: RoadCause;
+  severity?: string;
+  started_at?: string | null;
+  estimated_reopen?: string | null;
+  updater_name?: string;
 }
+
+export type RoadCause = '' | 'flood' | 'landslide' | 'repair' | 'accident' | 'other';
 
 export interface SosEntry {
   id: string;
@@ -369,4 +384,95 @@ export interface HospitalCapacity {
   available: number;
   accepting: boolean;
   updated_at: string | null;
+}
+
+/* ------------------------------------------------ Phase 3: operations data */
+export type InventoryCategory = 'Food' | 'Water' | 'Medical' | 'Equipment' | 'Shelter Supplies' | 'Hygiene';
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: InventoryCategory;
+  unit: string;
+  stock: number;
+  reorder: number;
+  location: string;
+  supplier: string;
+  updated_at: string | null;
+}
+
+export interface DistributionLogEntry {
+  id: string;
+  item_id: string | null;
+  item_name: string;
+  qty: number;
+  barangay: string;
+  family: string;
+  distributed_by: string;
+  distributed_at: string;
+}
+
+export type AssessmentStatus = 'draft' | 'submitted' | 'validated';
+
+export interface DamageAssessment {
+  id: string;
+  barangay: string;
+  barangay_uuid: string | null;
+  report_id: string | null;
+  report_code: string;
+  event_name: string;
+  hazard_type: string;
+  assessed_on: string;
+  affected_families: number;
+  affected_persons: number;
+  displaced_families: number;
+  displaced_persons: number;
+  dead: number;
+  injured: number;
+  missing: number;
+  houses_totally: number;
+  houses_partially: number;
+  infra_damage_php: number;
+  agri_damage_php: number;
+  infra_notes: string;
+  agri_notes: string;
+  power_status: string;
+  water_status: string;
+  comms_status: string;
+  needs: string[];
+  needs_notes: string;
+  remarks: string;
+  status: AssessmentStatus;
+  assessed_by_name: string;
+  updated_at: string | null;
+}
+
+export interface SituationReport {
+  id: string;
+  sitrep_no: number;
+  event_name: string;
+  period_from: string | null;
+  period_to: string | null;
+  barangay: string;
+  summary: Record<string, number>;
+  remarks: string;
+  prepared_by_name: string;
+  created_at: string;
+}
+
+export interface OverdueReport {
+  id: string;
+  code: string;
+  hazard_type: string;
+  barangay: string;
+  severity: string;
+  description: string;
+  created_at: string;
+  minutes: number;
+}
+
+export interface ShelterTrendPoint {
+  day: string;
+  occupancy: number;
+  capacity: number;
 }

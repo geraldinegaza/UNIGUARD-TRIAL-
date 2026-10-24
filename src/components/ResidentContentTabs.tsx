@@ -25,9 +25,11 @@ import {
   Maximize2,
   Minimize2,
   X,
-  Filter
+  Filter,
+  Download
 } from 'lucide-react';
 import { Barangay, User as UserType } from '../types';
+import { exportGuidesPdf } from '../lib/pdf';
 import { useRepo } from '../hooks/useRepo';
 import { GUIDE_HAZARDS } from '../lib/hazards';
 import { telHref } from '../lib/util';
@@ -766,8 +768,19 @@ export const ResidentGuidesView: React.FC = () => {
           <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
             <span>Preparedness Guides</span>
           </h3>
-          <span className="text-[11px] font-semibold text-slate-500">
-            Active Hazard: <strong className="text-[#d00018]">{selectedHazard}</strong>
+          <span className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
+            <span>
+              Active Hazard: <strong className="text-[#d00018]">{selectedHazard}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => exportGuidesPdf(guides, selectedHazard).catch(() => {})}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[32px] rounded-full bg-white border border-red-900/20 text-red-900 hover:bg-red-50 font-bold cursor-pointer"
+              title="Save this guide as a PDF to read offline"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>PDF</span>
+            </button>
           </span>
         </div>
 

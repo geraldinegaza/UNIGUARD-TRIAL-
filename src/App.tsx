@@ -26,6 +26,7 @@ import { LdrrmcFaqsView } from './components/LdrrmcFaqsView';
 import { LdrrmcSosLogView } from './components/LdrrmcSosLogView';
 import { LdrrmcHotlinesView } from './components/LdrrmcHotlinesView';
 import { LdrrmcAnalyticsView } from './components/LdrrmcAnalyticsView';
+import { LdrrmcReportsView } from './components/LdrrmcReportsView';
 import { LdrrmcOthersReviewView } from './components/LdrrmcOthersReviewView';
 import { ResidentNotificationsView } from './components/ResidentNotificationsView';
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
@@ -613,6 +614,15 @@ export default function App() {
                   onOpenDrillDown={handleOpenDrillDown}
                 />
               </div>
+            )}
+
+            {/* Reports & documentation */}
+            {activeTab === 'reports' && currentUser.role !== 'citizen' && (
+              <LdrrmcReportsView
+                currentUser={currentUser}
+                barangays={barangays}
+                reports={currentUser.role === 'barangay' ? reports.filter(r => r.barangay_id === currentUser.barangay_id) : reports}
+              />
             )}
 
             {/* View 10: Road Work & Infrastructure Obstructions */}

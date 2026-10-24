@@ -639,6 +639,20 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
                 {/* Users and the Activity Log are Super Admin screens, in the Super Admin console */}
 
+                {/* Reports & documentation: situation reports, damage assessments, incident summaries */}
+                <button
+                  onClick={() => {
+                    setActiveTab('reports');
+                    setIsMenuOpen(false);
+                  }}
+                  className={`w-full px-3 py-2 text-left text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
+                    isBarangay ? 'text-[#011025] hover:bg-[#C2E8FF]/30' : 'text-neutral-700 hover:bg-neutral-100'
+                  }`}
+                >
+                  <FileText className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
+                  <span>Reports & Documents</span>
+                </button>
+
                 {/* Dispatch Units (LGU) */}
                 {isLgu && (
                   <button

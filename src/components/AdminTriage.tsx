@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
+import { OverdueQueuePanel } from './OverdueQueuePanel';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -473,6 +474,8 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
               </div>
             </div>
           </div>
+
+          {isLgu && <OverdueQueuePanel canVerify={canVerify} onVerified={onReportsUpdated} />}
 
           {/* Status Filter Bar Matching Reference Image Capsule Tabs: All, Pending, Verified, In Progress, Resolved, Rejected */}
           <div className={`flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none p-1.5 rounded-full border w-fit max-w-full ${

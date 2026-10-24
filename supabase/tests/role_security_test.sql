@@ -1,5 +1,5 @@
 -- ============================================================================
---  UniGuard · per-role security test (after migrations 026 + 122-148)
+--  UniGuard · per-role security test (after migrations 026 + 122-151)
 --
 --  Impersonates each role and asserts what it can and cannot do. Everything
 --  runs inside one transaction that is rolled back, so nothing is written.
@@ -166,5 +166,60 @@ select pg_temp.ok((select count(*) from public.report_dispatches) = 1, 'dispatch
 select pg_temp.ok((select count(*) from public.reports) = 1
                   and (select id from public.reports) = (select pob_verified from t_rep),
                   'dispatch reads only the report dispatched to its unit');
+
+-- ------------------------------------------------- Phase 3 (migration 151)
+-- the Baay report has waited two hours without barangay verification
+select pg_temp.as_backend();
+update public.reports set created_at = now() - interval '2 hours' where id = (select baay_report from t_rep);
+insert into public.relief_inventory (name, category, unit, stock, reorder) values ('Test Food Pack', 'Food', 'packs', 20, 5);
+create temp table t_item as select id from public.relief_inventory where name = 'Test Food Pack';
+grant select on t_item to authenticated;
+
+set local role anon;
+select pg_temp.must_fail($$select count(*) from public.lgu_escalation_queue$$, 'a signed-out visitor cannot read the overdue queue');
+select pg_temp.must_fail($$select count(*) from public.others_hazard_review$$, 'a signed-out visitor cannot read the Others review');
+select pg_temp.as_backend();
+
+select pg_temp.as_user((select citizen from t_ids));
+select pg_temp.ok((select count(*) from public.lgu_escalation_queue) = 0, 'a resident sees nobody else''s overdue reports');
+select pg_temp.must_fail($$select public.log_relief_distribution((select id from t_item), 1, 'Poblacion', '')$$, 'a resident cannot record a relief distribution');
+select pg_temp.ok((select count(*) from public.situation_reports) = 0 and (select count(*) from public.relief_inventory) = 0,
+                  'a resident cannot read situation reports or relief stock');
+
+select pg_temp.as_user((select official from t_ids));
+select pg_temp.ok((select count(*) from public.lgu_escalation_queue where id = (select baay_report from t_rep)) = 0,
+                  'an official does not see another barangay''s overdue report');
+select pg_temp.ok((select (public.log_relief_distribution((select id from t_item), 5, 'Poblacion', 'Dela Cruz household'))->>'stock') = '15',
+                  'an official records goods for their barangay and the stock drops');
+select pg_temp.must_fail($$select public.log_relief_distribution((select id from t_item), 1, 'Baay', '')$$, 'an official cannot record goods for another barangay');
+select pg_temp.must_fail($$select public.log_relief_distribution((select id from t_item), 99, 'Poblacion', '')$$, 'a distribution larger than the stock is refused');
+select pg_temp.ok(pg_temp.rows_changed($$insert into public.relief_distribution_log (item_id, item_name, qty, barangay) values ((select id from t_item), 'x', 1, 'Baay')$$) = 0,
+                  'an official cannot write the distribution log directly');
+select pg_temp.ok(pg_temp.rows_changed($$update public.relief_inventory set stock = 999 where true$$) = 0, 'an official cannot change the stock');
+insert into public.damage_assessments (barangay_id, assessed_on, affected_families, affected_persons, status)
+values (public.my_barangay_id(), current_date, 4, 15, 'submitted');
+select pg_temp.ok((select count(*) from public.damage_assessments) = 1, 'an official files a damage assessment for their barangay');
+select pg_temp.must_fail($$insert into public.damage_assessments (barangay_id, status) values (public.my_barangay_id(), 'validated')$$,
+                         'an official cannot validate an assessment');
+select pg_temp.must_fail($$insert into public.damage_assessments (barangay_id, status) values ((select id from public.barangays where name = 'Baay'), 'draft')$$,
+                         'an official cannot file for another barangay');
+insert into public.situation_reports (sitrep_no, event_name, barangay_id, summary) values (1, 'Test event', public.my_barangay_id(), '{"incidents": 1}');
+select pg_temp.ok((select count(*) from public.situation_reports) = 1, 'an official saves a situation report for their barangay');
+
+select pg_temp.as_user((select lgu from t_ids));
+select pg_temp.ok((select count(*) from public.lgu_escalation_queue where id = (select baay_report from t_rep)) = 1,
+                  'the LDRRMO sees a report unverified for over an hour, with no write needed');
+select pg_temp.ok((select count(*) from public.relief_distribution_log where barangay = 'Poblacion') = 1, 'the LDRRMO reads the distribution log');
+select pg_temp.ok(pg_temp.rows_changed($$update public.damage_assessments set status = 'validated' where true$$) = 1, 'the LDRRMO validates the assessment');
+
+select pg_temp.as_user((select superadmin from t_ids));
+select pg_temp.must_fail($$select public.lgu_verify_overdue_report((select baay_report from t_rep))$$, 'the Super Admin cannot verify an overdue report');
+
+select pg_temp.as_user((select lgu from t_ids));
+select public.lgu_verify_overdue_report((select baay_report from t_rep));
+select pg_temp.ok((select status = 'verified' and verified_by_role = 'lgu_ldrrmc' from public.reports where id = (select baay_report from t_rep)),
+                  'the LDRRMO verifies the overdue report, recorded as an LGU verification');
+select pg_temp.ok((select count(*) from public.lgu_escalation_queue where id = (select baay_report from t_rep)) = 0,
+                  'a verified report leaves the overdue queue');
 
 rollback;

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
+import { exportGuidesPdf } from '../lib/pdf';
 import * as repo from '../services/repo';
 import { GUIDE_HAZARDS } from '../lib/hazards';
 import { GuidePhase } from '../types';
@@ -21,7 +22,8 @@ import {
   Phone,
   Layers,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  FileDown,
 } from 'lucide-react';
 
 // The same canonical hazard list the report form uses, plus "General"
@@ -147,7 +149,19 @@ export const LdrrmcGuidesView: React.FC<LdrrmcGuidesViewProps> = ({ currentUser 
           </p>
         </div>
 
-        {/* Top Right Action Button: + Add Guide */}
+        {/* Top Right Actions: all guides as PDF, + Add Guide */}
+        <div className="flex flex-wrap gap-2 shrink-0 self-start sm:self-auto">
+        <button
+          onClick={() => exportGuidesPdf(store.guides, 'all').catch(() => {})}
+          className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium rounded-full transition-colors cursor-pointer ${
+            isBarangay
+              ? 'bg-white hover:bg-[#C2E8FF]/30 text-[#052659] border border-[#7EA0C5]/40'
+              : 'bg-white hover:bg-neutral-50 text-neutral-700 border border-neutral-200'
+          }`}
+        >
+          <FileDown className="w-4 h-4" />
+          <span>All Guides PDF</span>
+        </button>
         <button
           onClick={handleOpenAdd}
           className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium rounded-full shadow-xs transition-colors cursor-pointer shrink-0 self-start sm:self-auto ${
@@ -159,6 +173,7 @@ export const LdrrmcGuidesView: React.FC<LdrrmcGuidesViewProps> = ({ currentUser 
           <Plus className="w-4 h-4" />
           <span>Add Guide</span>
         </button>
+        </div>
       </div>
 
       {/* Action Flash Notification */}

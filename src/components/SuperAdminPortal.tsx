@@ -19,7 +19,7 @@ import {
 import { User, UserRole, ChangeRequest } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
-import { relTime } from '../lib/util';
+import { relTime, download, toCSV } from '../lib/util';
 import { TriadEmblem } from '../brand';
 
 // Super Admin console. Initial draft of the layout: a light sidebar with the
@@ -96,6 +96,61 @@ interface SuperAdminPortalProps {
   onOpenOperations?: (tab?: string) => void;
 }
 
+// activity log labels and where each kind of record can be opened
+const ROLE_TEXT: Record<string, string> = {
+  super_admin: 'Super Admin',
+  lgu_ldrrmc: 'LDRRMO',
+  barangay_official: 'Barangay official',
+  dispatch_team: 'Dispatch',
+  citizen: 'Resident',
+};
+const ENTITY_TEXT: Record<string, string> = {
+  reports: 'Incident report',
+  report_dispatches: 'Dispatch',
+  profiles: 'Account',
+  advisories: 'Advisory',
+  evacuation_centers: 'Shelter',
+  emergency_hotlines: 'Hotline',
+  change_requests: 'Change request',
+  road_status: 'Road status',
+  road_work_posts: 'Road work',
+  relief_distributions: 'Relief schedule',
+  relief_inventory: 'Relief stock',
+  relief_distribution_log: 'Relief handed out',
+  damage_assessments: 'Damage assessment',
+  situation_reports: 'Situation report',
+  dispatch_units: 'Dispatch unit',
+  unit_requests: 'Unit request',
+  dispatch_equipment: 'Unit equipment',
+  hospital_capacity: 'Hospital capacity',
+  sos_log: 'SOS',
+  sos_alerts: 'SOS',
+  preparedness_guides: 'Guide',
+  faqs: 'FAQ',
+};
+const ENTITY_TAB: Record<string, string> = {
+  reports: 'incidents',
+  report_dispatches: 'incidents',
+  profiles: 'accounts',
+  advisories: 'advisories',
+  evacuation_centers: 'shelters',
+  emergency_hotlines: 'hotlines',
+  change_requests: 'hotlines',
+  road_status: 'road_work',
+  road_work_posts: 'road_work',
+  relief_distributions: 'relief',
+  relief_inventory: 'relief',
+  relief_distribution_log: 'relief',
+  damage_assessments: 'reports',
+  situation_reports: 'reports',
+  dispatch_units: 'dispatch_units',
+  unit_requests: 'dispatch_units',
+  sos_log: 'sos_log',
+  sos_alerts: 'sos_log',
+  preparedness_guides: 'guides',
+  faqs: 'faqs',
+};
+
 export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser, onSignOut, onOpenOperations }) => {
   const data = useRepo();
   const [view, setView] = useState<View>('overview');
@@ -106,6 +161,13 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
   const [loadError, setLoadError] = useState<string | null>(null);
+  // activity log filters
+  const [actQuery, setActQuery] = useState('');
+  const [actRole, setActRole] = useState('all');
+  const [actEntity, setActEntity] = useState('all');
+  const [actFrom, setActFrom] = useState('');
+  const [actTo, setActTo] = useState('');
+  const [actLimit, setActLimit] = useState(100);
 
   // the yellow band behind the pulse card ends where the hero ends
   const heroRef = useRef<HTMLElement>(null);
@@ -541,25 +603,129 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
     </div>
   );
 
+  const entities = Array.from(new Set(data.audit.map((a) => a.entity).filter(Boolean))).sort();
+  const filteredAudit = data.audit.filter((a) => {
+    if (actRole !== 'all' && (actRole === 'system' ? a.actor_id || a.actor_name !== 'system' : a.actor_role !== actRole)) return false;
+    if (actEntity !== 'all' && a.entity !== actEntity) return false;
+    const day = (a.timestamp || '').slice(0, 10);
+    if (actFrom && day < actFrom) return false;
+    if (actTo && day > actTo) return false;
+    const q = actQuery.trim().toLowerCase();
+    if (q && ![a.description, a.event_type, a.actor_name, a.entity, a.actor_barangay].some((x) => (x || '').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const exportAudit = () =>
+    download(
+      `uniguard-activity-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCSV(
+        filteredAudit.map((a) => ({
+          when: a.timestamp,
+          actor: a.actor_name,
+          role: ROLE_TEXT[a.actor_role || ''] || a.actor_role || '',
+          barangay: a.actor_barangay || '',
+          action: a.event_type,
+          record: a.entity,
+          record_id: a.target_id,
+          details: a.description,
+        }))
+      )
+    );
+  const fieldCls = 'h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] text-neutral-800 outline-none focus:border-[#C98A0B] min-w-0';
+
   const activityView = (
     <div className="px-4 sm:px-8 pt-6">
-      <h2 className="text-[20px] font-bold text-neutral-800 mb-4">Activity log</h2>
-      <div className="bg-white rounded-[22px] p-2 shadow-[0_20px_40px_-28px_rgba(58,42,8,0.4)]">
-        {data.audit.map((a) => (
-          <div key={a.id} className="flex items-start gap-3 px-4 py-3 rounded-2xl hover:bg-[#FFFBF0]">
-            <span className="w-8 h-8 rounded-xl bg-[#FFF3C9] text-[#C98A0B] flex items-center justify-center shrink-0 mt-0.5">
-              <Activity className="w-4 h-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] text-neutral-800">{a.description || a.event_type}</span>
-              <span className="block text-[11px] text-neutral-400 mt-0.5">
-                {a.actor_name} · {relTime(a.timestamp)}
-              </span>
-            </span>
-          </div>
-        ))}
-        {!data.audit.length && <p className="px-4 py-10 text-center text-[13px] text-neutral-400">No activity recorded yet.</p>}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h2 className="text-[20px] font-bold text-neutral-800">Activity log</h2>
+        <button
+          type="button"
+          onClick={exportAudit}
+          disabled={!filteredAudit.length}
+          className="h-9 px-4 rounded-full bg-white text-[#8A5A00] text-[12px] font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Export CSV
+        </button>
       </div>
+      <div className="bg-white rounded-[22px] p-3 sm:p-4 mb-3 shadow-[0_20px_40px_-28px_rgba(58,42,8,0.4)] grid grid-cols-2 xl:grid-cols-4 gap-2.5">
+        <input
+          className={`${fieldCls} col-span-2 xl:col-span-4`}
+          placeholder="Search actor, action, record"
+          value={actQuery}
+          onChange={(e) => setActQuery(e.target.value)}
+          aria-label="Search the activity log"
+        />
+        <select className={fieldCls} value={actRole} onChange={(e) => setActRole(e.target.value)} aria-label="Actor role">
+          <option value="all">Every role</option>
+          {Object.entries(ROLE_TEXT).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
+          <option value="system">System</option>
+        </select>
+        <select className={fieldCls} value={actEntity} onChange={(e) => setActEntity(e.target.value)} aria-label="Record type">
+          <option value="all">Every record</option>
+          {entities.map((e) => (
+            <option key={e} value={e}>
+              {ENTITY_TEXT[e] || e}
+            </option>
+          ))}
+        </select>
+        <input type="date" className={fieldCls} value={actFrom} onChange={(e) => setActFrom(e.target.value)} aria-label="From date" />
+        <input type="date" className={fieldCls} value={actTo} onChange={(e) => setActTo(e.target.value)} aria-label="To date" />
+      </div>
+      <p className="text-[11px] text-[#5C3A0A]/70 mb-2 px-1">
+        Showing {filteredAudit.length} of the latest {data.audit.length} entries.
+      </p>
+      <div className="bg-white rounded-[22px] p-2 shadow-[0_20px_40px_-28px_rgba(58,42,8,0.4)]">
+        {filteredAudit.map((a) => {
+          const target = a.entity ? ENTITY_TAB[a.entity] : undefined;
+          return (
+            <div key={a.id} className="flex items-start gap-3 px-3 sm:px-4 py-3 rounded-2xl hover:bg-[#FFFBF0]">
+              <span className="w-8 h-8 rounded-xl bg-[#FFF3C9] text-[#C98A0B] flex items-center justify-center shrink-0 mt-0.5">
+                <Activity className="w-4 h-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] text-neutral-800 break-words">{a.description || a.event_type}</span>
+                <span className="block text-[11px] text-neutral-400 mt-0.5">
+                  {a.actor_name}
+                  {a.actor_role ? ` (${ROLE_TEXT[a.actor_role] || a.actor_role}${a.actor_barangay ? `, ${a.actor_barangay}` : ''})` : ''} · {ENTITY_TEXT[a.entity] || a.entity} ·{' '}
+                  {new Date(a.timestamp).toLocaleString()}
+                </span>
+              </span>
+              {target && (target === 'accounts' || onOpenOperations) && (
+                <button
+                  type="button"
+                  onClick={() => (target === 'accounts' ? setView('accounts') : onOpenOperations && onOpenOperations(target))}
+                  className="shrink-0 h-8 px-3 rounded-full bg-[#FFF3C9] text-[#8A5A00] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer hover:bg-[#FFE89A]"
+                  title="Open the screen that holds this record"
+                >
+                  Open
+                  <ArrowUpRight className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {!filteredAudit.length && (
+          <p className="px-4 py-10 text-center text-[13px] text-neutral-400">{data.audit.length ? 'Nothing matches these filters.' : 'No activity recorded yet.'}</p>
+        )}
+      </div>
+      {data.audit.length >= actLimit && (
+        <div className="flex justify-center mt-3">
+          <button
+            type="button"
+            onClick={() => {
+              const next = actLimit + 400;
+              setActLimit(next);
+              repo.loadAudit(next).catch(() => {});
+            }}
+            className="h-9 px-5 rounded-full bg-white text-[#8A5A00] text-[12px] font-bold shadow-sm cursor-pointer"
+          >
+            Load older activity
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -792,6 +958,16 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                       className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
                     >
                       Operations
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {onOpenOperations && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenOperations('hotlines')}
+                      className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
+                    >
+                      Hotlines
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
                   )}
