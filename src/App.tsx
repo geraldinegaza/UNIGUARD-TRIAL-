@@ -33,6 +33,7 @@ import { ResidentNotificationsView } from './components/ResidentNotificationsVie
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
 import { ResidentHomeDraftView } from './components/ResidentHomeDraftView';
 import { DispatchPortal } from './components/DispatchPortal';
+import { SuperAdminPortal } from './components/SuperAdminPortal';
 import { StaffBottomNav } from './components/StaffMobileNav';
 import { ResidentBottomNav, residentTabIndex, useResidentSwipeTabs } from './components/ResidentMobileNav';
 import { BrandLoader, TriadEmblem, portalForRole, useBrandThemeColor } from './brand';
@@ -234,11 +235,15 @@ export default function App() {
     );
   }
 
-  // Dispatch Team accounts get their own console
-  if (currentUser.role === 'dispatch') {
+  // Dispatch Team and Super Admin accounts get their own consoles
+  if (currentUser.role === 'dispatch' || currentUser.role === 'super_admin') {
     return (
       <div className="h-full w-full">
-        <DispatchPortal currentUser={currentUser} onSignOut={handleSignOut} />
+        {currentUser.role === 'dispatch' ? (
+          <DispatchPortal currentUser={currentUser} onSignOut={handleSignOut} />
+        ) : (
+          <SuperAdminPortal currentUser={currentUser} onSignOut={handleSignOut} />
+        )}
         <EmergencyAlertNotificationModal
           isOpen={isAlertNotificationOpen}
           onClose={() => setIsAlertNotificationOpen(false)}

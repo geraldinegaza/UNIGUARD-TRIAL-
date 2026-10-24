@@ -5,7 +5,7 @@
 // left = barangay, right = LDRRMO command, keel = residents, joined by the
 // beacon hub (alerts). Each portal recolors the same shape in its own palette.
 
-export type Portal = 'auth' | 'resident' | 'barangay' | 'command' | 'dispatch';
+export type Portal = 'auth' | 'resident' | 'barangay' | 'command' | 'dispatch' | 'admin';
 export type EmblemVariant = 'light' | 'reverse';
 
 /** Map a user role from the database to the portal look it gets. */
@@ -14,6 +14,7 @@ export function portalForRole(role?: string | null): Portal {
   if (role === 'citizen') return 'resident';
   if (role === 'barangay') return 'barangay';
   if (role === 'dispatch') return 'dispatch';
+  if (role === 'super_admin') return 'admin';
   return 'command'; // lgu_admin and every other LGU / LDRRMO staff role
 }
 
@@ -136,6 +137,25 @@ export const THEMES: Record<Portal, PortalTheme> = {
     themeColor: '#EA580C',
     accent: '#EA580C',
   },
+  // Super Admin: warm golden yellow with deep brown text for contrast
+  admin: {
+    emblem: {
+      light: { left: '#B7791F', right: '#F6C445', keel: '#5C3A0A', hub: '#FFFFFF', dot: '#D69E2E' },
+      reverse: { left: '#FFFFFF', right: '#FDE68A', keel: '#FBBF24', hub: '#B7791F', dot: '#FFFFFF' },
+    },
+    uni: { light: '#3A2A08', reverse: '#FFFFFF' },
+    guard: { light: '#D69E2E', reverse: '#FDE68A' },
+    tagText: { light: '#8A6A2A', reverse: '#FDE68A' },
+    chip: {
+      light: { bg: '#FFF8E1', text: '#92600A', border: '#F6DFA0' },
+      reverse: { bg: 'rgba(255,255,255,0.2)', text: '#FFFFFF', border: 'rgba(255,255,255,0.35)' },
+    },
+    solid: '#F2B21B',
+    surface: '#FFFBF0',
+    screen: 'linear-gradient(135deg, #FFFBF0 0%, #FDF1CF 55%, #FBE6A8 100%)',
+    themeColor: '#F2B21B',
+    accent: '#D69E2E',
+  },
 };
 
 /** Which emblem/wordmark variant reads on the portal's loading screen. */
@@ -145,6 +165,7 @@ export const SCREEN_VARIANT: Record<Portal, EmblemVariant> = {
   barangay: 'reverse',
   command: 'light',
   dispatch: 'light',
+  admin: 'light',
 };
 
 export interface BrandContext {
@@ -198,6 +219,12 @@ export const IDENTITY: Record<Portal, PortalIdentity> = {
     descriptor: () => 'Dispatch Team · Lingayen',
     tagline: 'Dispatch Team · Lingayen',
   },
+  admin: {
+    name: 'Super Admin',
+    chip: () => 'Super Admin',
+    descriptor: () => 'System Administration · Lingayen',
+    tagline: 'UniGuard System Administration',
+  },
 };
 
 /** Everything the system can be busy doing, so each portal can say it in its own words. */
@@ -227,6 +254,7 @@ const plural = (n: number | undefined, one: string, many: string) =>
 
 const COPY: Record<Portal, Partial<Record<BrandProcess, CopyFn>>> = {
   dispatch: {},
+  admin: {},
   auth: {
     session: () => ({ title: 'Securing your session', detail: 'Checking your UniGuard account on this device', steps: ['Account', 'Role', 'Portal'] }),
     signin: () => ({ title: 'Signing you in', detail: 'Verifying your account and opening your portal', steps: ['Verify', 'Role', 'Portal'] }),
@@ -269,6 +297,14 @@ COPY.dispatch = {
   submit: () => ({ title: 'Assigning the unit', detail: 'Recording the dispatch and notifying the responders', steps: ['Call', 'Unit', 'Notified'] }),
   offline: () => ({ title: 'Dispatch console offline', detail: 'Showing the last synced queue. Changes sync when the connection returns', steps: ['Cached', 'Waiting', 'Sync'] }),
   signout: () => ({ title: 'Signing you out', detail: 'Closing the dispatch session', steps: ['Session', 'Cache', 'Done'] }),
+};
+
+COPY.admin = {
+  workspace: () => ({ title: 'Opening system administration', detail: 'Loading accounts, activity and system health across every portal', steps: ['Accounts', 'Activity', 'Health'] }),
+  refresh: () => ({ title: 'Refreshing the overview', detail: 'Pulling the latest accounts and activity', steps: ['Accounts', 'Activity', 'Health'] }),
+  export: () => ({ title: 'Preparing the system report', detail: 'Compiling accounts and activity into a file', steps: ['Collect', 'Format', 'Download'] }),
+  offline: () => ({ title: 'Administration offline', detail: 'Showing the last synced overview. Changes sync when the connection returns', steps: ['Cached', 'Waiting', 'Sync'] }),
+  signout: () => ({ title: 'Signing you out', detail: 'Closing the administration session', steps: ['Session', 'Cache', 'Done'] }),
 };
 
 const FALLBACK: CopyFn = () => ({ title: 'Working on it', detail: 'UniGuard is loading your data', steps: ['Prepare', 'Load', 'Ready'] });

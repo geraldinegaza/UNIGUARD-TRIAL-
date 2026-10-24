@@ -133,12 +133,14 @@ const ROLE_FROM_DB: Record<string, UserRole> = {
   barangay_official: 'barangay',
   lgu_ldrrmc: 'lgu_admin',
   dispatch_team: 'dispatch',
+  super_admin: 'super_admin',
 };
 const ROLE_TO_DB: Record<UserRole, string> = {
   citizen: 'citizen',
   barangay: 'barangay_official',
   lgu_admin: 'lgu_ldrrmc',
   dispatch: 'dispatch_team',
+  super_admin: 'super_admin',
 };
 export const roleToDb = (role: UserRole) => ROLE_TO_DB[role];
 
