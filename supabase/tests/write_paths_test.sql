@@ -190,4 +190,22 @@ select pg_temp.saves($$update public.evacuation_centers set status = 'full' wher
 select pg_temp.as_user((select superadmin from t_ids));
 select pg_temp.saves($$delete from public.emergency_hotlines where agency_name = 'Coast Guard Lingayen'$$, 'Super Admin deletes a hotline');
 
+-- Super Admin and dispatch console (reference build) ---------------------------
+select pg_temp.as_user((select superadmin from t_ids));
+select pg_temp.saves($$update public.reports set hazard_type = 'flood', severity = 'emergency', description = 'Corrected by the Super Admin'
+  where id = (select pob_pending from t_rep)$$, 'Super Admin corrects an incident record');
+select pg_temp.saves($$update public.profiles set full_name = 'Kap. Santos', phone = '0917 000 1111' where email = 'official@example.com'$$,
+                     'Super Admin edits an account name and phone');
+select pg_temp.as_user((select member from t_unit));
+select pg_temp.saves($$select public.record_equipment_check((select id from public.dispatch_equipment where owner_unit_id = public.my_unit_id() limit 1), 'needs_repair', '40%', 'Leaking hose')$$,
+                     'unit admin records a readiness check with level and notes');
+select pg_temp.saves($$select public.set_equipment_status((select id from public.dispatch_equipment where owner_unit_id = public.my_unit_id() limit 1), 'maintenance', null, 'At the shop')$$,
+                     'unit admin sets equipment status with a note');
+select pg_temp.saves($$select public.set_personnel_duty((select id from public.unit_personnel where unit_id = public.my_unit_id() limit 1), true, now(), null)$$,
+                     'unit admin clocks a crew member in');
+select pg_temp.saves($$select public.create_unit_request(public.my_unit_id(), 'other', 'Generator for the station')$$, 'unit sends a support request');
+select pg_temp.as_user((select superadmin from t_ids));
+select pg_temp.saves($$select public.delete_dispatch_unit((select unit from t_unit))$$, 'Super Admin deletes a dispatch unit');
+select pg_temp.ok((select role from public.profiles where id = (select member from t_unit)) = 'citizen', 'its member account becomes a resident');
+
 rollback;

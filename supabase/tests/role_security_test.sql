@@ -271,4 +271,15 @@ select pg_temp.as_user((select official from t_ids));
 select pg_temp.must_fail($$select public.advance_report_status((select pob_pending from t_rep), 'rejected', '')$$,
                          'a disabled official cannot change a status');
 
+-- ------------------------------------------------- unit deletion (migration 154)
+select pg_temp.as_user((select lgu from t_ids));
+select pg_temp.must_fail($$select public.delete_dispatch_unit((select unit from t_unit))$$, 'LDRRMO staff cannot delete a dispatch unit');
+select pg_temp.as_user((select member from t_unit));
+select pg_temp.must_fail($$select public.delete_dispatch_unit((select unit from t_unit))$$, 'a dispatch account cannot delete its unit');
+select pg_temp.ok(pg_temp.rows_changed($$update public.profiles set full_name = 'x' where email = 'official@example.com'$$) = 0,
+                  'a dispatch account cannot edit someone else''s profile');
+select pg_temp.as_user((select superadmin from t_ids));
+select pg_temp.must_fail($$select public.delete_dispatch_unit((select unit from t_unit))$$,
+                         'a unit with a dispatch in progress cannot be deleted');
+
 rollback;

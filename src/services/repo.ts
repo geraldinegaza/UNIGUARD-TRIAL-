@@ -40,6 +40,9 @@ import {
   UnitRequest,
   HospitalCapacity,
   UnitType,
+  DispatchEvent,
+  PatientNotice,
+  CaptainContact,
   InventoryItem,
   DistributionLogEntry,
   DamageAssessment,
@@ -94,6 +97,9 @@ export interface RepoState {
   personnel: UnitPersonnel[];
   equipment: UnitEquipment[];
   capacity: HospitalCapacity | null;
+  dispatchEvents: DispatchEvent[];
+  patientNotices: PatientNotice[];
+  captains: CaptainContact[];
   // Phase 3 operations data, loaded by the screens that use it
   inventory: InventoryItem[];
   distributionLog: DistributionLogEntry[];
@@ -158,6 +164,9 @@ let state: RepoState = {
   personnel: [],
   equipment: [],
   capacity: null,
+  dispatchEvents: [],
+  patientNotices: [],
+  captains: [],
   inventory: [],
   distributionLog: [],
   assessments: [],
@@ -635,7 +644,7 @@ export function setUser(user: User | null) {
     set({
       reports: [], notifications: [], beneficiaries: [], sosLog: [], othersReview: [], users: [], audit: [], responders: [],
       changeRequests: [], units: [], unitMembers: [], unitRequests: [], myUnit: null, dispatches: [], personnel: [],
-      equipment: [], capacity: null, inventory: [], distributionLog: [], assessments: [], sitreps: [], overdue: [],
+      equipment: [], capacity: null, dispatchEvents: [], patientNotices: [], captains: [], inventory: [], distributionLog: [], assessments: [], sitreps: [], overdue: [],
       shelterTrend: [],
     });
   }
@@ -1621,6 +1630,7 @@ const toDispatch = (d: Row): Dispatch => ({
   on_scene_at: d.on_scene_at || null,
   done_at: d.done_at || null,
   after_action: d.after_action || '',
+  after_action_at: d.after_action_at || null,
   report: d.report
     ? {
         code: d.report.code || '',
@@ -1757,7 +1767,15 @@ export async function loadMyUnit(): Promise<void> {
     dispatches: dispatches.error ? [] : (dispatches.data || []).map(toDispatch),
     personnel: personnel.error
       ? []
-      : (personnel.data || []).map((p: Row) => ({ id: p.id, unit_id: p.unit_id, name: p.name || '', role: p.role || '', phone: p.phone || '', on_duty: !!p.on_duty })),
+      : (personnel.data || []).map((p: Row) => ({
+          id: p.id,
+          unit_id: p.unit_id,
+          name: p.name || '',
+          role: p.role || '',
+          phone: p.phone || '',
+          on_duty: !!p.on_duty,
+          shift_start: p.shift_start || null,
+        })),
     equipment: equipment.error
       ? []
       : (equipment.data || []).map((e: Row) => ({
@@ -2178,4 +2196,101 @@ export async function saveOrgProfile(org: OrgProfile): Promise<void> {
   const { error: e2 } = await c.from('app_settings').upsert({ key: 'main', value, updated_at: new Date().toISOString() });
   if (e2) fail(e2);
   await loadOrgProfile();
+}
+
+/* ============================ dispatch console: the reference build's screens */
+// The status trail of this unit's dispatches (who moved it, when, with what note)
+export async function loadDispatchExtras(): Promise<void> {
+  if (!supabase || !state.user || !state.user.dispatch_unit_id) return;
+  const c = supabase;
+  const unitId = state.user.dispatch_unit_id;
+  const ids = state.dispatches.map((d) => d.id);
+  const [events, notices, captains] = await Promise.all([
+    ids.length
+      ? c.from('report_dispatch_events').select('*').in('dispatch_id', ids).order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null } as { data: Row[]; error: null }),
+    c.from('patient_notices').select('*').eq('unit_id', unitId).order('created_at', { ascending: false }),
+    c.from('barangays').select('name, captain_name, captain_phone').eq('active', true).order('name'),
+  ]);
+  set({
+    dispatchEvents: events.error
+      ? []
+      : (events.data || []).map((e: Row) => ({
+          id: e.id,
+          dispatch_id: e.dispatch_id,
+          actor_name: e.actor_name || '',
+          action: e.action || '',
+          note: e.note || '',
+          created_at: e.created_at,
+        })),
+    patientNotices: notices.error
+      ? []
+      : (notices.data || []).map((n: Row) => ({
+          id: n.id,
+          report_id: n.report_id || null,
+          patients: n.patients || 1,
+          condition: n.condition || '',
+          eta: n.eta || null,
+          status: n.status || 'sent',
+          created_at: n.created_at,
+        })),
+    captains: captains.error
+      ? []
+      : (captains.data || [])
+          .filter((b: Row) => b.captain_phone)
+          .map((b: Row) => ({ barangay: b.name, captain_name: b.captain_name || '', captain_phone: b.captain_phone })),
+  });
+}
+
+export async function ackPatientNotice(noticeId: string): Promise<void> {
+  await rpcOrFail('ack_patient_notice', { p_notice_id: noticeId, p_status: 'acknowledged' });
+  await loadDispatchExtras();
+}
+
+// Clock in (on duty from now) or out
+export async function clockPersonnel(personnelId: string, onDuty: boolean): Promise<void> {
+  await rpcOrFail('set_personnel_duty', {
+    p_personnel_id: personnelId,
+    p_on_duty: onDuty,
+    p_shift_start: onDuty ? new Date().toISOString() : null,
+    p_shift_end: onDuty ? null : new Date().toISOString(),
+  });
+  await loadMyUnit();
+}
+
+// A readiness check with the reference build's fields: condition, level, notes
+export async function equipmentCheck(equipmentId: string, condition: string, level: string, notes: string): Promise<void> {
+  await rpcOrFail('record_equipment_check', { p_equipment_id: equipmentId, p_condition: condition, p_level: level, p_notes: notes });
+  await loadMyUnit();
+}
+
+export async function equipmentStatus(equipmentId: string, status: UnitEquipment['status'], notes: string): Promise<void> {
+  await rpcOrFail('set_equipment_status', { p_equipment_id: equipmentId, p_status: status, p_condition: null, p_notes: notes });
+  await loadMyUnit();
+}
+
+/* ================================ Super Admin: units and accounts (reference) */
+export async function deleteDispatchUnit(unitId: string): Promise<void> {
+  await rpcOrFail('delete_dispatch_unit', { p_unit_id: unitId });
+  await loadDispatchUnits();
+}
+
+// The Super Admin corrects an account's name and phone (profiles rule allows it)
+export async function editAccountDetails(userId: string, fullName: string, phone: string): Promise<void> {
+  const { error } = await client()
+    .from('profiles')
+    .update({ full_name: fullName.trim(), phone: phone.trim(), updated_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) fail(error);
+  await loadUsers();
+}
+
+// The Super Admin corrects an incident record: hazard, severity, description
+export async function editReport(reportId: string, patch: { hazard_type: string; severity: ReportSeverity; description: string }): Promise<void> {
+  const { error } = await client()
+    .from('reports')
+    .update({ hazard_type: classifyHazard(patch.hazard_type).key, severity: patch.severity, description: patch.description.trim() })
+    .eq('id', reportId);
+  if (error) fail(error);
+  await loadAll();
 }

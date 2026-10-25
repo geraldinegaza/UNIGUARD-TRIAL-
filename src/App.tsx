@@ -527,6 +527,7 @@ export default function App() {
                   openDispatchFor={pendingDispatchId}
                   onDispatchOpened={() => setPendingDispatchId(null)}
                   canVerify={!inSuperOps}
+                  canEditRecord={inSuperOps}
                 />
               </div>
             )}

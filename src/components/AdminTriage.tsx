@@ -9,6 +9,7 @@ import {
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { OverdueQueuePanel } from './OverdueQueuePanel';
+import { HAZARD_LABELS } from '../lib/hazards';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -49,6 +50,8 @@ interface AdminTriageProps {
   onSelectReport?: (report: IncidentReport) => void;
   /** false for the Super Admin, who may edit records but never verify them */
   canVerify?: boolean;
+  /** the Super Admin corrects a record (hazard, severity, description) instead of verifying */
+  canEditRecord?: boolean;
   /** open the dispatch form for this report (from the drill-down) */
   openDispatchFor?: string | null;
   /** start the queue searched for this text (from Others Review) */
@@ -110,6 +113,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
   onNavigateTab,
   onSelectReport,
   canVerify = true,
+  canEditRecord = false,
   openDispatchFor,
   initialSearch,
   onDispatchOpened,
@@ -140,6 +144,30 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
   const [rejectionReason, setRejectionReason] = useState('False alarm / Duplicate ticket');
 
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  // Super Admin: Edit incident (reference build)
+  const [editRecord, setEditRecord] = useState<IncidentReport | null>(null);
+  const [recordForm, setRecordForm] = useState<{ hazard_type: string; severity: IncidentReport['severity']; description: string }>({
+    hazard_type: '',
+    severity: 'advisory',
+    description: '',
+  });
+  const saveRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editRecord) return;
+    if (!recordForm.description.trim()) {
+      setActionNotice('The description cannot be empty.');
+      return;
+    }
+    try {
+      await repo.editReport(editRecord.id, recordForm);
+      setActionNotice(`${editRecord.code} updated and logged to the activity log`);
+      setEditRecord(null);
+      onReportsUpdated();
+    } catch (err: any) {
+      setActionNotice(err.message || 'Could not update the incident.');
+    }
+    setTimeout(() => setActionNotice(null), 4000);
+  };
 
   // Responder roster for the dispatch modal, and the latest status note of the open report
   const { responders, audit: auditLogs, units } = useRepo();
@@ -1042,6 +1070,20 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
 
 
 
+                            {/* Super Admin: Edit in place of Verify (reference build) */}
+                            {canEditRecord && (
+                              <button
+                                onClick={() => {
+                                  setEditRecord(report);
+                                  setRecordForm({ hazard_type: report.hazard_type, severity: report.severity, description: report.description });
+                                }}
+                                className="px-3.5 py-1 bg-[#18181b] hover:bg-black text-white text-[11px] font-medium rounded-full transition-all cursor-pointer shadow-2xs"
+                                title="Correct this record"
+                              >
+                                Edit
+                              </button>
+                            )}
+
                             {/* Details Drawer Toggle */}
                             <button
                               onClick={() =>
@@ -1239,6 +1281,17 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
                                   >
                                     <MapPin className={`w-3.5 h-3.5 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`} />
                                     <span>View on Map Radar</span>
+                                  </button>
+                                )}
+                                {canEditRecord && (
+                                  <button
+                                    onClick={() => {
+                                      setEditRecord(report);
+                                      setRecordForm({ hazard_type: report.hazard_type, severity: report.severity, description: report.description });
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium text-white bg-[#18181b] hover:bg-black transition-colors cursor-pointer shadow-2xs"
+                                  >
+                                    <span>Edit record</span>
                                   </button>
                                 )}
                                 {report.status === 'unverified' && (
@@ -1574,6 +1627,66 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
               </div>
             </form>
           </div>
+        </div>
+      )}
+      {/* Super Admin: correct an incident record (reference build) */}
+      {editRecord && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4" onClick={() => setEditRecord(null)}>
+          <form
+            role="dialog"
+            aria-label={`Edit incident ${editRecord.code}`}
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={saveRecord}
+            className="bg-white rounded-[24px] max-w-md w-full max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 shadow-2xl border border-neutral-200/80 space-y-4"
+          >
+            <h3 className="font-semibold text-base text-neutral-900">Edit incident {editRecord.code}</h3>
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-neutral-500">Hazard type</label>
+              <select
+                value={recordForm.hazard_type}
+                onChange={(e) => setRecordForm({ ...recordForm, hazard_type: e.target.value })}
+                className="w-full text-xs font-medium p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 focus:bg-white focus:outline-hidden"
+              >
+                {HAZARD_LABELS.map((h) => (
+                  <option key={h} value={h}>
+                    {h}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-neutral-500">Severity</label>
+              <select
+                value={recordForm.severity}
+                onChange={(e) => setRecordForm({ ...recordForm, severity: e.target.value as IncidentReport['severity'] })}
+                className="w-full text-xs font-medium p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 focus:bg-white focus:outline-hidden"
+              >
+                <option value="advisory">Advisory</option>
+                <option value="warning">Warning</option>
+                <option value="emergency">Emergency</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5 text-neutral-500">Description</label>
+              <textarea
+                rows={4}
+                value={recordForm.description}
+                onChange={(e) => setRecordForm({ ...recordForm, description: e.target.value })}
+                className="w-full text-xs p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 focus:bg-white focus:outline-hidden"
+              />
+              <p className="mt-1.5 text-[11px] text-neutral-500">
+                Status, barangay and the reporter are managed by the workflow and cannot be edited here. Every change is written to the activity log.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
+              <button type="button" onClick={() => setEditRecord(null)} className="px-4 py-2 text-xs font-medium rounded-full text-neutral-600 hover:bg-neutral-100 cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" className="px-5 py-2 text-xs font-medium text-white rounded-full bg-[#18181b] hover:bg-neutral-800 cursor-pointer">
+                Save changes
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

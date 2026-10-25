@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Truck, Plus, X, Users, Inbox, Check, Ban, Mail, Phone, MapPin } from 'lucide-react';
+import { Truck, Plus, X, Users, Inbox, Check, Ban, Mail, Phone, MapPin, Search, Trash2, Pencil } from 'lucide-react';
 import { DispatchUnit, UnitType, User } from '../types';
 import * as repo from '../services/repo';
 import { useRepo } from '../hooks/useRepo';
@@ -36,15 +36,30 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
   const [edit, setEdit] = useState({ name: '', contact_number: '', address: '' });
   const [invite, setInvite] = useState({ email: '', unitRole: 'unit_admin' as 'unit_admin' | 'member' });
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  // reference build: the Super Admin edits a member's name and phone
+  const [editMember, setEditMember] = useState<User | null>(null);
+  const [memberForm, setMemberForm] = useState({ full_name: '', phone: '' });
 
   useEffect(() => {
     repo
       .loadDispatchUnits()
       .then(() => {
         // no units yet: start with the New unit form open
-        if (!repo.getState().units.length) setShowNew(true);
+        if (!repo.getState().units.length && canManageAccounts) setShowNew(true);
       })
       .catch((e: any) => setLoadError(e?.message || 'Could not load the dispatch units.'));
+  }, []);
+
+  // Escape closes whichever dialog is open
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setEditMember(null);
+      setOpenUnit(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   const flash = (msg: string) => {
@@ -66,8 +81,12 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
 
   const membersOf = (unitId: string): User[] => unitMembers.filter((m) => m.dispatch_unit_id === unitId);
   const pending = unitRequests.filter((r) => r.status === 'pending');
+  const q = search.trim().toLowerCase();
+  const shown = q
+    ? units.filter((u) => [u.name, u.unit_type, u.address, u.contact_number].some((f) => (f || '').toLowerCase().includes(q)))
+    : units;
   const unitName = (id: string) => units.find((u) => u.id === id)?.name || 'Unit';
-  const grouped = useMemo(() => TYPES.map((t) => ({ type: t, list: units.filter((u) => u.unit_type === t) })), [units]);
+  const grouped = useMemo(() => TYPES.map((t) => ({ type: t, list: shown.filter((u) => u.unit_type === t) })), [shown]);
 
   const openPanel = (u: DispatchUnit) => {
     setOpenUnit(u);
@@ -85,11 +104,30 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
             BFP, PNP, rescue and hospital units that receive dispatches from the incident queue.
           </p>
         </div>
-        <button type="button" onClick={() => setShowNew((v) => !v)} className={`${primary} self-start sm:self-auto`}>
-          {showNew ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-          <span>{showNew ? 'Close' : 'New unit'}</span>
-        </button>
+        {/* a new unit invites its first admin account, so it is a Super Admin action */}
+        {canManageAccounts && (
+          <button type="button" onClick={() => setShowNew((v) => !v)} className={`${primary} self-start sm:self-auto`}>
+            {showNew ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            <span>{showNew ? 'Close' : 'New unit'}</span>
+          </button>
+        )}
       </div>
+
+      <label className={`${card} flex items-center gap-2 px-4 h-12`}>
+        <Search className="w-4 h-4 text-neutral-400 shrink-0" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search units: name, type, address or contact"
+          aria-label="Search dispatch units"
+          className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none"
+        />
+        {search && (
+          <button type="button" onClick={() => setSearch('')} className="text-[11px] font-semibold text-neutral-600 cursor-pointer">
+            Clear
+          </button>
+        )}
+      </label>
 
       {notice && (
         <div className="px-4 py-3 rounded-2xl bg-white border border-neutral-200 text-xs font-medium text-neutral-800 flex items-center justify-between gap-3">
@@ -146,16 +184,18 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
         </form>
       )}
 
-      {/* Support requests from the units */}
-      {pending.length > 0 && (
+      {/* Support request inbox: every request from the units */}
+      {unitRequests.length > 0 && (
         <div className={`${card} overflow-hidden`}>
           <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50 flex items-center gap-2">
             <Inbox className="w-4 h-4 text-neutral-700" />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-900">Support requests</h2>
-            <span className="ml-auto text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-700">{pending.length} pending</span>
+            <span className="ml-auto text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-700">
+              {pending.length} pending · {unitRequests.length} total
+            </span>
           </div>
           <ul className="divide-y divide-neutral-100">
-            {pending.map((r) => (
+            {unitRequests.map((r) => (
               <li key={r.id} className="px-6 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-semibold text-neutral-900">
@@ -163,6 +203,16 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
                   </span>
                   <span className="block text-[11px] text-neutral-500 mt-0.5">{r.details || 'No details'} · {relTime(r.created_at)}</span>
                 </span>
+                {r.status !== 'pending' ? (
+                  <span
+                    className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                      r.status === 'declined' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-neutral-100 text-neutral-700 border border-neutral-200'
+                    }`}
+                  >
+                    {r.status}
+                    {r.decided_at ? ` · ${relTime(r.decided_at)}` : ''}
+                  </span>
+                ) : (
                 <span className="flex gap-2 shrink-0">
                   <button type="button" disabled={busy} onClick={() => run(() => repo.decideUnitRequest(r.id, 'declined'), 'Request declined')} className={ghost}>
                     Decline
@@ -172,6 +222,7 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
                     Approve
                   </button>
                 </span>
+                )}
               </li>
             ))}
           </ul>
@@ -279,6 +330,29 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
                 <Ban className="w-4 h-4" />
                 {openUnit.active ? 'Deactivate unit' : 'Activate unit'}
               </button>
+              {canManageAccounts && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    const n = membersOf(openUnit.id).length;
+                    if (
+                      !window.confirm(
+                        `Delete ${openUnit.name}? Its crew, equipment and requests are removed${n ? `, and its ${n} member account${n === 1 ? '' : 's'} become resident accounts` : ''}. Past dispatches keep their record. This cannot be undone.`
+                      )
+                    )
+                      return;
+                    run(async () => {
+                      await repo.deleteDispatchUnit(openUnit.id);
+                      setOpenUnit(null);
+                    }, `${openUnit.name} deleted`);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 min-h-[36px] rounded-full text-xs font-semibold bg-red-600 hover:bg-red-700 text-white cursor-pointer disabled:opacity-60"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete unit
+                </button>
+              )}
               <button
                 type="button"
                 disabled={busy}
@@ -320,13 +394,26 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
                       {canManageAccounts && (
                         <button
                           type="button"
+                          onClick={() => {
+                            setEditMember(m);
+                            setMemberForm({ full_name: m.full_name || '', phone: m.phone || '' });
+                          }}
+                          aria-label={`Edit ${m.full_name || m.email}`}
+                          className="w-8 h-8 rounded-full border border-neutral-200 text-neutral-600 hover:bg-white flex items-center justify-center cursor-pointer shrink-0"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {canManageAccounts && (
+                        <button
+                          type="button"
                           disabled={busy}
                           onClick={() =>
-                            run(() => repo.adminUsers({ action: 'set-disabled', userId: m.id, disabled: !m.disabled }).then(() => repo.loadDispatchUnits()), m.disabled ? 'Member enabled' : 'Member disabled')
+                            run(() => repo.adminUsers({ action: 'set-disabled', userId: m.id, disabled: !m.disabled }).then(() => repo.loadDispatchUnits()), m.disabled ? 'Member enabled' : 'Member deactivated')
                           }
                           className="text-[11px] font-medium px-3 py-1.5 rounded-full border border-neutral-200 text-neutral-700 hover:bg-white cursor-pointer"
                         >
-                          {m.disabled ? 'Enable' : 'Disable'}
+                          {m.disabled ? 'Enable' : 'Deactivate'}
                         </button>
                       )}
                     </li>
@@ -370,6 +457,44 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {editMember && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-neutral-950/50 p-0 sm:p-6" onClick={() => setEditMember(null)}>
+          <form
+            role="dialog"
+            aria-label="Edit account"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!memberForm.full_name.trim()) return;
+              run(async () => {
+                await repo.editAccountDetails(editMember.id, memberForm.full_name, memberForm.phone);
+                await repo.loadDispatchUnits();
+                setEditMember(null);
+              }, 'Account updated');
+            }}
+            className="w-full sm:max-w-sm bg-white rounded-t-[24px] sm:rounded-[24px] p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] space-y-3"
+          >
+            <h3 className="font-semibold text-base text-neutral-900">Edit account · {editMember.email}</h3>
+            <div>
+              <label className={label}>Full name</label>
+              <input className={input} value={memberForm.full_name} onChange={(e) => setMemberForm({ ...memberForm, full_name: e.target.value })} />
+            </div>
+            <div>
+              <label className={label}>Phone</label>
+              <input className={input} inputMode="tel" value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setEditMember(null)} className={ghost}>
+                Cancel
+              </button>
+              <button type="submit" disabled={busy} className={primary}>
+                Save
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

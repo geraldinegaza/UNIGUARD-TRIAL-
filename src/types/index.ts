@@ -342,6 +342,7 @@ export interface Dispatch {
   on_scene_at: string | null;
   done_at: string | null;
   after_action: string;
+  after_action_at: string | null;
   report: {
     code: string;
     hazard_type: string;
@@ -362,6 +363,7 @@ export interface UnitPersonnel {
   role: string;
   phone: string;
   on_duty: boolean;
+  shift_start: string | null;
 }
 
 export interface UnitEquipment {
@@ -481,4 +483,30 @@ export interface ShelterTrendPoint {
   day: string;
   occupancy: number;
   capacity: number;
+}
+
+/* ------------------------------------------- dispatch console (reference build) */
+export interface DispatchEvent {
+  id: string;
+  dispatch_id: string;
+  actor_name: string;
+  action: string;
+  note: string;
+  created_at: string;
+}
+
+export interface PatientNotice {
+  id: string;
+  report_id: string | null;
+  patients: number;
+  condition: string;
+  eta: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface CaptainContact {
+  barangay: string;
+  captain_name: string;
+  captain_phone: string;
 }

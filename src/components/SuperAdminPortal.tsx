@@ -17,6 +17,7 @@ import {
   Activity,
   UserPlus,
   X,
+  RefreshCw,
 } from 'lucide-react';
 import { User, UserRole, ChangeRequest } from '../types';
 import { useRepo } from '../hooks/useRepo';
@@ -100,6 +101,25 @@ interface SuperAdminPortalProps {
 }
 
 // activity log labels and where each kind of record can be opened
+// reference build: actions grouped into kinds for the activity filter
+const ACTION_BUCKET_TEXT: Record<string, string> = {
+  create: 'Create',
+  edit: 'Edit / update',
+  delete: 'Delete',
+  verify: 'Verify',
+  status: 'Status / dispatch',
+  other: 'Other',
+};
+const actionBucket = (action: string) => {
+  const a = (action || '').toLowerCase();
+  if (/\.create|\.insert|invited|received|published|fanned_out|member_invited/.test(a)) return 'create';
+  if (/\.update|\.edit|role_changed|barangay_changed|status_changed/.test(a)) return 'edit';
+  if (/\.delete|\.deleted/.test(a)) return 'delete';
+  if (/verif/.test(a)) return 'verify';
+  if (/dispatch|advance|resolved|rejected|disabled|enabled|deactivated/.test(a)) return 'status';
+  return 'other';
+};
+
 const ROLE_TEXT: Record<string, string> = {
   super_admin: 'Super Admin',
   lgu_ldrrmc: 'LDRRMO',
@@ -170,7 +190,13 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   const [actEntity, setActEntity] = useState('all');
   const [actFrom, setActFrom] = useState('');
   const [actTo, setActTo] = useState('');
-  const [actLimit, setActLimit] = useState(100);
+  const [actAction, setActAction] = useState('all');
+  const [actActor, setActActor] = useState('all');
+  const [actBarangay, setActBarangay] = useState('all');
+  const [actPage, setActPage] = useState(1);
+  const [refreshingAudit, setRefreshingAudit] = useState(false);
+  // any filter change starts the activity log again at page 1
+  useEffect(() => setActPage(1), [actQuery, actRole, actEntity, actAction, actActor, actBarangay, actFrom, actTo]);
 
   // the yellow band behind the pulse card ends where the hero ends
   const heroRef = useRef<HTMLElement>(null);
@@ -184,7 +210,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   }, []);
 
   useEffect(() => {
-    Promise.all([repo.loadUsers(), repo.loadAudit(100), repo.loadSos(), repo.loadChangeRequests(), repo.loadDispatchUnits()]).catch((e: any) =>
+    Promise.all([repo.loadUsers(), repo.loadAudit(500), repo.loadSos(), repo.loadChangeRequests(), repo.loadDispatchUnits()]).catch((e: any) =>
       setLoadError(e?.message || 'Some sections could not be loaded.')
     );
   }, []);
@@ -236,6 +262,8 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   const [editing, setEditing] = useState<User | null>(null);
   const [editRole, setEditRole] = useState<UserRole>('citizen');
   const [editBarangay, setEditBarangay] = useState<string>('');
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
   // a dispatch account belongs to one unit, as its admin or a member
   const [editUnit, setEditUnit] = useState<string>('');
   const [editUnitRole, setEditUnitRole] = useState<'unit_admin' | 'member'>('member');
@@ -290,45 +318,13 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
     }
   };
 
-  // System report: a PDF of accounts, incident load, pending requests and recent activity
-  const systemReport = () =>
-    exportPdf({
-      title: 'UniGuard System Report',
-      subtitle: data.org.office,
-      filename: `uniguard-system-report-${fileStamp()}.pdf`,
-      signer: currentUser.full_name,
-      sections: [
-        {
-          title: 'Accounts by role',
-          head: ['Role', 'Accounts'],
-          rows: [
-            ...ROLES.map((r) => [r.label, roleCounts[r.role] || 0] as (string | number)[]),
-            ['Disabled accounts', disabled],
-            ['Total', totalAccounts],
-          ],
-        },
-        {
-          title: 'Incident reports',
-          head: ['Status', 'Reports'],
-          rows: (['unverified', 'verified', 'dispatched', 'resolved', 'rejected'] as const).map((st) => [st, data.reports.filter((r) => r.status === st).length]),
-        },
-        {
-          title: 'Pending hotline change requests',
-          head: ['Requested', 'Action', 'Reason'],
-          rows: pending.map((c) => [new Date(c.created_at).toLocaleString(), c.action, c.reason || '']),
-        },
-        {
-          title: 'Recent activity',
-          head: ['When', 'Who', 'What'],
-          rows: data.audit.slice(0, 60).map((a) => [new Date(a.timestamp).toLocaleString(), a.actor_name, a.description || a.event_type]),
-        },
-      ],
-    }).catch(() => {});
 
   const openAccount = (u: User) => {
     setEditing(u);
     setEditRole(u.role);
     setEditBarangay(u.barangay_uuid || '');
+    setEditName(u.full_name || '');
+    setEditPhone(u.phone || '');
     setEditUnit(u.dispatch_unit_id || '');
     setEditUnitRole(u.unit_role === 'unit_admin' ? 'unit_admin' : 'member');
     setAccountNotice(null);
@@ -343,9 +339,16 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
       setAccountNotice(activeUnits.length ? 'Choose the unit this person belongs to.' : 'Create a dispatch unit first, in Dispatch units.');
       return;
     }
+    if (!editName.trim()) {
+      setAccountNotice('The name cannot be empty.');
+      return;
+    }
     setSavingAccount(true);
     setAccountNotice(null);
     try {
+      if (editName.trim() !== (editing.full_name || '') || editPhone.trim() !== (editing.phone || '')) {
+        await repo.editAccountDetails(editing.id, editName, editPhone);
+      }
       const unitChanged =
         editRole === 'dispatch' &&
         (editUnit !== (editing.dispatch_unit_id || '') || editUnitRole !== (editing.unit_role === 'unit_admin' ? 'unit_admin' : 'member'));
@@ -448,10 +451,19 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
             const count = series.byDay[dayKey(d)] || 0;
             const isToday = dayKey(d) === dayKey(today);
             return (
-              <span
+              <button
+                type="button"
                 key={i}
-                title={count ? `${count} report${count === 1 ? '' : 's'}` : undefined}
-                className={`h-6 rounded-md text-[10px] leading-6 tabular-nums ${
+                onClick={() => {
+                  // the filter takes a local calendar date (YYYY-MM-DD)
+                  const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  clearActivity();
+                  setActFrom(k);
+                  setActTo(k);
+                  setView('activity');
+                }}
+                title={`${count ? `${count} report${count === 1 ? '' : 's'} · ` : ''}open this day's activity`}
+                className={`h-6 rounded-md text-[10px] leading-6 tabular-nums cursor-pointer hover:ring-1 hover:ring-[#F2B21B] ${
                   isToday
                     ? 'bg-[#F2B21B] text-white font-bold'
                     : count
@@ -460,7 +472,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                 }`}
               >
                 {n}
-              </span>
+              </button>
             );
           })}
         </div>
@@ -577,6 +589,14 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
         >
           <UserPlus className="w-4 h-4" />
           New account
+        </button>
+        <button
+          type="button"
+          onClick={exportUsersPdf}
+          className="h-10 px-4 rounded-full bg-white text-[#8A5A00] text-[12px] font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer"
+        >
+          <Download className="w-4 h-4" />
+          Export PDF
         </button>
         <label className="h-10 flex-1 sm:flex-none w-full sm:w-72 flex items-center gap-2 px-4 rounded-full bg-white shadow-sm">
           <Search className="w-4 h-4 text-neutral-400 shrink-0" />
@@ -727,13 +747,25 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
               </span>
             </div>
 
-            {editing.role === 'dispatch' ? (
-              <p className="mt-5 text-[13px] text-neutral-600 bg-[#FFFBF0] rounded-xl px-4 py-3">
-                Dispatch team accounts belong to a dispatch unit and are managed from the unit, which comes in the next phase.
-              </p>
-            ) : (
+            {(
               <>
-                <label className="block mt-5 text-[11px] font-semibold text-neutral-500">Role</label>
+                <label className="block mt-5 text-[11px] font-semibold text-neutral-500">Full name</label>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="mt-1.5 w-full h-11 rounded-xl border border-neutral-200 px-3 text-[13px] bg-white focus:outline-none focus:border-[#F2B21B]"
+                />
+                <label className="block mt-4 text-[11px] font-semibold text-neutral-500">Phone</label>
+                <input
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  inputMode="tel"
+                  className="mt-1.5 w-full h-11 rounded-xl border border-neutral-200 px-3 text-[13px] bg-white focus:outline-none focus:border-[#F2B21B]"
+                />
+                <p className="mt-3 text-[11px] text-neutral-400">
+                  {editing.disabled ? 'Disabled' : 'Active'} · joined {new Date(editing.created_at).toLocaleDateString()}
+                </p>
+                <label className="block mt-4 text-[11px] font-semibold text-neutral-500">Role</label>
                 <select
                   value={editRole}
                   onChange={(e) => setEditRole(e.target.value as UserRole)}
@@ -820,16 +852,14 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
               >
                 {editing.disabled ? 'Enable account' : 'Disable account'}
               </button>
-              {editing.role !== 'dispatch' && (
-                <button
-                  type="button"
-                  onClick={saveAccount}
-                  disabled={savingAccount}
-                  className="flex-1 h-11 rounded-full bg-gradient-to-r from-[#F6C445] to-[#F2A50F] text-white text-[13px] font-bold shadow-[0_10px_20px_-10px_rgba(242,165,15,0.9)] cursor-pointer disabled:opacity-50"
-                >
-                  {savingAccount ? 'Saving…' : 'Save'}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={saveAccount}
+                disabled={savingAccount}
+                className="flex-1 h-11 rounded-full bg-gradient-to-r from-[#F6C445] to-[#F2A50F] text-white text-[13px] font-bold shadow-[0_10px_20px_-10px_rgba(242,165,15,0.9)] cursor-pointer disabled:opacity-50"
+              >
+                {savingAccount ? 'Saving…' : 'Save'}
+              </button>
             </div>
             <button type="button" onClick={() => setEditing(null)} className="mt-3 w-full h-10 text-[13px] text-neutral-500 cursor-pointer">
               Close
@@ -841,47 +871,121 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   );
 
   const entities = Array.from(new Set(data.audit.map((a) => a.entity).filter(Boolean))).sort();
+  const actors = Array.from(new Set(data.audit.map((a) => a.actor_name).filter(Boolean))).sort();
+  const auditBarangays = Array.from(new Set(data.audit.map((a) => a.actor_barangay || '').filter(Boolean))).sort();
   const filteredAudit = data.audit.filter((a) => {
     if (actRole !== 'all' && (actRole === 'system' ? a.actor_id || a.actor_name !== 'system' : a.actor_role !== actRole)) return false;
     if (actEntity !== 'all' && a.entity !== actEntity) return false;
-    const day = (a.timestamp || '').slice(0, 10);
+    if (actAction !== 'all' && actionBucket(a.event_type) !== actAction) return false;
+    if (actActor !== 'all' && a.actor_name !== actActor) return false;
+    if (actBarangay !== 'all' && (a.actor_barangay || '') !== actBarangay) return false;
+    // compare by the local calendar day (timestamps are stored in UTC)
+    const t = new Date(a.timestamp);
+    const day = isNaN(t.getTime()) ? '' : `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
     if (actFrom && day < actFrom) return false;
     if (actTo && day > actTo) return false;
     const q = actQuery.trim().toLowerCase();
     if (q && ![a.description, a.event_type, a.actor_name, a.entity, a.actor_barangay].some((x) => (x || '').toLowerCase().includes(q))) return false;
     return true;
   });
-  const exportAudit = () =>
-    download(
-      `uniguard-activity-${new Date().toISOString().slice(0, 10)}.csv`,
-      toCSV(
-        filteredAudit.map((a) => ({
-          when: a.timestamp,
-          actor: a.actor_name,
-          role: ROLE_TEXT[a.actor_role || ''] || a.actor_role || '',
-          barangay: a.actor_barangay || '',
-          action: a.event_type,
-          record: a.entity,
-          record_id: a.target_id,
-          details: a.description,
-        }))
-      )
-    );
+  const PAGE = 25;
+  const pages = Math.max(1, Math.ceil(filteredAudit.length / PAGE));
+  const page = Math.min(actPage, pages);
+  const pageRows = filteredAudit.slice((page - 1) * PAGE, page * PAGE);
+  const clearActivity = () => {
+    setActQuery('');
+    setActRole('all');
+    setActEntity('all');
+    setActAction('all');
+    setActActor('all');
+    setActBarangay('all');
+    setActFrom('');
+    setActTo('');
+    setActPage(1);
+  };
+  // reference build: Export PDF of the filtered activity log and of the accounts
+  function exportAuditPdf() {
+    return exportPdf({
+      title: 'Activity Log',
+      subtitle: data.org.office,
+      meta: [`${filteredAudit.length} of ${data.audit.length} entries`],
+      filename: `uniguard-activity-${fileStamp()}.pdf`,
+      landscape: true,
+      signer: currentUser.full_name,
+      sections: [
+        {
+          title: 'Entries',
+          head: ['When', 'Who', 'Role', 'Barangay', 'Record', 'Action', 'What changed'],
+          rows: filteredAudit.map((a) => [
+            new Date(a.timestamp).toLocaleString(),
+            a.actor_name,
+            ROLE_TEXT[a.actor_role || ''] || a.actor_role || 'System',
+            a.actor_barangay || '',
+            ENTITY_TEXT[a.entity] || a.entity,
+            a.event_type,
+            a.description,
+          ]),
+        },
+      ],
+    }).catch(() => {});
+  }
+  function exportUsersPdf() {
+    return exportPdf({
+      title: 'User Management',
+      subtitle: data.org.office,
+      meta: [`${accounts.length} accounts`],
+      filename: `uniguard-accounts-${fileStamp()}.pdf`,
+      landscape: true,
+      signer: currentUser.full_name,
+      sections: [
+        {
+          title: 'Accounts',
+          head: ['Name', 'Email', 'Role', 'Barangay', 'Status', 'Created'],
+          rows: accounts.map((u) => [
+            u.full_name || '(no name)',
+            u.email,
+            (ROLES.find((r) => r.role === u.role)?.label || u.role) + (u.unit_role ? ` (${u.unit_role.replace('_', ' ')})` : ''),
+            u.barangay_name || '',
+            u.disabled ? 'Disabled' : 'Active',
+            new Date(u.created_at).toLocaleDateString(),
+          ]),
+        },
+      ],
+    }).catch(() => {});
+  }
   const fieldCls = 'h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] text-neutral-800 outline-none focus:border-[#C98A0B] min-w-0';
 
   const activityView = (
     <div className="px-4 sm:px-8 pt-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-[20px] font-bold text-neutral-800">Activity log</h2>
-        <button
-          type="button"
-          onClick={exportAudit}
-          disabled={!filteredAudit.length}
-          className="h-9 px-4 rounded-full bg-white text-[#8A5A00] text-[12px] font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
-        >
-          <Download className="w-3.5 h-3.5" />
-          Export CSV
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="h-9 px-3 rounded-full bg-white/70 text-[#8A5A00] text-[12px] font-bold inline-flex items-center">
+            {filteredAudit.length} / {data.audit.length}
+          </span>
+          <button
+            type="button"
+            disabled={refreshingAudit}
+            onClick={async () => {
+              setRefreshingAudit(true);
+              await repo.loadAudit(500).catch(() => {});
+              setRefreshingAudit(false);
+            }}
+            className="h-9 px-4 rounded-full bg-white text-[#8A5A00] text-[12px] font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshingAudit ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={exportAuditPdf}
+            disabled={!filteredAudit.length}
+            className="h-9 px-4 rounded-full bg-white text-[#8A5A00] text-[12px] font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export PDF
+          </button>
+        </div>
       </div>
       <div className="bg-white rounded-[22px] p-3 sm:p-4 mb-3 shadow-[0_20px_40px_-28px_rgba(58,42,8,0.4)] grid grid-cols-2 xl:grid-cols-4 gap-2.5">
         <input
@@ -908,14 +1012,41 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
             </option>
           ))}
         </select>
+        <select className={fieldCls} value={actAction} onChange={(e) => setActAction(e.target.value)} aria-label="Action type">
+          <option value="all">Every action</option>
+          {Object.entries(ACTION_BUCKET_TEXT).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
+        </select>
+        <select className={fieldCls} value={actActor} onChange={(e) => setActActor(e.target.value)} aria-label="Changed by">
+          <option value="all">Everyone</option>
+          {actors.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+        <select className={fieldCls} value={actBarangay} onChange={(e) => setActBarangay(e.target.value)} aria-label="Barangay">
+          <option value="all">Every barangay</option>
+          {auditBarangays.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
         <input type="date" className={fieldCls} value={actFrom} onChange={(e) => setActFrom(e.target.value)} aria-label="From date" />
         <input type="date" className={fieldCls} value={actTo} onChange={(e) => setActTo(e.target.value)} aria-label="To date" />
+        <button type="button" onClick={clearActivity} className="h-10 px-4 rounded-xl bg-white border border-[#F3D98A] text-[12px] font-bold text-[#8A5A00] cursor-pointer">
+          Clear
+        </button>
       </div>
       <p className="text-[11px] text-[#5C3A0A]/70 mb-2 px-1">
-        Showing {filteredAudit.length} of the latest {data.audit.length} entries.
+        Every change made by an account, newest first. Tap Open to go to the record.
       </p>
       <div className="bg-white rounded-[22px] p-2 shadow-[0_20px_40px_-28px_rgba(58,42,8,0.4)]">
-        {filteredAudit.map((a) => {
+        {pageRows.map((a) => {
           const target = a.entity ? ENTITY_TAB[a.entity] : undefined;
           return (
             <div key={a.id} className="flex items-start gap-3 px-3 sm:px-4 py-3 rounded-2xl hover:bg-[#FFFBF0]">
@@ -948,19 +1079,29 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
           <p className="px-4 py-10 text-center text-[13px] text-neutral-400">{data.audit.length ? 'Nothing matches these filters.' : 'No activity recorded yet.'}</p>
         )}
       </div>
-      {data.audit.length >= actLimit && (
-        <div className="flex justify-center mt-3">
-          <button
-            type="button"
-            onClick={() => {
-              const next = actLimit + 400;
-              setActLimit(next);
-              repo.loadAudit(next).catch(() => {});
-            }}
-            className="h-9 px-5 rounded-full bg-white text-[#8A5A00] text-[12px] font-bold shadow-sm cursor-pointer"
-          >
-            Load older activity
-          </button>
+      {filteredAudit.length > PAGE && (
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-3 px-1">
+          <span className="text-[12px] text-[#5C3A0A]/70">
+            Page {page} of {pages} · {filteredAudit.length} entries match
+          </span>
+          <span className="flex gap-2">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setActPage(page - 1)}
+              className="h-9 px-4 rounded-full bg-white text-[#8A5A00] text-[12px] font-bold shadow-sm cursor-pointer disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <button
+              type="button"
+              disabled={page >= pages}
+              onClick={() => setActPage(page + 1)}
+              className="h-9 px-4 rounded-full bg-white text-[#8A5A00] text-[12px] font-bold shadow-sm cursor-pointer disabled:opacity-40"
+            >
+              Next
+            </button>
+          </span>
         </div>
       )}
     </div>
@@ -1235,10 +1376,10 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                 </span>
                 <button
                   type="button"
-                  onClick={() => systemReport()}
+                  onClick={() => (view === 'activity' ? exportAuditPdf() : exportUsersPdf())}
                   className="hidden sm:flex h-9 px-4 rounded-full bg-[#F28C0F] text-white text-[12px] font-bold items-center gap-2 shadow-md cursor-pointer shrink-0"
                 >
-                  <Download className="w-3.5 h-3.5" /> System report
+                  <Download className="w-3.5 h-3.5" /> Export PDF
                 </button>
                 <button
                   type="button"
