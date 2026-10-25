@@ -100,32 +100,6 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     typeof window !== 'undefined' ? window.innerWidth : 1200
   );
 
-  // Update scroll boundaries on scroll and resize
-  useEffect(() => {
-    const el = navScrollRef.current;
-    if (!el) return;
-
-    const checkScrollPosition = () => {
-      const atLeft = el.scrollLeft <= 2;
-      const atRight = Math.ceil(el.scrollLeft + el.clientWidth) >= el.scrollWidth - 2;
-      setIsScrolledToLeft(atLeft);
-      setIsScrolledToRight(atRight);
-    };
-
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-      checkScrollPosition();
-    };
-
-    checkScrollPosition();
-    el.addEventListener('scroll', checkScrollPosition, { passive: true });
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      el.removeEventListener('scroll', checkScrollPosition);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
 
   // Live notifications and nav counts from the data store
   const data = useRepo();
@@ -345,6 +319,41 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       : []),
   ];
 
+  // Update scroll boundaries on scroll and resize
+  useEffect(() => {
+    const el = navScrollRef.current;
+    if (!el) return;
+
+    const checkScrollPosition = () => {
+      const atLeft = el.scrollLeft <= 2;
+      const atRight = Math.ceil(el.scrollLeft + el.clientWidth) >= el.scrollWidth - 2;
+      setIsScrolledToLeft(atLeft);
+      setIsScrolledToRight(atRight);
+    };
+
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      checkScrollPosition();
+    };
+
+    checkScrollPosition();
+    el.addEventListener('scroll', checkScrollPosition, { passive: true });
+    window.addEventListener('resize', handleResize);
+    // The links change (Operations mode, badges, short labels) without a
+    // window resize; re-check the fades whenever the bar or its links resize.
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(checkScrollPosition) : null;
+    if (ro) {
+      ro.observe(el);
+      Array.from(el.children).forEach((c) => ro.observe(c));
+    }
+
+    return () => {
+      el.removeEventListener('scroll', checkScrollPosition);
+      window.removeEventListener('resize', handleResize);
+      ro?.disconnect();
+    };
+  }, [adminNavItems.length]);
+
   const navItems = isResident ? residentNavItems : adminNavItems;
 
   // LDRRMO & Barangay Portal Top Navigation Bar (matching reference image style transfer)
@@ -390,7 +399,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         </div>
 
         {/* Navigation Links: Visibly organized container with horizontal scroll and dynamic fade masks */}
-        <div className={`relative hidden md:block flex-1 min-w-0 order-last lg:order-none basis-full lg:basis-0 max-w-full lg:max-w-[760px] xl:max-w-[860px] shrink rounded-full backdrop-blur-xs shadow-2xs p-1 overflow-hidden mx-0 lg:mx-2.5 ${
+        <div className={`relative hidden md:block flex-1 min-w-0 order-last lg:order-none basis-full lg:basis-0 max-w-full lg:max-w-[640px] xl:max-w-[720px] shrink rounded-full backdrop-blur-xs shadow-2xs p-1 overflow-hidden mx-0 lg:mx-2.5 ${
           isBarangay
             ? 'bg-white/80 border border-[#7EA0C5]/40'
             : 'bg-white/70 border border-gray-200/60'
