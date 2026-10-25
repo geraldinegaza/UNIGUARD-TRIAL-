@@ -38,7 +38,13 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    repo.loadDispatchUnits().catch((e: any) => setLoadError(e?.message || 'Could not load the dispatch units.'));
+    repo
+      .loadDispatchUnits()
+      .then(() => {
+        // no units yet: start with the New unit form open
+        if (!repo.getState().units.length) setShowNew(true);
+      })
+      .catch((e: any) => setLoadError(e?.message || 'Could not load the dispatch units.'));
   }, []);
 
   const flash = (msg: string) => {

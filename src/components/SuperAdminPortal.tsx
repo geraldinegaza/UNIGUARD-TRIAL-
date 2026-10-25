@@ -631,6 +631,11 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                     ))}
                   </select>
                 </label>
+                {!activeUnits.length && onOpenOperations && (
+                  <button type="button" onClick={() => onOpenOperations('dispatch_units')} className="sm:col-span-2 text-left text-[12px] font-bold text-[#8A5A00] underline cursor-pointer">
+                    No dispatch units yet. Create one in Dispatch units
+                  </button>
+                )}
                 <label className="block">
                   <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">In the unit</span>
                   <select className="w-full h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] outline-none focus:border-[#C98A0B]" value={newAcct.unitRole} onChange={(e) => setNewAcct({ ...newAcct, unitRole: e.target.value as 'unit_admin' | 'member' })}>
@@ -758,7 +763,14 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                       </select>
                     ) : (
                       <p className="mt-1.5 text-[12px] text-amber-800">
-                        No active dispatch units yet. Create one in <b>Dispatch units</b> first.
+                        No active dispatch units yet.{' '}
+                        {onOpenOperations ? (
+                          <button type="button" onClick={() => onOpenOperations('dispatch_units')} className="font-bold underline cursor-pointer">
+                            Create one in Dispatch units
+                          </button>
+                        ) : (
+                          <b>Create one in Dispatch units first.</b>
+                        )}
                       </p>
                     )}
                     <label className="block mt-4 text-[11px] font-semibold text-neutral-500">In the unit</label>
@@ -1153,11 +1165,12 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
           <main className="flex-1 min-w-0 overflow-y-auto">
             {/* warm hero with the section links */}
             <section ref={heroRef} className="relative bg-gradient-to-br from-[#F7CE6A] via-[#F2B744] to-[#E9A12A] pt-[env(safe-area-inset-top)]">
-              <div className="flex items-center gap-3 px-4 sm:px-8 pt-4 sm:pt-6">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-8 pt-4 sm:pt-6">
                 <span className="lg:hidden w-8 h-8 rounded-lg bg-white/30 flex items-center justify-center shrink-0">
                   <TriadEmblem portal="admin" variant="reverse" size={20} />
                 </span>
-                <nav aria-label="Admin sections" className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar min-w-0">
+                {/* wraps onto a second line rather than hiding links off the edge */}
+                <nav aria-label="Admin sections" className="flex flex-wrap items-center gap-1 sm:gap-2 min-w-0 flex-1">
                   {VIEWS.map((v) => (
                     <button
                       key={v.id}
