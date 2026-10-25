@@ -18,6 +18,10 @@ import {
   UserPlus,
   X,
   RefreshCw,
+  LayoutGrid,
+  Bell,
+  BarChart3,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import { User, UserRole, ChangeRequest } from '../types';
 import { useRepo } from '../hooks/useRepo';
@@ -99,6 +103,15 @@ interface SuperAdminPortalProps {
   /** opens the operations console (incidents, map, shelters, road work, hotlines, analytics) */
   onOpenOperations?: (tab?: string) => void;
 }
+
+// Sidebar menu: LDRRMO screens the Super Admin opens in Operations
+const SIDE_MENU: { tab: string; label: string; icon: typeof Users }[] = [
+  { tab: 'overview', label: 'Operations', icon: LayoutGrid },
+  { tab: 'settings', label: 'Settings', icon: SettingsIcon },
+  { tab: 'notifications', label: 'Notifications', icon: Bell },
+  { tab: 'reports', label: 'Reports & Documents', icon: FileText },
+  { tab: 'analytics', label: 'Analytics', icon: BarChart3 },
+];
 
 // activity log labels and where each kind of record can be opened
 // reference build: actions grouped into kinds for the activity filter
@@ -215,6 +228,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
     );
   }, []);
 
+  const unreadNotes = data.notifications.filter((n) => n.unread).length;
   const roleCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     data.users.forEach((u) => (counts[u.role] = (counts[u.role] || 0) + 1));
@@ -1278,24 +1292,36 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
               })}
             </ul>
 
-            <div className="mt-9 flex items-center justify-between">
-              <h2 className="text-[13px] font-bold text-neutral-800">Recent activity</h2>
-              <span className="w-2 h-2 rounded-full bg-[#F2B21B]" />
-            </div>
-            <ul className="mt-3 space-y-2.5">
-              {data.audit.slice(0, 4).map((a) => (
-                <li key={a.id} className="text-[11px] text-neutral-500 leading-snug">
-                  <span className="line-clamp-2">{a.description || a.event_type}</span>
-                  <span className="text-neutral-300">{relTime(a.timestamp)}</span>
-                </li>
-              ))}
-              {!data.audit.length && <li className="text-[11px] text-neutral-400">No activity yet.</li>}
-            </ul>
+            {/* menu: the LDRRMO screens the Super Admin opens in the gold Operations view */}
+            {onOpenOperations && (
+              <>
+                <h2 className="mt-9 text-[13px] font-bold text-neutral-800">Menu</h2>
+                <nav aria-label="Operations menu" className="mt-3 space-y-1">
+                  {SIDE_MENU.map(({ tab, label, icon: Icon }) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => onOpenOperations(tab)}
+                      className="w-full h-10 px-3 rounded-xl flex items-center gap-3 text-left text-[13px] font-semibold text-neutral-700 hover:bg-[#FFF6DB] hover:text-[#8A5A00] cursor-pointer group"
+                    >
+                      <Icon className="w-4 h-4 text-neutral-400 group-hover:text-[#C98A0B]" />
+                      <span className="flex-1">{label}</span>
+                      {tab === 'notifications' && unreadNotes > 0 && (
+                        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#F28C0F] text-white text-[10px] font-bold flex items-center justify-center">
+                          {unreadNotes}
+                        </span>
+                      )}
+                      <ArrowUpRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-[#C98A0B]" />
+                    </button>
+                  ))}
+                </nav>
+              </>
+            )}
 
             <button
               type="button"
               onClick={onSignOut}
-              className="mt-auto pt-0 h-11 rounded-full bg-gradient-to-r from-[#F6C445] to-[#F2A50F] text-white text-[13px] font-bold flex items-center justify-between px-5 shadow-[0_10px_20px_-10px_rgba(242,165,15,0.9)] cursor-pointer"
+              className="mt-auto shrink-0 h-11 rounded-full bg-gradient-to-r from-[#F6C445] to-[#F2A50F] text-white text-[13px] font-bold flex items-center justify-between px-5 shadow-[0_10px_20px_-10px_rgba(242,165,15,0.9)] cursor-pointer"
             >
               <span>Sign out</span>
               <LogOut className="w-4 h-4" />
@@ -1330,46 +1356,19 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                       )}
                     </button>
                   ))}
-                  {onOpenOperations && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenOperations()}
-                      className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
-                    >
-                      Operations
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  {onOpenOperations && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenOperations('settings')}
-                      className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
-                    >
-                      Settings
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  {onOpenOperations && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenOperations('hotlines')}
-                      className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
-                    >
-                      Hotlines
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  {onOpenOperations && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenOperations('dispatch_units')}
-                      className="shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
-                    >
-                      Dispatch units
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  {/* phones and tablets have no sidebar: its menu shows here instead */}
+                  {onOpenOperations &&
+                    SIDE_MENU.map(({ tab, label }) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => onOpenOperations(tab)}
+                        className="lg:hidden shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer text-[#5C3A0A]/75 hover:text-[#3A2A08] inline-flex items-center gap-1"
+                      >
+                        {label}
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </button>
+                    ))}
                 </nav>
                 <span className="ml-auto hidden sm:flex w-9 h-9 rounded-full bg-white/35 text-[#3A2A08] font-bold items-center justify-center shrink-0">
                   {initial}

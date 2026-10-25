@@ -83,6 +83,9 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
   // LDRRMO Top Bar Right Controls State (Search, Notifications, Menu matching Image 2)
   const [searchQuery, setSearchQuery] = useState('');
+  // the search box folds into a round button so the section links keep the room
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchOpen = searchFocused || !!searchQuery;
   const [isNotifsOpen, setIsNotifsOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const rightControlsRef = useRef<HTMLDivElement>(null);
@@ -303,14 +306,14 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     {
       id: 'road_work',
       label: 'Road Work',
-      shortLabel: 'Road Work',
+      shortLabel: 'Roads',
       icon: Construction,
       badge: null,
     },
     {
       id: 'sos_log',
       label: 'SOS Log',
-      shortLabel: 'SOS Log',
+      shortLabel: 'SOS',
       icon: ShieldAlert,
       badge: null,
     },
@@ -328,6 +331,18 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       icon: Layers,
       badge: null,
     },
+    // LDRRMO and the Super Admin in Operations: dispatch units sit in the top bar
+    ...(isLgu
+      ? [
+          {
+            id: 'dispatch_units',
+            label: 'Dispatch Units',
+            shortLabel: 'Dispatch',
+            icon: Truck,
+            badge: null,
+          },
+        ]
+      : []),
   ];
 
   const navItems = isResident ? residentNavItems : adminNavItems;
@@ -354,7 +369,9 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             portal={onExitOps ? 'admin' : isBarangay ? 'barangay' : 'command'}
             size={26}
             context={{ barangayName: currentUser.barangay_name }}
-            wordmarkClassName="hidden sm:inline"
+            // in Operations the gold and the SUPER ADMIN tag mark the portal, so the
+            // wordmark gives its room to the section links on narrower laptops
+            wordmarkClassName={onExitOps ? 'hidden min-[1366px]:inline' : 'hidden sm:inline'}
           />
           {/* Super Admin in the operations console: the way back to the admin console */}
           {onExitOps && (
@@ -362,16 +379,18 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
               type="button"
               onClick={onExitOps}
               title="Back to the Super Admin console"
-              className="hidden md:inline-flex items-center gap-1 h-7 px-3 rounded-full text-[11px] font-bold text-white bg-gradient-to-r from-[#F6C445] to-[#F2A50F] shadow-2xs cursor-pointer shrink-0"
+              aria-label="Back to the Super Admin console"
+              className="hidden md:inline-flex items-center justify-center gap-1 h-7 w-7 2xl:w-auto 2xl:px-3 rounded-full text-[11px] font-bold text-white bg-gradient-to-r from-[#F6C445] to-[#F2A50F] shadow-2xs cursor-pointer shrink-0"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
-              Admin console
+              {/* the label shows on wide screens; elsewhere the arrow keeps the room for the section links */}
+              <span className="hidden 2xl:inline">Admin console</span>
             </button>
           )}
         </div>
 
         {/* Navigation Links: Visibly organized container with horizontal scroll and dynamic fade masks */}
-        <div className={`relative hidden md:block flex-1 min-w-0 order-last lg:order-none basis-full lg:basis-0 max-w-full lg:max-w-[640px] xl:max-w-[720px] shrink rounded-full backdrop-blur-xs shadow-2xs p-1 overflow-hidden mx-0 lg:mx-2.5 ${
+        <div className={`relative hidden md:block flex-1 min-w-0 order-last lg:order-none basis-full lg:basis-0 max-w-full lg:max-w-[760px] xl:max-w-[860px] shrink rounded-full backdrop-blur-xs shadow-2xs p-1 overflow-hidden mx-0 lg:mx-2.5 ${
           isBarangay
             ? 'bg-white/80 border border-[#7EA0C5]/40'
             : 'bg-white/70 border border-gray-200/60'
@@ -387,7 +406,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           {/* Horizontally Scrollable Nav Container */}
           <nav
             ref={navScrollRef}
-            className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1"
+            className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1"
           >
             {adminNavItems.map((item) => {
               const isActive =
@@ -404,13 +423,13 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                     if (item.id === 'home') setActiveTab('overview');
                     else setActiveTab(item.id);
                   }}
-                  className={`shrink-0 rounded-full px-4 py-1.5 font-medium text-xs shadow-xs transition-all whitespace-nowrap [text-overflow:clip] flex items-center gap-1.5 cursor-pointer ${
+                  className={`shrink-0 rounded-full px-3.5 py-1.5 font-medium text-xs shadow-xs transition-all whitespace-nowrap [text-overflow:clip] flex items-center gap-1.5 cursor-pointer ${
                     isBarangay
                       ? 'bg-[#052659] text-white hover:bg-[#5482B4]'
                       : 'bg-[#2A2A2A] text-white'
                   }`}
                 >
-                  <span className="[text-overflow:clip]">{t(item.label)}</span>
+                  <span className="[text-overflow:clip]">{t(windowWidth < 1440 ? item.shortLabel : item.label)}</span>
                   {item.badge && (
                     <span className="bg-white/20 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0">
                       {item.badge}
@@ -425,13 +444,13 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                     if (item.id === 'home') setActiveTab('overview');
                     else setActiveTab(item.id);
                   }}
-                  className={`shrink-0 font-medium px-3 py-1.5 text-xs transition-colors whitespace-nowrap [text-overflow:clip] flex items-center gap-1.5 cursor-pointer rounded-full ${
+                  className={`shrink-0 font-medium px-2.5 py-1.5 text-xs transition-colors whitespace-nowrap [text-overflow:clip] flex items-center gap-1.5 cursor-pointer rounded-full ${
                     isBarangay
                       ? 'text-[#5482B4] hover:text-[#011025] hover:bg-[#C2E8FF]/30'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-black/5'
                   }`}
                 >
-                  <span className="[text-overflow:clip]">{t(item.label)}</span>
+                  <span className="[text-overflow:clip]">{t(windowWidth < 1440 ? item.shortLabel : item.label)}</span>
                   {item.badge && (
                     <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded-full shrink-0 ${
                       isBarangay
@@ -459,7 +478,12 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0" ref={rightControlsRef}>
           {/* Search Input Box with organized, responsive width */}
           <div className="relative hidden md:flex items-center min-w-0">
-            <div className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 h-8.5 sm:h-9.5 rounded-full text-xs shadow-2xs transition-all w-32 sm:w-44 md:w-52 lg:w-60 xl:w-64 min-w-0 ${
+            <div
+              onClick={() => searchInputRef.current?.focus()}
+              title={searchOpen ? undefined : 'Search (⌘K)'}
+              className={`flex items-center gap-1.5 sm:gap-2 h-8.5 sm:h-9.5 rounded-full text-xs shadow-2xs transition-all min-w-0 cursor-text ${
+                searchOpen ? 'px-3 sm:px-3.5 w-56 xl:w-64' : 'w-8.5 sm:w-9.5 justify-center px-0 cursor-pointer'
+              } ${
               isBarangay
                 ? 'border border-[#7EA0C5]/40 bg-white hover:bg-[#C2E8FF]/15 focus-within:bg-white focus-within:border-[#052659] focus-within:ring-1 focus-within:ring-[#052659]/30 text-[#011025]'
                 : 'border border-gray-200/90 bg-white hover:bg-neutral-50/80 focus-within:bg-white focus-within:border-neutral-400 focus-within:ring-1 focus-within:ring-neutral-400/50 text-neutral-700'
@@ -469,6 +493,9 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
+                onFocus={() => setSearchFocused(true)}
+                // a short delay lets a click on a result land before the box folds
+                onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && searchHits[0]) searchHits[0].open();
@@ -482,11 +509,11 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                     ? 'Search incidents...'
                     : 'Search incidents, responders...'
                 }
-                className={`w-full min-w-0 bg-transparent text-xs focus:outline-none truncate ${
+                className={`${searchOpen ? 'w-full' : 'w-0 opacity-0 absolute'} min-w-0 bg-transparent text-xs focus:outline-none truncate ${
                   isBarangay ? 'text-[#011025] placeholder:text-[#7EA0C5]' : 'text-neutral-800 placeholder:text-neutral-400'
                 }`}
               />
-              {searchQuery ? (
+              {!searchOpen ? null : searchQuery ? (
                 <button
                   onClick={() => setSearchQuery('')}
                   className={`${isBarangay ? 'text-[#7EA0C5] hover:text-[#011025]' : 'text-neutral-400 hover:text-neutral-600'} p-0.5 cursor-pointer shrink-0`}
@@ -552,7 +579,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             aria-label="Live feed"
           >
             <Waves className={`w-3.5 h-3.5 shrink-0 ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`} />
-            <span className="whitespace-nowrap hidden sm:inline">Live feed</span>
+            <span className="whitespace-nowrap hidden 2xl:inline">Live feed</span>
           </div>
 
           {/* Notifications Button with Badge 4 */}
@@ -764,20 +791,6 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   <FileText className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
                   <span>Reports & Documents</span>
                 </button>
-
-                {/* Dispatch Units (LGU) */}
-                {isLgu && (
-                  <button
-                    onClick={() => {
-                      setActiveTab('dispatch_units');
-                      setIsMenuOpen(false);
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer text-neutral-700 hover:bg-neutral-100"
-                  >
-                    <Truck className="w-4 h-4 text-neutral-800" />
-                    <span>Dispatch Units</span>
-                  </button>
-                )}
 
                 {/* Offline Sync */}
                 <button
