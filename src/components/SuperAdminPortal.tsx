@@ -184,7 +184,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   }, []);
 
   useEffect(() => {
-    Promise.all([repo.loadUsers(), repo.loadAudit(100), repo.loadSos(), repo.loadChangeRequests()]).catch((e: any) =>
+    Promise.all([repo.loadUsers(), repo.loadAudit(100), repo.loadSos(), repo.loadChangeRequests(), repo.loadDispatchUnits()]).catch((e: any) =>
       setLoadError(e?.message || 'Some sections could not be loaded.')
     );
   }, []);
@@ -236,10 +236,21 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   const [editing, setEditing] = useState<User | null>(null);
   const [editRole, setEditRole] = useState<UserRole>('citizen');
   const [editBarangay, setEditBarangay] = useState<string>('');
+  // a dispatch account belongs to one unit, as its admin or a member
+  const [editUnit, setEditUnit] = useState<string>('');
+  const [editUnitRole, setEditUnitRole] = useState<'unit_admin' | 'member'>('member');
+  const activeUnits = data.units.filter((u) => u.active);
   const [savingAccount, setSavingAccount] = useState(false);
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
   // New staff account: the admin-users function emails an invitation
-  const [newAcct, setNewAcct] = useState<{ fullName: string; email: string; role: 'barangay_official' | 'lgu_ldrrmc'; barangayId: string } | null>(null);
+  const [newAcct, setNewAcct] = useState<{
+    fullName: string;
+    email: string;
+    role: 'barangay_official' | 'lgu_ldrrmc' | 'dispatch_team';
+    barangayId: string;
+    unitId: string;
+    unitRole: 'unit_admin' | 'member';
+  } | null>(null);
   const [newAcctBusy, setNewAcctBusy] = useState(false);
   const [newAcctNote, setNewAcctNote] = useState<string | null>(null);
   const createAccount = async (e: React.FormEvent) => {
@@ -253,6 +264,10 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
       setNewAcctNote('Choose the barangay this official will manage.');
       return;
     }
+    if (newAcct.role === 'dispatch_team' && !newAcct.unitId) {
+      setNewAcctNote(activeUnits.length ? 'Choose the unit this person belongs to.' : 'Create a dispatch unit first, in Dispatch units.');
+      return;
+    }
     setNewAcctBusy(true);
     try {
       await repo.adminUsers({
@@ -261,6 +276,8 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
         fullName: newAcct.fullName.trim(),
         role: newAcct.role,
         barangayId: newAcct.role === 'barangay_official' ? newAcct.barangayId : null,
+        unitId: newAcct.role === 'dispatch_team' ? newAcct.unitId : null,
+        unitRole: newAcct.role === 'dispatch_team' ? newAcct.unitRole : undefined,
         redirectUrl: window.location.origin,
       });
       setNewAcctNote(`Invitation sent to ${newAcct.email.trim()}. They set a password from the email.`);
@@ -312,6 +329,8 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
     setEditing(u);
     setEditRole(u.role);
     setEditBarangay(u.barangay_uuid || '');
+    setEditUnit(u.dispatch_unit_id || '');
+    setEditUnitRole(u.unit_role === 'unit_admin' ? 'unit_admin' : 'member');
     setAccountNotice(null);
   };
   const saveAccount = async () => {
@@ -320,11 +339,22 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
       setAccountNotice('Choose the barangay this official serves.');
       return;
     }
+    if (editRole === 'dispatch' && !editUnit) {
+      setAccountNotice(activeUnits.length ? 'Choose the unit this person belongs to.' : 'Create a dispatch unit first, in Dispatch units.');
+      return;
+    }
     setSavingAccount(true);
     setAccountNotice(null);
     try {
-      if (editRole !== editing.role) {
-        await repo.adminUsers({ action: 'set-role', userId: editing.id, role: repo.roleToDb(editRole) });
+      const unitChanged =
+        editRole === 'dispatch' &&
+        (editUnit !== (editing.dispatch_unit_id || '') || editUnitRole !== (editing.unit_role === 'unit_admin' ? 'unit_admin' : 'member'));
+      if (editRole !== editing.role || unitChanged) {
+        await repo.adminUsers(
+          editRole === 'dispatch'
+            ? { action: 'set-role', userId: editing.id, role: 'dispatch_team', unitId: editUnit, unitRole: editUnitRole }
+            : { action: 'set-role', userId: editing.id, role: repo.roleToDb(editRole) }
+        );
       }
       if (editRole === 'barangay' || editRole === 'citizen') {
         const target = editBarangay || null;
@@ -540,7 +570,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
         <button
           type="button"
           onClick={() => {
-            setNewAcct({ fullName: '', email: '', role: 'barangay_official', barangayId: '' });
+            setNewAcct({ fullName: '', email: '', role: 'barangay_official', barangayId: '', unitId: '', unitRole: 'member' });
             setNewAcctNote(null);
           }}
           className="h-10 px-4 rounded-full bg-[#F28C0F] text-white text-[12px] font-bold inline-flex items-center gap-2 shadow-md cursor-pointer"
@@ -569,7 +599,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
             </button>
           </div>
           <p className="text-[12px] text-neutral-500">
-            The person gets an email to set their password. Residents sign up by themselves; dispatch accounts are created from Dispatch units.
+            The person gets an email to set their password. Residents sign up by themselves.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
@@ -582,11 +612,34 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
             </label>
             <label className="block">
               <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Role</span>
-              <select className="w-full h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] outline-none focus:border-[#C98A0B]" value={newAcct.role} onChange={(e) => setNewAcct({ ...newAcct, role: e.target.value as 'barangay_official' | 'lgu_ldrrmc' })}>
+              <select className="w-full h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] outline-none focus:border-[#C98A0B]" value={newAcct.role} onChange={(e) => setNewAcct({ ...newAcct, role: e.target.value as 'barangay_official' | 'lgu_ldrrmc' | 'dispatch_team' })}>
                 <option value="barangay_official">Barangay official</option>
                 <option value="lgu_ldrrmc">LDRRMO staff</option>
+                <option value="dispatch_team">Dispatch team</option>
               </select>
             </label>
+            {newAcct.role === 'dispatch_team' && (
+              <>
+                <label className="block">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Dispatch unit</span>
+                  <select className="w-full h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] outline-none focus:border-[#C98A0B]" value={newAcct.unitId} onChange={(e) => setNewAcct({ ...newAcct, unitId: e.target.value })}>
+                    <option value="">{activeUnits.length ? 'Choose a unit' : 'No active units yet'}</option>
+                    {activeUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.unit_type})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">In the unit</span>
+                  <select className="w-full h-10 px-3 rounded-xl bg-[#FFFBF0] border border-[#F3D98A] text-[13px] outline-none focus:border-[#C98A0B]" value={newAcct.unitRole} onChange={(e) => setNewAcct({ ...newAcct, unitRole: e.target.value as 'unit_admin' | 'member' })}>
+                    <option value="member">Member</option>
+                    <option value="unit_admin">Unit admin</option>
+                  </select>
+                </label>
+              </>
+            )}
             {newAcct.role === 'barangay_official' && (
               <label className="block">
                 <span className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Barangay</span>
@@ -684,8 +737,41 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                   <option value="citizen">Resident</option>
                   <option value="barangay">Barangay official</option>
                   <option value="lgu_admin">LDRRMO staff</option>
+                  <option value="dispatch">Dispatch team</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
+                {editRole === 'dispatch' && (
+                  <>
+                    <label className="block mt-4 text-[11px] font-semibold text-neutral-500">Dispatch unit</label>
+                    {activeUnits.length ? (
+                      <select
+                        value={editUnit}
+                        onChange={(e) => setEditUnit(e.target.value)}
+                        className="mt-1.5 w-full h-11 rounded-xl border border-neutral-200 px-3 text-[13px] bg-white focus:outline-none focus:border-[#F2B21B]"
+                      >
+                        <option value="">Choose a unit</option>
+                        {activeUnits.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name} ({u.unit_type})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="mt-1.5 text-[12px] text-amber-800">
+                        No active dispatch units yet. Create one in <b>Dispatch units</b> first.
+                      </p>
+                    )}
+                    <label className="block mt-4 text-[11px] font-semibold text-neutral-500">In the unit</label>
+                    <select
+                      value={editUnitRole}
+                      onChange={(e) => setEditUnitRole(e.target.value as 'unit_admin' | 'member')}
+                      className="mt-1.5 w-full h-11 rounded-xl border border-neutral-200 px-3 text-[13px] bg-white focus:outline-none focus:border-[#F2B21B]"
+                    >
+                      <option value="member">Member</option>
+                      <option value="unit_admin">Unit admin (manages the unit's crew and equipment)</option>
+                    </select>
+                  </>
+                )}
                 {(editRole === 'barangay' || editRole === 'citizen') && (
                   <>
                     <label className="block mt-4 text-[11px] font-semibold text-neutral-500">Barangay</label>

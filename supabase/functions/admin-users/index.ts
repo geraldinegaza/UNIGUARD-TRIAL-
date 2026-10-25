@@ -222,8 +222,15 @@ Deno.serve(async (req: Request) => {
         const wantSuper = asked === 'super_admin';
         const role = wantSuper ? 'lgu_ldrrmc' : asked;
         if (!ALL_ROLES.includes(role)) return json({ error: 'Unknown role' }, 400);
+        // a dispatch account always belongs to an active unit, as admin or member
+        const unitId = (payload.unitId as string) || null;
+        const unitRole = (payload.unitRole as string) || '';
         if (role === 'dispatch_team') {
-          return json({ error: 'Dispatch team accounts are created through the dispatch unit workflow' }, 400);
+          if (!unitId || !['unit_admin', 'member'].includes(unitRole)) {
+            return json({ error: 'Choose the unit and whether this person is its admin or a member' }, 400);
+          }
+          const { data: unitRow } = await admin.from('dispatch_units').select('id, active').eq('id', unitId).maybeSingle();
+          if (!unitRow || !unitRow.active) return json({ error: 'That unit does not exist or is inactive' }, 400);
         }
         const { data: target } = await admin.from('profiles')
           .select('id, role, is_super_admin').eq('id', userId).maybeSingle();
@@ -236,11 +243,16 @@ Deno.serve(async (req: Request) => {
             .eq('role', 'lgu_ldrrmc').eq('is_super_admin', true).eq('disabled', false);
           if ((count ?? 0) <= 1) return json({ error: 'This is the last Super Admin. Grant Super Admin to another account first.' }, 400);
         }
+        // joining a unit sets it; leaving dispatch clears the unit
+        const unitPatch = role === 'dispatch_team'
+          ? { dispatch_unit_id: unitId, unit_role: unitRole }
+          : { dispatch_unit_id: null, unit_role: '' };
         const { data, error } = await admin.from('profiles')
-          .update({ role, is_super_admin: wantSuper, updated_at: new Date().toISOString() }).eq('id', userId).select('*').single();
+          .update({ role, is_super_admin: wantSuper, ...unitPatch, updated_at: new Date().toISOString() }).eq('id', userId).select('*').single();
         if (error) return json({ error: error.message }, 400);
         await audit('user.role_changed', userId, {
-          from: wasSuper ? 'super_admin' : target.role, to: wantSuper ? 'super_admin' : role
+          from: wasSuper ? 'super_admin' : target.role, to: wantSuper ? 'super_admin' : role,
+          ...(role === 'dispatch_team' ? { unitId, unitRole } : {})
         });
         return json({ ok: true, profile: data });
       }

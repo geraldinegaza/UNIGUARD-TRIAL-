@@ -1258,8 +1258,17 @@ export async function loadUsers(): Promise<void> {
 }
 
 type AdminAction =
-  | { action: 'create'; email: string; fullName: string; role: 'barangay_official' | 'lgu_ldrrmc'; barangayId?: string | null; redirectUrl?: string }
-  | { action: 'set-role'; userId: string; role: string }
+  | {
+      action: 'create';
+      email: string;
+      fullName: string;
+      role: 'barangay_official' | 'lgu_ldrrmc' | 'dispatch_team';
+      barangayId?: string | null;
+      unitId?: string | null;
+      unitRole?: 'unit_admin' | 'member';
+      redirectUrl?: string;
+    }
+  | { action: 'set-role'; userId: string; role: string; unitId?: string | null; unitRole?: 'unit_admin' | 'member' }
   | { action: 'set-barangay'; userId: string; barangayId: string | null }
   | { action: 'set-disabled'; userId: string; disabled: boolean };
 
