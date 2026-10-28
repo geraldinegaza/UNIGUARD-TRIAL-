@@ -486,4 +486,11 @@ export const FIL: Record<string, string> = {
   "Locating…": "Hinahanap…",
   "Latitude": "Latitude",
   "Longitude": "Longitude",
+  "Relief for Barangay {name} and municipality-wide distributions.": "Relief para sa Barangay {name} at sa buong bayan.",
+  "Municipality-wide relief distributions.": "Mga pamamahagi ng relief para sa buong bayan.",
+  "{n} active for your barangay": "{n} aktibo para sa inyong barangay",
+  "No relief distribution scheduled for your barangay yet": "Wala pang nakatakdang pamamahagi ng relief sa inyong barangay",
+  "New schedules appear here and in your notifications. Your barangay desk can tell you about pending distributions.": "Lalabas dito at sa iyong mga abiso ang mga bagong iskedyul. Makapagbibigay ng impormasyon ang inyong barangay desk tungkol sa mga paparating na pamamahagi.",
+  "Every schedule for your barangay and the municipality": "Lahat ng iskedyul para sa inyong barangay at sa buong bayan",
+  "Relief schedules for your barangay, who is eligible, and the documents to bring.": "Mga iskedyul ng relief sa inyong barangay, sino ang kwalipikado, at mga dokumentong dadalhin.",
 };

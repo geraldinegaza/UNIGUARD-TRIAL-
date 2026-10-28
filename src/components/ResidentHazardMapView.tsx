@@ -67,9 +67,11 @@ export const ResidentHazardMapView: React.FC<{
   const openRef = useRef(onOpenItem);
   openRef.current = onOpenItem;
 
+  // every barangay's open hazards (migration 156); until that view exists, the
+  // resident's own barangay from reports_feed
   const hazards = useMemo(
-    () => data.reports.filter((r) => r.has_location && r.status !== 'resolved' && r.status !== 'rejected'),
-    [data.reports]
+    () => (data.mapHazards ?? data.reports).filter((r) => r.has_location && r.status !== 'resolved' && r.status !== 'rejected'),
+    [data.mapHazards, data.reports]
   );
   const relief = useMemo(() => data.relief.filter((r) => r.active && r.lat !== null && r.lng !== null), [data.relief]);
   const shelters = useMemo(() => data.centers.filter((c) => c.has_location), [data.centers]);
@@ -218,7 +220,10 @@ export const ResidentHazardMapView: React.FC<{
       return;
     }
     // a report that is no longer open is not a hazard marker; show where it was
-    const rep = kind === 'report' ? data.reports.find((r) => `report:${r.id}` === focus.id && r.has_location) : undefined;
+    const rep =
+      kind === 'report'
+        ? [...(data.mapHazards || []), ...data.reports].find((r) => `report:${r.id}` === focus.id && r.has_location)
+        : undefined;
     if (rep && groupRef.current) {
       const m = L.marker([rep.latitude, rep.longitude], { icon: icon(rep.status === 'resolved' ? 'DONE' : 'REP', '#525252') })
         .bindPopup(popup(rep.hazard_type, [`${rep.code} · ${rep.status}`, rep.barangay_name ? `Barangay ${rep.barangay_name}` : '']))

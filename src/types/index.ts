@@ -127,6 +127,8 @@ export interface EvacuationCenter {
 
 export interface EmergencyHotline {
   id: string;
+  /** public.barangays.id for a barangay desk; null for a citywide number */
+  barangay_uuid?: string | null;
   agency_name: string;
   contact_number: string;
   scope: string;

@@ -77,6 +77,8 @@ export interface RepoState {
   user: User | null;
   barangays: Barangay[];
   reports: IncidentReport[];
+  /** residents: open hazards in every barangay, for the Hazard Map only (null: not loaded, use reports) */
+  mapHazards: IncidentReport[] | null;
   advisories: Advisory[];
   centers: EvacuationCenter[];
   hotlines: EmergencyHotline[];
@@ -156,6 +158,7 @@ let state: RepoState = {
   user: null,
   barangays: fallbackBarangays(),
   reports: [],
+  mapHazards: null,
   advisories: [],
   centers: [],
   hotlines: [],
@@ -364,6 +367,7 @@ function toCenter(c: Row): EvacuationCenter {
 
 const toHotline = (h: Row): EmergencyHotline => ({
   id: h.id,
+  barangay_uuid: h.barangay_id || null,
   agency_name: h.agency_name || '',
   contact_number: h.contact_number || '',
   scope: h.scope || PLACE.areaAll,
@@ -585,7 +589,15 @@ export async function loadAll(): Promise<void> {
     // Each remaining table is best-effort: a failed read keeps what the store already has.
     if (!advisories.error) patch.advisories = (advisories.data || []).map(toAdvisory);
     if (!centers.error) patch.centers = (centers.data || []).map(toCenter);
-    if (!hotlines.error) patch.hotlines = (hotlines.data || []).map(toHotline);
+    if (!hotlines.error) {
+      const all = (hotlines.data || []).map(toHotline);
+      // a resident sees the citywide numbers and their own barangay's, never another barangay's desk
+      const me = state.user;
+      patch.hotlines =
+        me && me.role === 'citizen' && me.barangay_uuid
+          ? all.filter((h) => !h.barangay_uuid || h.barangay_uuid === me.barangay_uuid)
+          : all;
+    }
     if (!notifications.error) patch.notifications = (notifications.data || []).map(toNotification);
     if (!relief.error) patch.relief = (relief.data || []).map(toRelief);
     if (!beneficiaries.error) patch.beneficiaries = (beneficiaries.data || []).map(toBeneficiary);
@@ -593,6 +605,12 @@ export async function loadAll(): Promise<void> {
     if (!faqs.error) patch.faqs = (faqs.data || []).map(toFaq);
     if (!roadWork.error) patch.roadWork = (roadWork.data || []).map(toRoadWork);
     if (!roadStatus.error) patch.roadStatus = (roadStatus.data || []).map(toRoadStatus);
+    // the Hazard Map is the one resident screen that looks across barangays (migration 156)
+    if (state.user?.role === 'citizen') {
+      const map = await c.from('hazard_map_feed').select('*').order('created_at', { ascending: false }).limit(500);
+      if (seq !== loadSeq) return;
+      patch.mapHazards = map.error ? null : (map.data || []).map((r: Row) => toReport(r));
+    }
     if (!barangays.error && barangays.data && barangays.data.length) {
       patch.barangays = barangays.data.map((b: Row) => ({
         id: barangaySlug(b.name),
@@ -673,7 +691,7 @@ export function setUser(user: User | null) {
     // nothing the last account could read stays in memory or on the device
     offline.clearSnapshot();
     set({
-      reports: [], notifications: [], beneficiaries: [], sosLog: [], othersReview: [], users: [], audit: [], responders: [],
+      reports: [], mapHazards: null, notifications: [], beneficiaries: [], sosLog: [], othersReview: [], users: [], audit: [], responders: [],
       changeRequests: [], units: [], unitMembers: [], unitRequests: [], myUnit: null, dispatches: [], personnel: [],
       equipment: [], capacity: null, dispatchEvents: [], patientNotices: [], captains: [], inventory: [], distributionLog: [], assessments: [], sitreps: [], overdue: [],
       shelterTrend: [], helpRequests: [], acceptingHospitals: [], equipmentCatalog: [], patrolShelters: [], reliefEscorts: [], helpInbox: [],

@@ -158,45 +158,18 @@ const ReliefHubCard: React.FC<{ hub: ReliefDistributionHub; id?: string }> = ({ 
 );
 
 export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: UserType; focus?: ItemFocus }> = ({
-  barangays,
   currentUser,
   focus,
 }) => {
   const { relief } = useRepo();
 
-  // The barangay list comes from the database
-  const ALL_LINGAYEN_BARANGAYS = useMemo(() => ['All', ...barangays.map((b) => b.name)], [barangays]);
-
-  // Determine user's home barangay from account
-  const userBarangayName = currentUser?.barangay_name || 'All';
-
-  // Automatic default based on user's account, with option to choose All or per barangay
-  const [selectedBarangay, setSelectedBarangay] = useState<string>(() => userBarangayName);
-  const [isBarangayDropdownOpen, setIsBarangayDropdownOpen] = useState<boolean>(false);
-  const [barangaySearchFilter, setBarangaySearchFilter] = useState<string>('');
+  // A resident sees the relief for their own barangay and the municipality-wide
+  // distributions, never another barangay's (the database applies the same rule)
+  const userBarangayName = currentUser?.barangay_name || '';
   const [isScheduleMinimized, setIsScheduleMinimized] = useState<boolean>(false);
   const [isViewAllModalOpen, setIsViewAllModalOpen] = useState<boolean>(false);
   const [criteriaTab, setCriteriaTab] = useState<'all' | 'eligibility' | 'documents'>('all');
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsBarangayDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Keep synced if user switches demo persona
-  useEffect(() => {
-    if (userBarangayName) {
-      setSelectedBarangay(userBarangayName);
-    }
-  }, [userBarangayName]);
 
   // Active relief distributions published by the LGU
   const activeHubs: ReliefDistributionHub[] = useMemo(
@@ -225,32 +198,22 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
   // barangay, expand the schedules and bring the card into view
   useEffect(() => {
     if (!focus) return;
-    const hub = activeHubs.find((h) => h.id === focus.id);
-    if (!hub) return;
-    setSelectedBarangay(barangays.some((b) => b.name.toLowerCase() === hub.barangay.toLowerCase()) ? hub.barangay : 'All');
+    if (!activeHubs.some((h) => h.id === focus.id)) return;
     setIsScheduleMinimized(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.key, activeHubs.length]);
   useFocusItem(focus ? `relief-${focus.id}` : null, `${focus?.key}-${activeHubs.length}`);
 
-  // Filter distribution hubs by selected barangay
+  // this barangay's distributions and the municipality-wide ones
   const filteredHubs = useMemo(() => {
-    if (selectedBarangay === 'All') return activeHubs;
-    return activeHubs.filter(
-      (hub) => hub.barangay.toLowerCase() === selectedBarangay.toLowerCase()
-    );
-  }, [selectedBarangay, activeHubs]);
+    const mine = userBarangayName.toLowerCase();
+    return activeHubs.filter((hub) => !hub.barangay || !mine || hub.barangay.toLowerCase() === mine);
+  }, [userBarangayName, activeHubs]);
 
   // Eligibility and documents published for the distributions being shown
   const eligibilityList = useMemo(() => Array.from(new Set(filteredHubs.flatMap((h) => h.eligibility))), [filteredHubs]);
   const requiredDocsList = useMemo(() => Array.from(new Set(filteredHubs.flatMap((h) => h.requiredDocs))), [filteredHubs]);
 
-  // Filter barangays inside dropdown search
-  const searchableBarangays = useMemo(() => {
-    if (!barangaySearchFilter.trim()) return ALL_LINGAYEN_BARANGAYS;
-    const q = barangaySearchFilter.toLowerCase().trim();
-    return ALL_LINGAYEN_BARANGAYS.filter((b) => b.toLowerCase().includes(q));
-  }, [barangaySearchFilter, ALL_LINGAYEN_BARANGAYS]);
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
@@ -263,7 +226,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
           </div>
 
           <p className="text-white/90 text-xs sm:text-sm font-medium leading-relaxed">
-            {t("Per-barangay relief schedules, eligibility, required documents, and the authorized-beneficiary list. Filter by your barangay.")}
+            {t("Relief schedules for your barangay, who is eligible, and the documents to bring.")}
           </p>
 
           <div className="flex flex-wrap items-center gap-2 pt-2 text-xs font-bold text-white">
@@ -274,7 +237,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
               {t("📦 DSWD Standard Family Food Packs")}
             </span>
             <span className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/15 shadow-2xs">
-              📍 {barangays.length} Barangays Monitored
+              📍 {userBarangayName ? `Brgy. ${userBarangayName}` : t('Lingayen')}
             </span>
           </div>
         </div>
@@ -285,159 +248,16 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
         </div>
       </div>
 
-      {/* 2. Sleek Dropdown Filter (Automatic User Barangay + Option to View All or Per Barangay) */}
-      <div className="bg-white rounded-3xl border border-neutral-100/80 p-6 sm:p-7 shadow-xl hover:shadow-2xl transition-shadow space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-red-50 text-red-900 border border-red-100 flex items-center justify-center shrink-0">
-              <MapPin className="w-4 h-4" />
-            </div>
-            <h3 className="text-xs sm:text-sm font-extrabold text-neutral-900 uppercase tracking-wider">
-              {t("Barangay Relief Filter")}
-            </h3>
-          </div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-neutral-500">
-            <span>{t("Account Home:")}</span>
-            <span className="px-3 py-1 rounded-full bg-red-50 border border-red-900/20 text-red-900 font-bold">
-              Brgy. {userBarangayName}
-            </span>
-          </div>
+      {/* 2. Whose relief this is: the resident's own barangay, plus municipality-wide */}
+      <div className="bg-white rounded-3xl border border-neutral-100/80 p-5 sm:p-6 shadow-xl flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-red-50 text-red-900 border border-red-100 flex items-center justify-center shrink-0">
+          <MapPin className="w-4 h-4" />
         </div>
-
-        {/* Dropdown Selector Component */}
-        <div ref={dropdownRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setIsBarangayDropdownOpen((prev) => !prev)}
-            className="w-full flex items-center justify-between gap-3 px-5 py-3.5 rounded-2xl border border-neutral-200/80 bg-neutral-50/60 hover:bg-neutral-100/80 transition-all text-xs sm:text-sm font-bold text-neutral-900 shadow-sm cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-red-900"
-          >
-            <div className="flex items-center gap-2.5 truncate">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-900 shrink-0" />
-              <span className="truncate">
-                {selectedBarangay === 'All'
-                  ? 'All Lingayen Barangays (View All Active Distribution Hubs)'
-                  : `Barangay ${selectedBarangay}`}
-              </span>
-              {selectedBarangay === userBarangayName && (
-                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-red-50 border border-red-900/20 text-red-900 shrink-0">
-                  Your Barangay (Auto-detected)
-                </span>
-              )}
-            </div>
-            <ChevronDown
-              className={`w-4 h-4 text-neutral-500 transition-transform duration-200 shrink-0 ${
-                isBarangayDropdownOpen ? 'rotate-180 text-red-900' : ''
-              }`}
-            />
-          </button>
-
-          {/* Dropdown Menu Popover */}
-          {isBarangayDropdownOpen && (
-            <div className="absolute left-0 right-0 mt-2 bg-white rounded-3xl border border-neutral-100 shadow-2xl py-3 z-50 animate-in fade-in zoom-in-95 duration-150">
-              {/* Search Inside Dropdown */}
-              <div className="px-4 pb-3 pt-1 border-b border-neutral-100">
-                <div className="relative">
-                  <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={barangaySearchFilter}
-                    onChange={(e) => setBarangaySearchFilter(e.target.value)}
-                    placeholder={t("Search 32 Lingayen barangays...")}
-                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-800 placeholder-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-red-900"
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              {/* Barangay Options List */}
-              <div className="max-h-60 overflow-y-auto py-2 px-2 space-y-1">
-                {/* Option: View All */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedBarangay('All');
-                    setIsBarangayDropdownOpen(false);
-                    setBarangaySearchFilter('');
-                  }}
-                  className={`w-full px-4 py-2 rounded-xl text-left text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
-                    selectedBarangay === 'All'
-                      ? 'bg-red-50 text-red-900 font-bold'
-                      : 'text-neutral-700 hover:bg-neutral-50'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span>🌐</span>
-                    <span>All Lingayen Barangays (View All Active Schedules)</span>
-                  </span>
-                  {selectedBarangay === 'All' && <Check className="w-4 h-4 text-red-900" />}
-                </button>
-
-                {/* Option: Quick shortcut to user's registered barangay if not 'All' */}
-                {userBarangayName && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedBarangay(userBarangayName);
-                      setIsBarangayDropdownOpen(false);
-                      setBarangaySearchFilter('');
-                    }}
-                    className={`w-full px-4 py-2 rounded-xl text-left text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer border-y border-neutral-100 ${
-                      selectedBarangay === userBarangayName
-                        ? 'bg-red-50 text-red-900 font-bold'
-                        : 'text-neutral-700 hover:bg-neutral-50'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>🏠</span>
-                      <span>Barangay {userBarangayName}</span>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100/70 text-red-900">
-                        {t("Your Registered Barangay")}
-                      </span>
-                    </span>
-                    {selectedBarangay === userBarangayName && (
-                      <Check className="w-4 h-4 text-red-900" />
-                    )}
-                  </button>
-                )}
-
-                {/* List of 32 Barangays */}
-                {searchableBarangays
-                  .filter((b) => b !== 'All')
-                  .map((bName) => {
-                    const isCurrent = selectedBarangay.toLowerCase() === bName.toLowerCase();
-                    const isUserHome = userBarangayName.toLowerCase() === bName.toLowerCase();
-                    return (
-                      <button
-                        key={bName}
-                        type="button"
-                        onClick={() => {
-                          setSelectedBarangay(bName);
-                          setIsBarangayDropdownOpen(false);
-                          setBarangaySearchFilter('');
-                        }}
-                        className={`w-full px-4 py-2 rounded-xl text-left text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
-                          isCurrent
-                            ? 'bg-red-50 text-red-900 font-bold'
-                            : 'text-neutral-700 hover:bg-neutral-50'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-300" />
-                          <span>Barangay {bName}</span>
-                          {isUserHome && (
-                            <span className="text-[10px] font-bold text-red-900 bg-red-50 px-2 py-0.5 rounded-full border border-red-900/20">
-                              {t("Your Barangay")}
-                            </span>
-                          )}
-                        </span>
-                        {isCurrent && <Check className="w-4 h-4 text-red-900" />}
-                      </button>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-        </div>
+        <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+          {userBarangayName
+            ? t('Relief for Barangay {name} and municipality-wide distributions.', { name: userBarangayName })
+            : t('Municipality-wide relief distributions.')}
+        </p>
       </div>
 
       {/* 3. Relief Distribution Schedules (With Minimized Pane and View All Option) */}
@@ -453,9 +273,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                 {t("Relief Distribution Schedules")}
               </h2>
               <p className="text-xs text-neutral-400 font-medium">
-                {selectedBarangay === 'All'
-                  ? `Showing all active municipal hubs (${filteredHubs.length} active)`
-                  : `Filtered for Barangay ${selectedBarangay}`}
+                {t('{n} active for your barangay', { n: filteredHubs.length })}
               </p>
             </div>
           </div>
@@ -507,17 +325,11 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                   <Info className="w-7 h-7" />
                 </div>
                 <h3 className="text-base sm:text-lg font-bold text-neutral-900">
-                  No Active Distribution for {selectedBarangay}
+                  {t('No relief distribution scheduled for your barangay yet')}
                 </h3>
                 <p className="text-xs sm:text-sm text-neutral-500 max-w-md mx-auto">
-                  {t("Check another barangay or contact your barangay desk for pending schedule advisories.")}
+                  {t('New schedules appear here and in your notifications. Your barangay desk can tell you about pending distributions.')}
                 </p>
-                <button
-                  onClick={() => setSelectedBarangay('All')}
-                  className="px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
-                >
-                  {t("View All Active Distribution Hubs")}
-                </button>
               </div>
             ) : (
               /* Active Distribution Cards Grid */
@@ -532,7 +344,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
         {isScheduleMinimized && (
           <div className="p-5 bg-neutral-50/80 flex items-center justify-between text-xs text-neutral-600">
             <span className="font-semibold">
-              Relief schedules minimized ({filteredHubs.length} distribution {filteredHubs.length === 1 ? 'hub' : 'hubs'} active for {selectedBarangay})
+              Relief schedules minimized ({filteredHubs.length} distribution {filteredHubs.length === 1 ? 'hub' : 'hubs'} active for your barangay)
             </span>
             <button
               onClick={() => setIsScheduleMinimized(false)}
@@ -559,7 +371,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
                     {t("All Municipal Relief Distribution Schedules")}
                   </h3>
                   <p className="text-xs text-white/80">
-                    {t("Comprehensive schedule overview across Lingayen barangays")}
+                    {t("Every schedule for your barangay and the municipality")}
                   </p>
                 </div>
               </div>
@@ -574,7 +386,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
             {/* Modal Content */}
             <div className="p-6 overflow-y-auto space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {activeHubs.map((hub) => <ReliefHubCard key={hub.id} hub={hub} />)}
+                {filteredHubs.map((hub) => <ReliefHubCard key={hub.id} hub={hub} />)}
               </div>
             </div>
 
