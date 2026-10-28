@@ -21,8 +21,10 @@ import {
   IdCard,
   QrCode,
   ShieldCheck,
-  Sun
+  Sun,
+  Download
 } from 'lucide-react';
+import { exportPdf, fileStamp } from '../lib/pdf';
 
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
@@ -40,6 +42,8 @@ export interface DistributionDrive {
   status?: 'In Progress' | 'Scheduled' | 'Completed';
   createdAt?: string;
   contactNumber?: string;
+  /** a PNP escort for the distribution: none, requested or confirmed */
+  escortStatus?: 'none' | 'requested' | 'confirmed';
 }
 
 export interface BeneficiaryRecord {
@@ -95,6 +99,7 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
           eligibility: r.eligibility.join(', '),
           requiredDocuments: r.required_docs.join(', '),
           contactNumber: r.contact_phone,
+          escortStatus: r.escort_status,
         })),
     [store.relief]
   );
@@ -140,6 +145,27 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
   const flash = (message: string) => {
     setActionNotice(message);
     setTimeout(() => setActionNotice(null), 4000);
+  };
+
+  // PNP escort request: the row whose note is open, and the note
+  const [escortFor, setEscortFor] = useState<string | null>(null);
+  const [escortNote, setEscortNote] = useState('');
+  const [escortBusy, setEscortBusy] = useState(false);
+  // a barangay official can ask only for their own barangay's distributions (the server checks too)
+  const canRequestEscort = (dist: DistributionDrive) => !isBarangay || dist.barangay === currentUser.barangay_name;
+  const sendEscortRequest = async (dist: DistributionDrive) => {
+    if (escortBusy) return;
+    setEscortBusy(true);
+    try {
+      await repo.requestReliefEscort(dist.id, escortNote.trim());
+      setEscortFor(null);
+      setEscortNote('');
+      flash(`PNP escort requested for ${dist.title}`);
+    } catch (err: any) {
+      flash(err?.message || 'Could not request the escort');
+    } finally {
+      setEscortBusy(false);
+    }
   };
 
   // Filtered beneficiaries based on Barangay dropdown and Search input
@@ -296,12 +322,53 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
             </h2>
           </div>
 
-          {/* Right counter pill matching reference: "X records" */}
-          <span className={`px-3 py-1 rounded-full text-xs font-mono font-medium ${
-            isBarangay ? 'bg-[#C2E8FF] text-[#052659] border-[#7EA0C5]/40' : 'bg-neutral-100 text-neutral-700 border-neutral-200/80'
-          } border shadow-2xs`}>
-            {distributions.length} {distributions.length === 1 ? 'record' : 'records'}
-          </span>
+          <div className="flex items-center gap-2">
+            {/* every schedule in scope, as a formatted PDF to print or send */}
+            {store.relief.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const rows = store.relief.filter((r) => !isBarangay || r.barangay.toLowerCase() === (currentUser.barangay_name || '').toLowerCase());
+                  exportPdf({
+                    title: 'Relief Distribution Schedules',
+                    subtitle: isBarangay ? `Barangay ${currentUser.barangay_name}` : 'All barangays',
+                    meta: [`${rows.length} ${rows.length === 1 ? 'distribution' : 'distributions'}`],
+                    filename: `uniguard-relief-schedules-${fileStamp()}.pdf`,
+                    landscape: true,
+                    signer: currentUser.full_name,
+                    sections: [
+                      {
+                        title: 'Schedules',
+                        head: ['Barangay', 'Title', 'Where', 'When', 'Contact', 'Eligibility', 'Documents', 'Active'],
+                        rows: rows.map((r) => [
+                          r.barangay || 'Municipality-wide',
+                          r.title,
+                          [r.location_name, r.address].filter(Boolean).join(', '),
+                          r.distribution_at ? new Date(r.distribution_at).toLocaleString() : 'To be announced',
+                          [r.contact_person, r.contact_phone].filter(Boolean).join(' · '),
+                          r.eligibility.join('; '),
+                          r.required_docs.join('; '),
+                          r.active ? 'Yes' : 'No',
+                        ]),
+                      },
+                    ],
+                  });
+                }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border cursor-pointer transition-colors ${
+                  isBarangay ? 'text-[#052659] border-[#7EA0C5]/40 hover:bg-[#C2E8FF]/40' : 'text-neutral-700 border-neutral-200 hover:bg-neutral-100'
+                }`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export PDF
+              </button>
+            )}
+            {/* Right counter pill matching reference: "X records" */}
+            <span className={`px-3 py-1 rounded-full text-xs font-mono font-medium ${
+              isBarangay ? 'bg-[#C2E8FF] text-[#052659] border-[#7EA0C5]/40' : 'bg-neutral-100 text-neutral-700 border-neutral-200/80'
+            } border shadow-2xs`}>
+              {distributions.length} {distributions.length === 1 ? 'record' : 'records'}
+            </span>
+          </div>
         </div>
 
         {/* Card Body: Lists Active Distributions with contents ONLY from screenshot */}
@@ -332,8 +399,8 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
         ) : (
           <div className={`divide-y ${isBarangay ? 'divide-[#7EA0C5]/15' : 'divide-neutral-100'}`}>
             {distributions.map((dist) => (
+              <div key={dist.id}>
               <div
-                key={dist.id}
                 className={`px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 ${
                   isBarangay ? 'hover:bg-[#C2E8FF]/15' : 'hover:bg-neutral-50/60'
                 } transition-colors`}
@@ -362,7 +429,37 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 self-end sm:self-auto">
+                  {dist.escortStatus && dist.escortStatus !== 'none' && (
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                        dist.escortStatus === 'confirmed'
+                          ? 'bg-[#E7F4EA] text-[#2F6B3F]'
+                          : isBarangay
+                          ? 'bg-[#C2E8FF]/60 text-[#052659]'
+                          : 'bg-neutral-100 text-neutral-700'
+                      }`}
+                    >
+                      {dist.escortStatus === 'confirmed' ? 'PNP escort confirmed' : 'PNP escort requested'}
+                    </span>
+                  )}
+                  {dist.escortStatus !== 'confirmed' && canRequestEscort(dist) && (
+                    <button
+                      onClick={() => {
+                        setEscortFor(escortFor === dist.id ? null : dist.id);
+                        setEscortNote('');
+                      }}
+                      aria-expanded={escortFor === dist.id}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-medium border ${
+                        isBarangay
+                          ? 'border-[#7EA0C5]/40 bg-[#C2E8FF]/20 hover:bg-[#C2E8FF]/50 text-[#052659]'
+                          : 'border-neutral-200/80 bg-white hover:bg-neutral-100 text-neutral-700 hover:text-neutral-900'
+                      } shadow-2xs transition-colors cursor-pointer flex items-center gap-1.5`}
+                    >
+                      <ShieldCheck className={`w-3.5 h-3.5 ${isBarangay ? 'text-[#052659]' : 'text-neutral-400'}`} />
+                      <span>{dist.escortStatus === 'requested' ? 'Update escort request' : 'Request PNP escort'}</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => handleEditDistribution(dist)}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-medium border ${
@@ -375,6 +472,42 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
                     <span>Edit</span>
                   </button>
                 </div>
+              </div>
+              {escortFor === dist.id && (
+                <div className={`px-6 pb-4 flex flex-col sm:flex-row gap-2 ${isBarangay ? 'bg-[#C2E8FF]/10' : 'bg-neutral-50/60'}`}>
+                  <input
+                    value={escortNote}
+                    onChange={(e) => setEscortNote(e.target.value)}
+                    maxLength={1000}
+                    placeholder="Convoy size, route, schedule"
+                    aria-label="Note for the PNP"
+                    className={`flex-1 min-w-0 text-xs p-2.5 rounded-xl outline-hidden transition-all ${
+                      isBarangay
+                        ? 'bg-white text-[#011025] border border-[#7EA0C5]/40 focus:border-[#052659]'
+                        : 'bg-white border border-neutral-200 focus:border-neutral-400'
+                    }`}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setEscortFor(null)}
+                      className={`px-4 py-2 text-xs font-medium rounded-full cursor-pointer transition-colors ${
+                        isBarangay ? 'text-[#5482B4] hover:bg-[#C2E8FF]/30' : 'text-neutral-600 hover:bg-neutral-100'
+                      }`}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => sendEscortRequest(dist)}
+                      disabled={escortBusy}
+                      className={`px-5 py-2 text-xs font-medium text-white rounded-full shadow-xs cursor-pointer transition-colors disabled:opacity-50 ${
+                        isBarangay ? 'bg-[#052659] hover:bg-[#031c42] border border-[#011025]/20' : 'bg-[#18181b] hover:bg-neutral-800'
+                      }`}
+                    >
+                      Send to the PNP
+                    </button>
+                  </div>
+                </div>
+              )}
               </div>
             ))}
           </div>

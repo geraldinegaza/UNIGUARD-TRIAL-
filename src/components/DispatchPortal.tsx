@@ -21,10 +21,11 @@ import {
   UserPlus,
   AlertTriangle,
 } from 'lucide-react';
-import { User, Dispatch, DispatchStage, UnitEquipment, UnitPersonnel } from '../types';
+import { User, Dispatch, DispatchAction, DispatchStage, HelpRequest, UnitEquipment, UnitPersonnel } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { relTime, download, toCSV, telHref } from '../lib/util';
+import { CONFIG } from '../lib/config';
 import { TriadEmblem, BrandLoader } from '../brand';
 
 // Dispatch Team console. A dispatch account belongs to one unit (BFP, PNP,
@@ -39,26 +40,97 @@ import { TriadEmblem, BrandLoader } from '../brand';
 
 type View = 'queue' | 'equipment' | 'roster' | 'hospital' | 'requests' | 'analytics' | 'contacts' | 'notifications';
 
-const STAGES: { id: DispatchStage; label: string }[] = [
-  { id: 'sent', label: 'Sent' },
-  { id: 'acknowledged', label: 'Acknowledged' },
-  { id: 'en_route', label: 'En route' },
-  { id: 'on_scene', label: 'On scene' },
-  { id: 'done', label: 'Done' },
-];
+const STAGE_LABEL: Record<DispatchStage, string> = {
+  sent: 'Sent',
+  acknowledged: 'Acknowledged',
+  en_route: 'En route',
+  on_scene: 'On scene',
+  under_control: 'Under control',
+  fire_out: 'Fire out',
+  on_hold: 'On hold',
+  transporting: 'Transporting',
+  arrived_hospital: 'At hospital',
+  done: 'Done',
+  declined: 'Declined',
+};
 const STAGE_PILL: Record<DispatchStage, string> = {
   sent: 'bg-[#D9534F] text-white',
   acknowledged: 'bg-[#E9B872] text-white',
   en_route: 'bg-[#7C83C9] text-white',
   on_scene: 'bg-[#6BAED6] text-white',
+  under_control: 'bg-[#E08A4F] text-white',
+  fire_out: 'bg-[#8CBF6E] text-white',
+  on_hold: 'bg-[#B98A8A] text-white',
+  transporting: 'bg-[#7C83C9] text-white',
+  arrived_hospital: 'bg-[#6BAED6] text-white',
   done: 'bg-[#73B386] text-white',
+  declined: 'bg-[#F3EFEC] text-neutral-500',
 };
-// the action that moves a dispatch to its next stage
-const NEXT_ACTION: Partial<Record<DispatchStage, { to: 'acknowledged' | 'en_route' | 'on_scene' | 'done'; label: string }>> = {
-  sent: { to: 'acknowledged', label: 'Acknowledge' },
-  acknowledged: { to: 'en_route', label: 'En route' },
-  en_route: { to: 'on_scene', label: 'On scene' },
-  on_scene: { to: 'done', label: 'Done' },
+// The steps after on scene depend on the team (migration 155):
+//   BFP       on scene -> under control -> fire out -> done
+//   Ambulance on scene -> transporting -> at hospital -> done
+//   Rescue    en route / on scene -> on hold (with a reason) -> resume -> on scene
+const isRescueTeam = (team: string) => team === 'Rescue Unit' || team === 'MDRRMO Rescue';
+const teamFlow = (team: string): { id: DispatchStage; label: string }[] => {
+  // the seven-step flows use short labels so each fits its segment
+  const head = (ack: string): { id: DispatchStage; label: string }[] => [
+    { id: 'sent', label: 'Sent' },
+    { id: 'acknowledged', label: ack },
+    { id: 'en_route', label: 'En route' },
+    { id: 'on_scene', label: 'On scene' },
+  ];
+  if (team === 'BFP') return [...head('Ack'), { id: 'under_control', label: 'Control' }, { id: 'fire_out', label: 'Fire out' }, { id: 'done', label: 'Done' }];
+  if (team === 'Ambulance') return [...head('Ack'), { id: 'transporting', label: 'Transit' }, { id: 'arrived_hospital', label: 'Arrived' }, { id: 'done', label: 'Done' }];
+  return [...head('Acknowledged'), { id: 'done', label: 'Done' }];
+};
+// the actions that move a dispatch on; the first is the main button
+const nextSteps = (d: Dispatch): { to: DispatchAction; label: string }[] => {
+  const rescue = isRescueTeam(d.team);
+  const hold = rescue ? [{ to: 'on_hold' as const, label: 'On hold' }] : [];
+  switch (d.dispatch_status) {
+    case 'sent':
+      return [{ to: 'acknowledged', label: 'Acknowledge' }];
+    case 'acknowledged':
+      return [{ to: 'en_route', label: 'En route' }];
+    case 'en_route':
+      return [{ to: 'on_scene', label: 'On scene' }, ...hold];
+    case 'on_scene':
+      if (d.team === 'BFP') return [{ to: 'under_control', label: 'Under control' }];
+      if (d.team === 'Ambulance') return [{ to: 'transporting', label: 'Transporting' }];
+      return [{ to: 'done', label: 'Done' }, ...hold];
+    case 'under_control':
+      return [{ to: 'fire_out', label: 'Fire out' }];
+    case 'fire_out':
+      return [{ to: 'done', label: 'Done' }];
+    case 'on_hold':
+      return [{ to: 'resume', label: 'Resume' }];
+    case 'transporting':
+      return [{ to: 'arrived_hospital', label: 'Arrived at hospital' }];
+    case 'arrived_hospital':
+      return [{ to: 'done', label: 'Done' }];
+    default:
+      return [];
+  }
+};
+const ACTION_LABEL: Record<string, string> = { ...STAGE_LABEL, arrived_hospital: 'Arrived at hospital', resume: 'Resumed' };
+// field data can be saved once the dispatch is acknowledged and until it closes
+const FIELD_OPEN: DispatchStage[] = ['acknowledged', 'en_route', 'on_scene', 'under_control', 'fire_out', 'on_hold', 'transporting', 'arrived_hospital'];
+const HELP_KIND: Record<HelpRequest['kind'], string> = {
+  general: 'General',
+  water_tanker: 'Water tanker',
+  extra_personnel: 'Extra personnel',
+  beyond_capacity: 'Beyond capacity',
+};
+const HELP_PILL: Record<HelpRequest['status'], string> = {
+  sent: 'bg-[#E9B872] text-white',
+  acknowledged: 'bg-[#7C83C9] text-white',
+  resolved: 'bg-[#73B386] text-white',
+};
+const NOTICE_PILL: Record<string, string> = {
+  sent: 'bg-[#E9B872] text-white',
+  acknowledged: 'bg-[#7C83C9] text-white',
+  arrived: 'bg-[#73B386] text-white',
+  cancelled: 'bg-[#F3EFEC] text-neutral-500',
 };
 const PRIORITY: Record<string, { label: string; rank: number }> = {
   emergency: { label: 'Critical', rank: 0 },
@@ -84,7 +156,7 @@ const KIND_LABEL: Record<string, string> = { fuel: 'Fuel', personnel: 'Personnel
 const UNIT_TYPE_LABEL: Record<string, string> = { BFP: 'Fire (BFP)', PNP: 'Police (PNP)', Rescue: 'Rescue Unit', Hospital: 'Hospital' };
 const pretty = (s: string) => (s || '').replace(/_/g, ' ');
 
-const isOpenStage = (s: DispatchStage) => s !== 'done';
+const isOpenStage = (s: DispatchStage) => s !== 'done' && s !== 'declined';
 const DAY_MS = 86400000;
 const overdue = (e: UnitEquipment) => !e.last_checked_at || Date.now() - Date.parse(e.last_checked_at) > DAY_MS;
 const absTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
@@ -137,6 +209,7 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
   const [sheetOpen, setSheetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeMain, setNoticeMain] = useState(false);
   const [afterAction, setAfterAction] = useState('');
   const [stepNote, setStepNote] = useState('');
   const [now, setNow] = useState(() => new Date());
@@ -154,7 +227,23 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [crewForm, setCrewForm] = useState({ name: '', role: '', phone: '' });
-  const [equipForm, setEquipForm] = useState({ label: '', identifier: '' });
+  // equipment: add, edit, retire / remove (unit admin)
+  const [addEquipOpen, setAddEquipOpen] = useState(false);
+  const [equipForm, setEquipForm] = useState({ catalogId: '', customLabel: '', identifier: '', condition: 'unknown', notes: '' });
+  const [editEquip, setEditEquip] = useState<UnitEquipment | null>(null);
+  const [editForm, setEditForm] = useState({ customLabel: '', identifier: '', condition: 'unknown', notes: '' });
+  const [removeEquip, setRemoveEquip] = useState<UnitEquipment | null>(null);
+  const [useCount, setUseCount] = useState<number | null>(null);
+  // the selected dispatch: Can't respond, Need help, road closure, field data, after-action
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState('');
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpForm, setHelpForm] = useState<{ kind: HelpRequest['kind']; message: string }>({ kind: 'general', message: '' });
+  const [closureOpen, setClosureOpen] = useState(false);
+  const [closureForm, setClosureForm] = useState({ roadName: '', note: '', segmentFrom: '', segmentTo: '', reopen: '' });
+  const [fieldForm, setFieldForm] = useState({ stranded: '0', location: '', needs: '', rescued: '0', injured: '0', missing: '0', hospitalId: '' });
+  const [noticeForm, setNoticeForm] = useState({ patients: '1', condition: '' });
+  const [aaForm, setAaForm] = useState({ people: '0', followUp: false, followNote: '', families: '', injured: '' });
 
   const refresh = async () => {
     try {
@@ -189,10 +278,12 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
     { id: 'notifications', label: 'Notifications', icon: Bell, dot: unread > 0 },
   ];
 
-  const run = async (fn: () => Promise<void>, ok: string) => {
+  // inMain: the message belongs to the main column (an action outside the dispatch detail)
+  const run = async (fn: () => Promise<void>, ok: string, inMain = false) => {
     if (busy) return false;
     setBusy(true);
     setNotice(null);
+    setNoticeMain(inMain);
     try {
       await fn();
       setNotice(ok);
@@ -204,6 +295,12 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
       setBusy(false);
       setTimeout(() => setNotice(null), 4500);
     }
+  };
+  // a hint about the selected dispatch, shown in its status box
+  const sayInDetail = (msg: string) => {
+    setNoticeMain(false);
+    setNotice(msg);
+    setTimeout(() => setNotice(null), 4500);
   };
 
   const q = query.trim().toLowerCase();
@@ -221,6 +318,25 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
   );
   const selected = items.find((i) => i.id === selectedId) || items[0] || null;
 
+  // the field, notice and after-action forms start from the selected dispatch's saved data
+  useEffect(() => {
+    const fd = selected?.field_data || {};
+    const rd = fd.rescue_details;
+    const rt = fd.rescue_tally;
+    const evacPeople = Array.isArray(fd.evac_tally) ? fd.evac_tally.reduce((s, e) => s + (Number(e?.people) || 0), 0) : 0;
+    setFieldForm({
+      stranded: String(rd?.stranded_count ?? 0),
+      location: rd?.location || '',
+      needs: rd?.special_needs || '',
+      rescued: String(rt?.rescued ?? 0),
+      injured: String(rt?.injured ?? 0),
+      missing: String(rt?.missing ?? 0),
+      hospitalId: fd.hospital_id || '',
+    });
+    setNoticeForm({ patients: '1', condition: '' });
+    setAaForm({ people: String(rt?.rescued || evacPeople || 0), followUp: false, followNote: '', families: '', injured: '' });
+  }, [selected?.id]);
+
   const activeCount = data.dispatches.filter((d) => isOpenStage(d.dispatch_status)).length;
   const crewOnDuty = data.personnel.filter((p) => p.on_duty).length;
   const newest = data.dispatches.find((d) => d.dispatch_status === 'sent');
@@ -235,6 +351,16 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
   };
 
   const initial = (currentUser.full_name || 'D').trim().charAt(0).toUpperCase();
+  // who is signed in, as the reference build's sidebar card shows it
+  const identity = [
+    currentUser.full_name || currentUser.email,
+    currentUser.unit_role === 'unit_admin' ? 'Unit admin' : 'Member',
+    unit ? UNIT_TYPE_LABEL[unit.unit_type] || unit.unit_type : '',
+    crewOnDuty ? `${crewOnDuty} on duty` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const equipLabel = (e: UnitEquipment) => e.label || data.equipmentCatalog.find((c) => c.id === e.catalog_id)?.label || 'Equipment';
   const clock = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const date = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -246,7 +372,7 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
         onAccent ? 'bg-white text-[#E2552B]' : STAGE_PILL[s]
       }`}
     >
-      {STAGES.find((x) => x.id === s)?.label}
+      {STAGE_LABEL[s] || pretty(s)}
     </span>
   );
 
@@ -307,10 +433,112 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
     </div>
   );
 
-  const stageIndex = selected ? STAGES.findIndex((s) => s.id === selected.dispatch_status) : 0;
-  const next = selected ? NEXT_ACTION[selected.dispatch_status] : undefined;
+  const flow = selected ? teamFlow(selected.team) : [];
+  // a rescue on hold sits at on scene in the progress bar
+  const stageIndex = selected ? flow.findIndex((s) => s.id === (selected.dispatch_status === 'on_hold' ? 'on_scene' : selected.dispatch_status)) : -1;
+  const steps = selected ? nextSteps(selected) : [];
   const onDuty = data.personnel.filter((p) => p.on_duty);
   const events = selected ? data.dispatchEvents.filter((e) => e.dispatch_id === selected.id) : [];
+  const helpFor = selected ? data.helpRequests.filter((h) => h.dispatch_id === selected.id) : [];
+  const isPnpUnit = unit?.unit_type === 'PNP';
+  const selOpen = !!selected && isOpenStage(selected.dispatch_status);
+  const fieldOpen = !!selected && FIELD_OPEN.includes(selected.dispatch_status);
+  const isRescue = !!selected && isRescueTeam(selected.team);
+  const isAmbulance = selected?.team === 'Ambulance';
+  const count = (v: string) => Math.max(0, Math.floor(Number(v)) || 0);
+
+  const respond = (to: DispatchAction) => {
+    if (!selected) return;
+    if (to === 'on_hold' && !stepNote.trim()) {
+      sayInDetail('Write the reason for the hold in the note first.');
+      return;
+    }
+    run(async () => {
+      await repo.respondToDispatch(selected.id, to, stepNote.trim());
+      await repo.loadDispatchExtras();
+      setStepNote('');
+    }, `Status updated to ${(ACTION_LABEL[to] || pretty(to)).toLowerCase()}`);
+  };
+
+  const askHelp = (kind: HelpRequest['kind'], message: string, ok: string) =>
+    selected ? run(() => repo.requestDispatchHelp(selected.id, kind, message), ok) : Promise.resolve(false);
+
+  const saveField = () => {
+    if (!selected) return;
+    const patch: Dispatch['field_data'] = {};
+    if (isRescue) {
+      const rescued = count(fieldForm.rescued);
+      patch.rescue_details = { stranded_count: count(fieldForm.stranded), location: fieldForm.location.trim(), special_needs: fieldForm.needs.trim() };
+      patch.rescue_tally = {
+        rescued,
+        injured: count(fieldForm.injured),
+        missing: count(fieldForm.missing),
+        destinations: fieldForm.hospitalId ? [{ kind: 'hospital', ref_id: fieldForm.hospitalId, count: rescued }] : [],
+      };
+    }
+    if (fieldForm.hospitalId) patch.hospital_id = fieldForm.hospitalId;
+    if (!Object.keys(patch).length) {
+      sayInDetail('Pick an accepting hospital first.');
+      return;
+    }
+    run(() => repo.saveDispatchFieldData(selected.id, patch), isRescue ? 'Field data saved' : 'Hospital saved');
+  };
+
+  const sendNotice = () => {
+    if (!selected) return;
+    if (!fieldForm.hospitalId) {
+      sayInDetail('Pick an accepting hospital first.');
+      return;
+    }
+    run(async () => {
+      await repo.sendPatientNotice(fieldForm.hospitalId, selected.report_id, count(noticeForm.patients) || 1, noticeForm.condition.trim());
+      setNoticeForm({ patients: '1', condition: '' });
+    }, 'Patient notice sent to the hospital');
+  };
+
+  const submitAfter = () => {
+    if (!selected) return;
+    const meta: Record<string, unknown> = {
+      people_assisted: count(aaForm.people),
+      follow_up_needed: aaForm.followUp,
+      follow_up_note: aaForm.followUp ? aaForm.followNote.trim() : '',
+    };
+    if (selected.team === 'BFP') {
+      meta.families_displaced = count(aaForm.families);
+      meta.people_injured = count(aaForm.injured);
+    }
+    run(() => repo.submitAfterAction(selected.id, afterAction.trim(), meta), 'After-action submitted');
+  };
+
+  // the accepting hospitals, plus the saved one if it has since gone on divert
+  const hospitalOptions = (
+    <>
+      <option value="">{data.acceptingHospitals.length ? 'Select an accepting hospital' : 'No hospital is accepting patients now'}</option>
+      {data.acceptingHospitals.map((h) => (
+        <option key={h.id} value={h.id}>
+          {h.name}
+          {h.available != null ? ` (${h.available} available)` : ''}
+        </option>
+      ))}
+      {fieldForm.hospitalId && !data.acceptingHospitals.some((h) => h.id === fieldForm.hospitalId) && (
+        <option value={fieldForm.hospitalId}>Saved hospital (not accepting now)</option>
+      )}
+    </>
+  );
+
+  const metaLines = (m: Record<string, unknown>): [string, string][] => {
+    const used = Array.isArray(m.equipment_used)
+      ? (m.equipment_used as { identifier?: string }[]).map((e) => e?.identifier || '').filter(Boolean).join(', ')
+      : '';
+    const lines: [string, unknown][] = [
+      ['People assisted', m.people_assisted],
+      ['Families displaced', m.families_displaced],
+      ['People injured', m.people_injured],
+      ['Follow-up', m.follow_up_needed ? m.follow_up_note || 'Needed' : null],
+      ['Equipment used', used],
+    ];
+    return lines.filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)]);
+  };
 
   const details = selected ? (
     <>
@@ -336,39 +564,209 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
 
       <section className={`${panel} p-5 flex flex-col`}>
         <h3 className="text-[15px] font-semibold text-neutral-800 mb-4">Status</h3>
-        <div className="grid grid-cols-5 gap-1.5" aria-label={`Stage: ${STAGES[stageIndex]?.label}`}>
-          {STAGES.map((s, i) => (
-            <div key={s.id} className="min-w-0">
-              <div className={`h-1.5 rounded-full ${i <= stageIndex ? 'bg-gradient-to-r from-[#F07A4A] to-[#E2552B]' : 'bg-[#F3ECE7]'}`} />
-              <span className={`block mt-1.5 text-[10px] font-semibold truncate ${i <= stageIndex ? 'text-[#C2410C]' : 'text-neutral-400'}`}>{s.label}</span>
-            </div>
-          ))}
-        </div>
+        {selected.dispatch_status === 'declined' ? (
+          <p className="text-[13px] text-neutral-600 bg-[#F7F4F2] rounded-xl px-3.5 py-2.5 whitespace-pre-wrap">
+            <span className="font-semibold text-neutral-700">Declined.</span> {selected.decline_reason}
+          </p>
+        ) : (
+          <div
+            className={`grid ${flow.length > 5 ? 'gap-1' : 'gap-1.5'}`}
+            style={{ gridTemplateColumns: `repeat(${flow.length}, minmax(0, 1fr))` }}
+            aria-label={`Stage: ${STAGE_LABEL[selected.dispatch_status]}`}
+          >
+            {flow.map((s, i) => (
+              <div key={s.id} className="min-w-0" title={STAGE_LABEL[s.id]}>
+                <div className={`h-1.5 rounded-full ${i <= stageIndex ? 'bg-gradient-to-r from-[#F07A4A] to-[#E2552B]' : 'bg-[#F3ECE7]'}`} />
+                <span
+                  className={`block mt-1.5 font-semibold ${flow.length > 5 ? 'text-[9px] leading-tight' : 'text-[10px] truncate'} ${
+                    i <= stageIndex ? 'text-[#C2410C]' : 'text-neutral-400'
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {selected.dispatch_status === 'on_hold' && selected.hold_reason && (
+          <p className="mt-3 text-[12px] text-[#7A3B3B] bg-[#F8ECEC] rounded-xl px-3.5 py-2 whitespace-pre-wrap">On hold: {selected.hold_reason}</p>
+        )}
 
-        {next ? (
+        {steps.length ? (
           <div className="mt-5 space-y-2">
-            <input className={field} value={stepNote} onChange={(e) => setStepNote(e.target.value)} placeholder="Note (optional)" aria-label="Note for this step" />
-            <button
-              type="button"
-              onClick={() =>
-                run(async () => {
-                  await repo.respondToDispatch(selected.id, next.to, stepNote.trim());
-                  await repo.loadDispatchExtras();
-                  setStepNote('');
-                }, `Status updated to ${(STAGES.find((x) => x.id === next.to)?.label || '').toLowerCase()}`)
-              }
-              disabled={busy}
-              className={`${accentBtn} w-full h-12`}
-            >
-              {busy ? <BrandLoader mode="inline" portal="dispatch" process="refresh" variant="reverse" /> : next.label}
+            <input
+              className={field}
+              value={stepNote}
+              onChange={(e) => setStepNote(e.target.value)}
+              placeholder={steps.some((s) => s.to === 'on_hold') ? 'Note (required for On hold)' : 'Note (optional)'}
+              aria-label="Note for this step"
+            />
+            <button type="button" onClick={() => respond(steps[0].to)} disabled={busy} className={`${accentBtn} w-full h-12`}>
+              {busy ? <BrandLoader mode="inline" portal="dispatch" process="refresh" variant="reverse" /> : steps[0].label}
             </button>
-            <p className="text-[11px] text-neutral-400 text-center">Each step is one tap. On scene and Done notify the reporter.</p>
+            {steps.slice(1).map((s) => (
+              <button key={s.to} type="button" onClick={() => respond(s.to)} disabled={busy} className={`${softBtn} w-full justify-center h-10`}>
+                {s.label}
+              </button>
+            ))}
+            <p className="text-[11px] text-neutral-400 text-center">Each step is one tap. The reporter is told from On scene onwards.</p>
           </div>
         ) : (
-          <p className="mt-4 text-center text-[12px] text-neutral-400">This dispatch is complete.</p>
+          selected.dispatch_status === 'done' && <p className="mt-4 text-center text-[12px] text-neutral-400">This dispatch is complete.</p>
         )}
-        {notice && <p className="mt-2 text-[12px] text-center text-neutral-500">{notice}</p>}
+
+        {selOpen && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(selected.dispatch_status === 'sent' || selected.dispatch_status === 'acknowledged') && (
+              <button
+                type="button"
+                className={softBtn}
+                disabled={busy}
+                onClick={() => {
+                  setDeclineReason('');
+                  setDeclineOpen(true);
+                }}
+              >
+                Can’t respond
+              </button>
+            )}
+            <button
+              type="button"
+              className={softBtn}
+              disabled={busy}
+              onClick={() => {
+                setHelpForm({ kind: 'general', message: '' });
+                setHelpOpen(true);
+              }}
+            >
+              Need help
+            </button>
+            {selected.team === 'BFP' && (
+              <>
+                <button type="button" className={softBtn} disabled={busy} onClick={() => askHelp('water_tanker', 'Requesting a water tanker on this dispatch.', 'Water tanker request sent to the LGU')}>
+                  Water tanker
+                </button>
+                <button type="button" className={softBtn} disabled={busy} onClick={() => askHelp('extra_personnel', 'Requesting extra personnel on this dispatch.', 'Personnel request sent to the LGU')}>
+                  Extra personnel
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        {notice && !noticeMain && <p className="mt-2 text-[12px] text-center text-neutral-500">{notice}</p>}
       </section>
+
+      {helpFor.length > 0 && (
+        <section className={`${panel} p-5`}>
+          <h3 className="text-[15px] font-semibold text-neutral-800 mb-3">Help requests</h3>
+          <ul className="space-y-2.5">
+            {helpFor.map((h) => (
+              <li key={h.id} className="flex items-start gap-3 text-[12px]">
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-neutral-700">{HELP_KIND[h.kind] || pretty(h.kind)}</span>
+                  <span className="block text-neutral-500 break-words">{h.message}</span>
+                  <span className="block text-neutral-400">{relTime(h.created_at)}</span>
+                </span>
+                {pill(HELP_PILL[h.status] || 'bg-neutral-200', h.status)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {fieldOpen && isRescue && (
+        <section className={`${panel} p-5 space-y-3`}>
+          <h3 className="text-[15px] font-semibold text-neutral-800">Rescue details & tally</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <Label text="Stranded">
+              <input type="number" min={0} inputMode="numeric" className={field} value={fieldForm.stranded} onChange={(e) => setFieldForm({ ...fieldForm, stranded: e.target.value })} />
+            </Label>
+            <Label text="Location">
+              <input className={field} value={fieldForm.location} onChange={(e) => setFieldForm({ ...fieldForm, location: e.target.value })} />
+            </Label>
+          </div>
+          <Label text="Special needs">
+            <input className={field} value={fieldForm.needs} onChange={(e) => setFieldForm({ ...fieldForm, needs: e.target.value })} placeholder="Elderly, infants, PWD…" />
+          </Label>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                ['rescued', 'Rescued'],
+                ['injured', 'Injured'],
+                ['missing', 'Missing'],
+              ] as const
+            ).map(([k, l]) => (
+              <Label key={k} text={l}>
+                <input type="number" min={0} inputMode="numeric" className={field} value={fieldForm[k]} onChange={(e) => setFieldForm({ ...fieldForm, [k]: e.target.value })} />
+              </Label>
+            ))}
+          </div>
+          <Label text="Destination hospital">
+            <select className={field} value={fieldForm.hospitalId} onChange={(e) => setFieldForm({ ...fieldForm, hospitalId: e.target.value })}>
+              {hospitalOptions}
+            </select>
+          </Label>
+          <button type="button" className={`${softBtn} w-full justify-center h-10`} disabled={busy} onClick={saveField}>
+            Save field data
+          </button>
+        </section>
+      )}
+
+      {fieldOpen && isAmbulance && (
+        <section className={`${panel} p-5 space-y-3`}>
+          <h3 className="text-[15px] font-semibold text-neutral-800">Hospital</h3>
+          <Label text="Accepting hospital">
+            <select className={field} value={fieldForm.hospitalId} onChange={(e) => setFieldForm({ ...fieldForm, hospitalId: e.target.value })}>
+              {hospitalOptions}
+            </select>
+          </Label>
+          <p className="text-[11px] text-neutral-400">Required before Transporting. Save it first, then tap Transporting.</p>
+          <button type="button" className={`${softBtn} w-full justify-center h-10`} disabled={busy} onClick={saveField}>
+            Save hospital
+          </button>
+        </section>
+      )}
+
+      {fieldOpen && (isRescue || isAmbulance) && (
+        <section className={`${panel} p-5 space-y-3`}>
+          <h3 className="text-[15px] font-semibold text-neutral-800">Send patient notice</h3>
+          <p className="text-[11px] text-neutral-400">Tells the hospital picked above that patients are coming.</p>
+          <div className="grid grid-cols-[1fr_2fr] gap-2">
+            <Label text="Patients">
+              <input type="number" min={1} inputMode="numeric" className={field} value={noticeForm.patients} onChange={(e) => setNoticeForm({ ...noticeForm, patients: e.target.value })} />
+            </Label>
+            <Label text="Condition">
+              <input className={field} value={noticeForm.condition} onChange={(e) => setNoticeForm({ ...noticeForm, condition: e.target.value })} placeholder="e.g. Trauma, stable" />
+            </Label>
+          </div>
+          <button type="button" className={`${accentBtn} w-full`} disabled={busy} onClick={sendNotice}>
+            <Truck className="w-4 h-4" /> Send notice
+          </button>
+        </section>
+      )}
+
+      {selOpen && isPnpUnit && (
+        <section className={`${panel} p-5`}>
+          <h3 className="text-[15px] font-semibold text-neutral-800 mb-1">Road closure</h3>
+          <p className="text-[11px] text-neutral-400 mb-3">Post a closure from this dispatch to the Road Status list, and reopen it when the road is clear.</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={`${accentBtn} h-9 px-4`}
+              disabled={busy}
+              onClick={() => {
+                setClosureForm({ roadName: '', note: '', segmentFrom: '', segmentTo: '', reopen: '' });
+                setClosureOpen(true);
+              }}
+            >
+              Post closure
+            </button>
+            <button type="button" className={softBtn} disabled={busy} onClick={() => run(() => repo.reopenRoadClosure(selected.id), 'Road reopened')}>
+              Reopen
+            </button>
+          </div>
+        </section>
+      )}
 
       {events.length > 0 && (
         <section className={`${panel} p-5`}>
@@ -376,7 +774,7 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
           <ol className="space-y-2.5">
             {events.map((e) => (
               <li key={e.id} className="text-[12px]">
-                <span className="font-semibold text-neutral-700 capitalize">{pretty(e.action)}</span>
+                <span className="font-semibold text-neutral-700 capitalize">{ACTION_LABEL[e.action] || pretty(e.action)}</span>
                 <span className="text-neutral-400"> · {e.actor_name || 'System'} · {absTime(e.created_at)}</span>
                 {e.note && <span className="block text-neutral-500">{e.note}</span>}
               </li>
@@ -391,26 +789,59 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
           {selected.after_action ? (
             <>
               <p className="text-[13px] text-neutral-600 bg-[#F7F4F2] rounded-xl px-3.5 py-2.5 whitespace-pre-wrap">{selected.after_action}</p>
+              {metaLines(selected.after_action_meta).length > 0 && (
+                <dl className="mt-2 space-y-1 text-[12px]">
+                  {metaLines(selected.after_action_meta).map(([k, v]) => (
+                    <div key={k} className="flex justify-between gap-3">
+                      <dt className="text-neutral-500 shrink-0">{k}</dt>
+                      <dd className="text-neutral-700 text-right break-words min-w-0">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
               {selected.after_action_at && <p className="mt-1.5 text-[11px] text-neutral-400">Filed {relTime(selected.after_action_at)}</p>}
             </>
           ) : (
-            <>
+            <div className="space-y-2">
               <textarea
                 rows={4}
                 value={afterAction}
                 onChange={(e) => setAfterAction(e.target.value)}
+                aria-label="After-action summary"
                 placeholder="What was done, time spent, equipment used, casualties or patients, outcome"
                 className="w-full rounded-xl bg-[#F7F4F2] border border-transparent px-3.5 py-2.5 text-[13px] resize-none focus:outline-none focus:bg-white focus:border-[#F07A4A]"
               />
-              <button
-                type="button"
-                disabled={busy || !afterAction.trim()}
-                onClick={() => run(() => repo.submitAfterAction(selected.id, afterAction.trim()), 'After-action submitted')}
-                className={`${accentBtn} w-full mt-2`}
-              >
+              <div className="grid grid-cols-2 gap-2">
+                <Label text="People assisted">
+                  <input type="number" min={0} inputMode="numeric" className={field} value={aaForm.people} onChange={(e) => setAaForm({ ...aaForm, people: e.target.value })} />
+                </Label>
+                <Label text="Follow-up needed">
+                  <select className={field} value={aaForm.followUp ? 'yes' : 'no'} onChange={(e) => setAaForm({ ...aaForm, followUp: e.target.value === 'yes' })}>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </Label>
+              </div>
+              {aaForm.followUp && (
+                <Label text="Follow-up note">
+                  <input className={field} value={aaForm.followNote} onChange={(e) => setAaForm({ ...aaForm, followNote: e.target.value })} placeholder="What needs following up?" />
+                </Label>
+              )}
+              {selected.team === 'BFP' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <Label text="Families displaced">
+                    <input type="number" min={0} inputMode="numeric" className={field} value={aaForm.families} onChange={(e) => setAaForm({ ...aaForm, families: e.target.value })} />
+                  </Label>
+                  <Label text="People injured">
+                    <input type="number" min={0} inputMode="numeric" className={field} value={aaForm.injured} onChange={(e) => setAaForm({ ...aaForm, injured: e.target.value })} />
+                  </Label>
+                </div>
+              )}
+              <p className="text-[11px] text-neutral-400">Equipment used and the step times are added for you.</p>
+              <button type="button" disabled={busy || !afterAction.trim()} onClick={submitAfter} className={`${accentBtn} w-full`}>
                 Submit after-action
               </button>
-            </>
+            </div>
           )}
         </section>
       )}
@@ -440,6 +871,47 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
   const queueView = (
     <>
       {heading('Incoming Dispatches', 'Open dispatches addressed to your unit.', chip(`${activeCount} active`))}
+      {isPnpUnit && (data.patrolShelters.length > 0 || data.reliefEscorts.length > 0) && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mb-4">
+          {data.patrolShelters.length > 0 && (
+            <section className={`${panel} p-5`}>
+              <h3 className="text-[15px] font-semibold text-neutral-800 mb-3">Shelters needing patrol</h3>
+              <ul className="space-y-2">
+                {data.patrolShelters.map((s) => (
+                  <li key={s.id} className="flex items-center justify-between gap-3 text-[13px]">
+                    <span className="min-w-0 truncate">
+                      <span className="font-semibold text-neutral-700">{s.name}</span>
+                      <span className="text-neutral-400"> · {s.barangay || '—'}</span>
+                    </span>
+                    <span className="shrink-0 text-[11px] text-neutral-400">{s.needs_patrol_at ? absTime(s.needs_patrol_at) : ''}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {data.reliefEscorts.length > 0 && (
+            <section className={`${panel} p-5`}>
+              <h3 className="text-[15px] font-semibold text-neutral-800 mb-3">Relief escorts</h3>
+              <ul className="space-y-2.5">
+                {data.reliefEscorts.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-neutral-700 truncate">{r.title || 'Relief distribution'}</span>
+                      <span className="block text-[11px] text-neutral-400 break-words">{[r.barangay, r.escort_note].filter(Boolean).join(' · ')}</span>
+                    </span>
+                    {pill(r.escort_status === 'confirmed' ? 'bg-[#73B386] text-white' : 'bg-[#E9B872] text-white', r.escort_status)}
+                    {r.escort_status === 'requested' && (
+                      <button type="button" disabled={busy} className={`${accentBtn} h-9 px-4`} onClick={() => run(() => repo.confirmReliefEscort(r.id), 'Escort confirmed', true)}>
+                        Confirm escort
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      )}
       <div className="hidden md:grid grid-cols-[1.2fr_1.2fr_1fr_1.1fr_auto_24px] gap-x-4 px-5 pb-2 text-[12px] font-medium text-neutral-500">
         <span>Incident</span>
         <span>Hazard / Severity</span>
@@ -462,6 +934,18 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
         <>
           {chip(`${data.equipment.length} items`)}
           {overdueCount > 0 && chip(`${overdueCount} overdue`, true)}
+          {isUnitAdmin && (
+            <button
+              type="button"
+              className={`${accentBtn} h-9 px-4`}
+              onClick={() => {
+                setEquipForm({ catalogId: data.equipmentCatalog[0]?.id || '', customLabel: '', identifier: '', condition: 'unknown', notes: '' });
+                setAddEquipOpen(true);
+              }}
+            >
+              <Plus className="w-4 h-4" /> Add equipment
+            </button>
+          )}
         </>
       )}
       <div className="space-y-3">
@@ -472,9 +956,9 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
                 <Wrench className="w-5 h-5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[14px] font-semibold text-neutral-800 truncate">{e.identifier || e.label}</span>
+                <span className="block text-[14px] font-semibold text-neutral-800 truncate">{e.identifier || equipLabel(e)}</span>
                 <span className="block text-[12px] text-neutral-400 truncate">
-                  {[e.identifier ? e.label : '', e.notes, `last check ${e.last_checked_at ? relTime(e.last_checked_at) : 'never'}`].filter(Boolean).join(' · ')}
+                  {[e.identifier ? equipLabel(e) : '', e.notes, `last check ${e.last_checked_at ? relTime(e.last_checked_at) : 'never'}`].filter(Boolean).join(' · ')}
                 </span>
               </span>
               <span className="hidden sm:inline-flex gap-1.5">
@@ -507,30 +991,36 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
               >
                 Status
               </button>
+              {isUnitAdmin && (
+                <>
+                  <button
+                    type="button"
+                    className={softBtn}
+                    onClick={() => {
+                      setEditEquip(e);
+                      setEditForm({ customLabel: e.label, identifier: e.identifier, condition: e.condition || 'unknown', notes: e.notes });
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className={softBtn}
+                    onClick={() => {
+                      setRemoveEquip(e);
+                      setUseCount(null);
+                      if (e.status !== 'deployed') repo.equipmentUseCount(e.id).then(setUseCount, () => setUseCount(-1));
+                    }}
+                  >
+                    {e.status === 'unavailable' ? 'Remove' : 'Retire / remove'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ))}
-        {!data.equipment.length && empty(isUnitAdmin ? 'No equipment yet. Add your unit’s equipment below.' : 'No equipment yet. Your unit admin adds equipment here.')}
+        {!data.equipment.length && empty(isUnitAdmin ? 'No equipment yet. Use Add equipment to register your unit’s equipment.' : 'No equipment yet. Your unit admin adds equipment here.')}
       </div>
-      {isUnitAdmin && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!equipForm.label.trim()) return;
-            run(async () => {
-              await repo.addEquipment(equipForm);
-              setEquipForm({ label: '', identifier: '' });
-            }, 'Equipment added');
-          }}
-          className={`${panel} mt-4 p-4 grid grid-cols-1 sm:grid-cols-[1.4fr_1fr_auto] gap-2`}
-        >
-          <input className={field} placeholder="Equipment (e.g. Fire truck, rubber boat)" value={equipForm.label} onChange={(e) => setEquipForm({ ...equipForm, label: e.target.value })} />
-          <input className={field} placeholder="Plate or tag number" value={equipForm.identifier} onChange={(e) => setEquipForm({ ...equipForm, identifier: e.target.value })} />
-          <button type="submit" disabled={busy} className={accentBtn}>
-            <Plus className="w-4 h-4" /> Add
-          </button>
-        </form>
-      )}
     </div>
   );
 
@@ -648,11 +1138,22 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
                 {n.eta ? ` · ETA ${absTime(n.eta)}` : ''}
               </span>
             </span>
-            {pill(n.status === 'sent' ? 'bg-[#E9B872] text-white' : 'bg-[#73B386] text-white', pretty(n.status))}
-            {n.status === 'sent' && (
-              <button type="button" disabled={busy} onClick={() => run(() => repo.ackPatientNotice(n.id), 'Notice acknowledged')} className={`${accentBtn} h-9 px-4`}>
-                Ack
-              </button>
+            {pill(NOTICE_PILL[n.status] || 'bg-[#F3EFEC] text-neutral-500', pretty(n.status))}
+            {(n.status === 'sent' || n.status === 'acknowledged') && (
+              // on phones the buttons take their own line so the notice text keeps its width
+              <span className="w-full sm:w-auto flex flex-wrap gap-2">
+                {n.status === 'sent' && (
+                  <button type="button" disabled={busy} onClick={() => run(() => repo.ackPatientNotice(n.id, 'acknowledged'), 'Notice acknowledged')} className={`${accentBtn} h-9 px-4`}>
+                    Acknowledge
+                  </button>
+                )}
+                <button type="button" disabled={busy} onClick={() => run(() => repo.ackPatientNotice(n.id, 'arrived'), 'Patient marked arrived')} className={softBtn}>
+                  Arrived
+                </button>
+                <button type="button" disabled={busy} onClick={() => run(() => repo.ackPatientNotice(n.id, 'cancelled'), 'Notice cancelled')} className={softBtn}>
+                  Cancel
+                </button>
+              </span>
             )}
           </div>
         ))}
@@ -683,8 +1184,8 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
       )}
       <div className="space-y-3">
         {data.unitRequests.map((r) => (
-          <div key={r.id} className={`${card} flex items-center gap-3`}>
-            <span className="min-w-0 flex-1">
+          <div key={r.id} className={`${card} flex flex-wrap sm:flex-nowrap items-center gap-3`}>
+            <span className="min-w-0 flex-1 basis-full sm:basis-auto">
               <span className="block text-[14px] font-semibold text-neutral-800 truncate">{KIND_LABEL[r.kind] || r.kind}</span>
               <span className="block text-[12px] text-neutral-400 break-words">
                 {r.details} · {absTime(r.created_at)}
@@ -694,6 +1195,17 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
             {pill(
               r.status === 'approved' || r.status === 'done' ? 'bg-[#73B386] text-white' : r.status === 'declined' ? 'bg-[#D9534F] text-white' : 'bg-[#E9B872] text-white',
               r.status
+            )}
+            {/* the unit admin closes an approved request once it was delivered */}
+            {isUnitAdmin && r.status === 'approved' && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => run(() => repo.decideUnitRequest(r.id, 'done'), 'Request marked done')}
+                className="shrink-0 h-9 px-4 rounded-full text-[12px] font-semibold bg-[#F7F4F2] text-neutral-700 cursor-pointer disabled:opacity-50"
+              >
+                Mark done
+              </button>
             )}
           </div>
         ))}
@@ -895,11 +1407,24 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
         <div className="h-full w-full max-w-[1500px] flex overflow-hidden sm:rounded-[28px] bg-[#FDF6F3]/80 backdrop-blur-xl sm:border border-white shadow-[0_30px_80px_-30px_rgba(160,70,40,0.35)]">
           {/* ---------------- left rail (tablet and desktop) */}
           <aside className="hidden md:flex w-[96px] shrink-0 flex-col">
-            <div className="h-[84px] flex items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setView('queue')}
+              aria-label="Go to incoming dispatches"
+              title="Incoming Dispatches"
+              className="h-[84px] flex items-center justify-center cursor-pointer"
+            >
               <TriadEmblem portal="dispatch" size={34} />
-            </div>
+            </button>
             <nav aria-label="Dispatch sections" className="flex-1 flex flex-col items-center gap-2 pt-6 pb-5 rounded-tr-[56px] bg-gradient-to-b from-[#F07A4A] via-[#E2552B] to-[#C2410C] overflow-y-auto no-scrollbar">
-              <span className="w-12 h-12 shrink-0 rounded-full bg-white/20 ring-2 ring-white/70 flex items-center justify-center text-white font-black text-lg mb-4">{initial}</span>
+              <span
+                role="img"
+                aria-label={`Signed in: ${identity}`}
+                title={identity}
+                className="w-12 h-12 shrink-0 rounded-full bg-white/20 ring-2 ring-white/70 flex items-center justify-center text-white font-black text-lg mb-4"
+              >
+                {initial}
+              </span>
               {NAV.map((item) => {
                 const Icon = item.icon;
                 const active = view === item.id;
@@ -927,6 +1452,9 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
               <button type="button" onClick={onSignOut} aria-label="Sign out" title="Sign out" className="shrink-0 w-11 h-11 rounded-xl bg-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-white/30">
                 <LogOut className="w-5 h-5" />
               </button>
+              <span className="shrink-0 max-w-[84px] truncate font-mono text-[9px] text-white/60" title={`build ${CONFIG.BUILD}`}>
+                {CONFIG.BUILD}
+              </span>
             </nav>
           </aside>
 
@@ -1022,7 +1550,10 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
                 ))}
               </div>
 
-              {notice && !hasDetails && <p className="mt-4 text-[12px] text-[#9A3412] bg-[#FFF4EC] rounded-xl px-4 py-2">{notice}</p>}
+              {/* with the detail panel open, its own status box shows the message */}
+              {notice && (!hasDetails || !sheetOpen || noticeMain) && (
+                <p className={`mt-4 text-[12px] text-[#9A3412] bg-[#FFF4EC] rounded-xl px-4 py-2 ${hasDetails && selected && !noticeMain ? 'lg:hidden' : ''}`}>{notice}</p>
+              )}
 
               {currentView}
             </div>
@@ -1064,7 +1595,7 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
       {/* ---------------- pop-ups (reference build) */}
       {checkFor && (
         <Modal
-          title={`Readiness check · ${checkFor.identifier || checkFor.label}`}
+          title={`Readiness check · ${checkFor.identifier || equipLabel(checkFor)}`}
           onClose={() => setCheckFor(null)}
           footer={
             <>
@@ -1104,7 +1635,7 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
 
       {statusFor && (
         <Modal
-          title={`Set status · ${statusFor.identifier || statusFor.label}`}
+          title={`Set status · ${statusFor.identifier || equipLabel(statusFor)}`}
           onClose={() => setStatusFor(null)}
           footer={
             <>
@@ -1214,6 +1745,329 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
               <option value="true">Accepting</option>
               <option value="false">Divert</option>
             </select>
+          </Label>
+        </Modal>
+      )}
+
+      {addEquipOpen && (
+        <Modal
+          title={`Add equipment${unit ? ` · ${unit.name}` : ''}`}
+          onClose={() => setAddEquipOpen(false)}
+          footer={
+            <>
+              <button type="button" className={softBtn} onClick={() => setAddEquipOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy || (!equipForm.catalogId && !equipForm.customLabel.trim())}
+                className={accentBtn}
+                onClick={async () => {
+                  if (
+                    await run(
+                      () =>
+                        repo.addEquipment({
+                          catalogId: equipForm.catalogId || null,
+                          customLabel: equipForm.customLabel,
+                          identifier: equipForm.identifier,
+                          condition: equipForm.condition,
+                          notes: equipForm.notes,
+                        }),
+                      'Equipment added'
+                    )
+                  )
+                    setAddEquipOpen(false);
+                }}
+              >
+                Add
+              </button>
+            </>
+          }
+        >
+          <Label text="Type">
+            <select className={field} value={equipForm.catalogId} onChange={(e) => setEquipForm({ ...equipForm, catalogId: e.target.value })}>
+              {data.equipmentCatalog.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+              <option value="">Other (custom)</option>
+            </select>
+          </Label>
+          {!equipForm.catalogId && (
+            <Label text="Custom label">
+              <input className={field} value={equipForm.customLabel} onChange={(e) => setEquipForm({ ...equipForm, customLabel: e.target.value })} placeholder="e.g. Portable pump" />
+            </Label>
+          )}
+          <Label text="Identifier (plate, tag or unit number)">
+            <input className={field} value={equipForm.identifier} onChange={(e) => setEquipForm({ ...equipForm, identifier: e.target.value })} placeholder="e.g. Fire Truck #2" />
+          </Label>
+          <Label text="Starting condition">
+            <select className={field} value={equipForm.condition} onChange={(e) => setEquipForm({ ...equipForm, condition: e.target.value })}>
+              {CONDITIONS.map((c) => (
+                <option key={c} value={c}>
+                  {pretty(c)}
+                </option>
+              ))}
+            </select>
+          </Label>
+          <Label text="Notes">
+            <textarea rows={2} className={`${field} h-auto py-2.5`} value={equipForm.notes} onChange={(e) => setEquipForm({ ...equipForm, notes: e.target.value })} placeholder="Anything the next shift should know" />
+          </Label>
+        </Modal>
+      )}
+
+      {editEquip && (
+        <Modal
+          title={`Edit · ${editEquip.identifier || equipLabel(editEquip)}`}
+          onClose={() => setEditEquip(null)}
+          footer={
+            <>
+              <button type="button" className={softBtn} onClick={() => setEditEquip(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                className={accentBtn}
+                onClick={async () => {
+                  const ok = await run(
+                    () =>
+                      repo.updateEquipment(editEquip.id, {
+                        customLabel: editEquip.catalog_id ? null : editForm.customLabel,
+                        identifier: editForm.identifier,
+                        condition: editForm.condition,
+                        notes: editForm.notes,
+                      }),
+                    'Equipment updated'
+                  );
+                  if (ok) setEditEquip(null);
+                }}
+              >
+                Save
+              </button>
+            </>
+          }
+        >
+          <Label text="Type">
+            <input className={field} value={equipLabel(editEquip)} disabled readOnly />
+          </Label>
+          {!editEquip.catalog_id && (
+            <Label text="Custom label">
+              <input className={field} value={editForm.customLabel} onChange={(e) => setEditForm({ ...editForm, customLabel: e.target.value })} />
+            </Label>
+          )}
+          <Label text="Identifier">
+            <input className={field} value={editForm.identifier} onChange={(e) => setEditForm({ ...editForm, identifier: e.target.value })} />
+          </Label>
+          <Label text="Condition">
+            <select className={field} value={editForm.condition} onChange={(e) => setEditForm({ ...editForm, condition: e.target.value })}>
+              {CONDITIONS.map((c) => (
+                <option key={c} value={c}>
+                  {pretty(c)}
+                </option>
+              ))}
+            </select>
+          </Label>
+          <Label text="Notes">
+            <textarea rows={2} className={`${field} h-auto py-2.5`} value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+          </Label>
+          <p className="text-[11px] text-neutral-400">The owner and type cannot be changed. Retire it and add a new one instead.</p>
+        </Modal>
+      )}
+
+      {removeEquip && (
+        <Modal
+          title={`${removeEquip.status === 'deployed' ? 'Cannot remove' : 'Retire or remove'} · ${removeEquip.identifier || equipLabel(removeEquip)}`}
+          onClose={() => setRemoveEquip(null)}
+          footer={
+            removeEquip.status === 'deployed' ? (
+              <button type="button" className={softBtn} onClick={() => setRemoveEquip(null)}>
+                Close
+              </button>
+            ) : (
+              <>
+                <button type="button" className={softBtn} onClick={() => setRemoveEquip(null)}>
+                  Cancel
+                </button>
+                {useCount !== null && removeEquip.status !== 'unavailable' && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className={softBtn}
+                    onClick={async () => {
+                      if (await run(() => repo.removeEquipment(removeEquip.id, true), 'Equipment retired')) setRemoveEquip(null);
+                    }}
+                  >
+                    Retire
+                  </button>
+                )}
+                {useCount === 0 && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className={accentBtn}
+                    onClick={async () => {
+                      if (await run(() => repo.removeEquipment(removeEquip.id, false), 'Equipment removed')) setRemoveEquip(null);
+                    }}
+                  >
+                    Remove permanently
+                  </button>
+                )}
+              </>
+            )
+          }
+        >
+          <p className="text-[13px] text-neutral-600">
+            {removeEquip.status === 'deployed'
+              ? 'This equipment is out on a dispatch. Release it from the dispatch (or mark the dispatch Done) before removing or retiring it.'
+              : useCount === null
+              ? 'Checking the dispatch history…'
+              : useCount < 0
+              ? removeEquip.status === 'unavailable'
+                ? 'Could not check the dispatch history. Try again in a moment.'
+                : 'Could not check the dispatch history. Retiring keeps the history safe.'
+              : useCount > 0 && removeEquip.status === 'unavailable'
+              ? `This equipment is retired. It was used in ${useCount} ${useCount === 1 ? 'dispatch' : 'dispatches'}, so it stays in the list to keep that history.`
+              : useCount > 0
+              ? `This equipment was used in ${useCount} ${useCount === 1 ? 'dispatch' : 'dispatches'}. Deleting it would erase that history, so retire it instead: it stays in the list, marked unavailable.`
+              : removeEquip.status === 'unavailable'
+              ? 'This equipment is retired and was never used on a dispatch. You can remove it permanently (its readiness checks go with it).'
+              : 'This equipment was never used on a dispatch. Remove it permanently (its readiness checks go with it), or retire it: it stays in the list, marked unavailable.'}
+          </p>
+        </Modal>
+      )}
+
+      {declineOpen && selected && (
+        <Modal
+          title="Can’t respond to this dispatch"
+          onClose={() => setDeclineOpen(false)}
+          footer={
+            <>
+              <button type="button" className={softBtn} onClick={() => setDeclineOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy || !declineReason.trim()}
+                className={accentBtn}
+                onClick={async () => {
+                  if (await run(() => repo.declineDispatch(selected.id, declineReason.trim()), 'Dispatch declined. The dispatcher has been told to pick another team.')) setDeclineOpen(false);
+                }}
+              >
+                Decline dispatch
+              </button>
+            </>
+          }
+        >
+          <p className="text-[12px] text-neutral-500">The dispatcher and the LGU are told right away so they can send another team.</p>
+          <Label text="Reason">
+            <textarea
+              rows={3}
+              maxLength={500}
+              className={`${field} h-auto py-2.5`}
+              value={declineReason}
+              onChange={(e) => setDeclineReason(e.target.value)}
+              placeholder="e.g. No available responders, equipment failure"
+            />
+          </Label>
+        </Modal>
+      )}
+
+      {helpOpen && selected && (
+        <Modal
+          title="Request help on this dispatch"
+          onClose={() => setHelpOpen(false)}
+          footer={
+            <>
+              <button type="button" className={softBtn} onClick={() => setHelpOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy || !helpForm.message.trim()}
+                className={accentBtn}
+                onClick={async () => {
+                  if (await askHelp(helpForm.kind, helpForm.message.trim(), 'Help request sent to the LGU')) setHelpOpen(false);
+                }}
+              >
+                Send
+              </button>
+            </>
+          }
+        >
+          <Label text="Kind">
+            <select className={field} value={helpForm.kind} onChange={(e) => setHelpForm({ ...helpForm, kind: e.target.value as HelpRequest['kind'] })}>
+              {(Object.keys(HELP_KIND) as HelpRequest['kind'][]).map((k) => (
+                <option key={k} value={k}>
+                  {HELP_KIND[k]}
+                </option>
+              ))}
+            </select>
+          </Label>
+          <Label text="Message">
+            <textarea
+              rows={3}
+              maxLength={1000}
+              className={`${field} h-auto py-2.5`}
+              value={helpForm.message}
+              onChange={(e) => setHelpForm({ ...helpForm, message: e.target.value })}
+              placeholder="What do you need?"
+            />
+          </Label>
+          <p className="text-[11px] text-neutral-400 text-right">{helpForm.message.length} / 1000</p>
+        </Modal>
+      )}
+
+      {closureOpen && selected && (
+        <Modal
+          title="Post a road closure"
+          onClose={() => setClosureOpen(false)}
+          footer={
+            <>
+              <button type="button" className={softBtn} onClick={() => setClosureOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy || !closureForm.roadName.trim()}
+                className={accentBtn}
+                onClick={async () => {
+                  const ok = await run(
+                    () =>
+                      repo.postRoadClosure(selected.id, {
+                        roadName: closureForm.roadName.trim(),
+                        note: closureForm.note.trim(),
+                        segmentFrom: closureForm.segmentFrom.trim(),
+                        segmentTo: closureForm.segmentTo.trim(),
+                        estimatedReopen: closureForm.reopen ? new Date(closureForm.reopen).toISOString() : null,
+                      }),
+                    'Road closure posted'
+                  );
+                  if (ok) setClosureOpen(false);
+                }}
+              >
+                Post closure
+              </button>
+            </>
+          }
+        >
+          <Label text="Road name">
+            <input className={field} value={closureForm.roadName} onChange={(e) => setClosureForm({ ...closureForm, roadName: e.target.value })} placeholder="e.g. Rizal St" />
+          </Label>
+          <Label text="Diversion route / note">
+            <textarea rows={2} className={`${field} h-auto py-2.5`} value={closureForm.note} onChange={(e) => setClosureForm({ ...closureForm, note: e.target.value })} placeholder="Detour via Mabini St, two lanes blocked" />
+          </Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Label text="From">
+              <input className={field} value={closureForm.segmentFrom} onChange={(e) => setClosureForm({ ...closureForm, segmentFrom: e.target.value })} placeholder="Purok 1" />
+            </Label>
+            <Label text="To">
+              <input className={field} value={closureForm.segmentTo} onChange={(e) => setClosureForm({ ...closureForm, segmentTo: e.target.value })} placeholder="Highway junction" />
+            </Label>
+          </div>
+          <Label text="Estimated reopen (optional)">
+            <input type="datetime-local" className={field} value={closureForm.reopen} onChange={(e) => setClosureForm({ ...closureForm, reopen: e.target.value })} />
           </Label>
         </Modal>
       )}

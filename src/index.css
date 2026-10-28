@@ -78,11 +78,35 @@ body {
 .ug-admin-ops.ug-admin-ops {
   background-image: linear-gradient(135deg, #F7CE6A 0%, #F2B744 55%, #E9A12A 100%) !important;
 }
+/* filled surfaces (stat cards, primary buttons): the console's warm gold, not a flat brown */
 .ug-admin-ops .bg-\[\#18181b\],
-.ug-admin-ops .bg-\[\#18181B\] { background-color: #9A6A0C !important; }
+.ug-admin-ops .bg-\[\#18181B\] {
+  background-color: #B9770E !important;
+  background-image: linear-gradient(140deg, #DDA024 0%, #B9770E 55%, #A2650A 100%) !important;
+}
 .ug-admin-ops .bg-\[\#2A2A2A\],
-.ug-admin-ops .bg-\[\#27272a\] { background-color: #7A520A !important; }
-.ug-admin-ops .border-\[\#18181b\] { border-color: #9A6A0C !important; }
+.ug-admin-ops .bg-\[\#27272a\] { background-color: #A2650A !important; background-image: none !important; }
+.ug-admin-ops .hover\:bg-\[\#18181b\]:hover,
+.ug-admin-ops .hover\:bg-\[\#2A2A2A\]:hover,
+.ug-admin-ops .hover\:bg-\[\#27272a\]:hover { background-color: #8A5A00 !important; background-image: none !important; }
+/* the LDRRMO's near-black outlines become a soft gold edge */
+.ug-admin-ops .border-\[\#18181b\],
+.ug-admin-ops .border-neutral-800,
+.ug-admin-ops .border-neutral-900 { border-color: rgba(162, 101, 10, 0.45) !important; }
+/* grey labels and dots on a gold surface turn cream so they stay readable */
+.ug-admin-ops .bg-\[\#18181b\] .text-neutral-400,
+.ug-admin-ops .bg-\[\#18181b\] .text-neutral-300,
+.ug-admin-ops .bg-\[\#18181b\] .text-neutral-500 { color: #FFF1C7 !important; }
+.ug-admin-ops .bg-\[\#18181b\] .bg-neutral-300,
+.ug-admin-ops .bg-\[\#18181b\] .bg-neutral-400 { background-color: #FFE7A3 !important; }
 .ug-admin-ops .text-\[\#18181B\],
-.ug-admin-ops .text-\[\#18181b\] { color: #7A520A !important; }
+.ug-admin-ops .text-\[\#18181b\] { color: #8A5A00 !important; }
 .ug-admin-ops .ring-\[\#F1F5FA\] { --tw-ring-color: #FFF7E0 !important; }
+
+/* An item opened from another screen ("Your Reports" on Home, a notification)
+   is scrolled to and outlined briefly so the eye lands on it */
+@keyframes ug-focus-ring { 0%, 60% { box-shadow: 0 0 0 3px rgba(153, 27, 27, 0.55); } 100% { box-shadow: 0 0 0 3px rgba(153, 27, 27, 0); } }
+.ug-focus-ring { animation: ug-focus-ring 2.2s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .ug-focus-ring { animation: none; box-shadow: 0 0 0 3px rgba(153, 27, 27, 0.55); }
+}

@@ -21,9 +21,11 @@ import {
   X,
   type LucideIcon,
   Settings,
+  Shield,
 } from 'lucide-react';
 import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
+import { SIDEBAR_OPS_TABS } from './SuperAdminPortal';
 
 // Phone navigation for the barangay and LDRRMO portals: four main sections in
 // a bottom bar, and everything else in the Menu at its far right, which opens
@@ -35,6 +37,8 @@ interface NavItem {
   icon: LucideIcon;
   /** shown to LDRRMO administrators only, as the server enforces */
   lguOnly?: boolean;
+  /** shown to barangay officials only */
+  barangayOnly?: boolean;
 }
 
 const BAR_TABS: NavItem[] = [
@@ -51,6 +55,7 @@ const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
       { id: 'sos_log', label: 'SOS Log', icon: ShieldAlert },
       { id: 'relief', label: 'Relief', icon: Package },
       { id: 'road_work', label: 'Road Work', icon: Construction },
+      { id: 'response_team', label: 'Response Team', icon: Shield, barangayOnly: true },
       { id: 'hotlines', label: 'Hotlines', icon: PhoneCall },
       { id: 'analytics', label: 'Analytics', icon: Layers },
       { id: 'reports', label: 'Reports & Documents', icon: FileText },
@@ -101,12 +106,22 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab, setAc
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const badges: Record<string, number> = {
+    // barangay: open incidents in the official's own barangay
+    incidents: isBarangay
+      ? data.reports.filter((r) => r.barangay_id === currentUser.barangay_id && r.status !== 'resolved' && r.status !== 'rejected').length
+      : 0,
     advisories: data.advisories.filter((a) => a.severity !== 'low').length,
     shelters: data.centers.filter((c) => c.status === 'open').length,
   };
   const menuGroups = MENU_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.lguOnly || isLgu),
+    items: group.items.filter(
+      (item) =>
+        (!item.lguOnly || isLgu) &&
+        (!item.barangayOnly || isBarangay) &&
+        // Super Admin in Operations: the Super Admin sidebar already links to these
+        !(onExitOps && SIDEBAR_OPS_TABS.includes(item.id))
+    ),
   })).filter((group) => group.items.length > 0);
   // Menu is the current slot for every section that is not in the bar itself
   const inMenuSection = !BAR_TABS.some((item) => isBarActive(item.id, activeTab));

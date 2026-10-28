@@ -3,7 +3,7 @@ import { AlertTriangle, Boxes, ClipboardList, Download, Edit3, PackageMinus, Plu
 import { Barangay, InventoryCategory, InventoryItem, User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
-import { download, toCSV } from '../lib/util';
+import { exportPdf, fileStamp } from '../lib/pdf';
 import { opsTone, shortWhen } from './opsTone';
 
 // Relief stock on hand (relief_inventory) and the goods handed out
@@ -127,20 +127,43 @@ export const ReliefStockPanel: React.FC<{ currentUser: User; barangays: Barangay
     }
   };
 
+  // both lists export as formatted PDFs, like every other export in the console
   const exportLog = () =>
-    download(
-      `uniguard-distribution-log-${new Date().toISOString().slice(0, 10)}.csv`,
-      toCSV(
-        distributionLog.map((d) => ({
-          when: d.distributed_at,
-          item: d.item_name,
-          quantity: d.qty,
-          barangay: d.barangay,
-          family_or_recipient: d.family,
-          recorded_by: d.distributed_by,
-        }))
-      )
-    );
+    exportPdf({
+      title: 'Relief Distribution Log',
+      meta: [`${distributionLog.length} ${distributionLog.length === 1 ? 'record' : 'records'}`],
+      filename: `uniguard-distribution-log-${fileStamp()}.pdf`,
+      landscape: true,
+      signer: currentUser.full_name,
+      sections: [
+        {
+          title: 'Goods handed out',
+          head: ['When', 'Item', 'Quantity', 'Barangay', 'Family / recipient', 'Recorded by'],
+          rows: distributionLog.map((d) => [
+            d.distributed_at ? new Date(d.distributed_at).toLocaleString() : '',
+            d.item_name,
+            d.qty,
+            d.barangay,
+            d.family,
+            d.distributed_by,
+          ]),
+        },
+      ],
+    });
+  const exportInventory = () =>
+    exportPdf({
+      title: 'Relief Inventory',
+      meta: [`${inventory.length} ${inventory.length === 1 ? 'item' : 'items'} · ${low.length} at or below reorder level`],
+      filename: `uniguard-inventory-${fileStamp()}.pdf`,
+      signer: currentUser.full_name,
+      sections: [
+        {
+          title: 'Stock on hand',
+          head: ['Item', 'Category', 'Stock', 'Reorder at', 'Location', 'Supplier'],
+          rows: inventory.map((i) => [i.name, i.category, `${i.stock} ${i.unit}`, `${i.reorder} ${i.unit}`, i.location, i.supplier]),
+        },
+      ],
+    });
 
   const totalUnits = inventory.reduce((n, i) => n + i.stock, 0);
 
@@ -166,10 +189,16 @@ export const ReliefStockPanel: React.FC<{ currentUser: User; barangays: Barangay
               <span>Add item</span>
             </button>
           )}
+          {view === 'stock' && inventory.length > 0 && (
+            <button onClick={exportInventory} className={t.ghost}>
+              <Download className="w-3.5 h-3.5" />
+              <span>Export PDF</span>
+            </button>
+          )}
           {view === 'log' && distributionLog.length > 0 && (
             <button onClick={exportLog} className={t.ghost}>
               <Download className="w-3.5 h-3.5" />
-              <span>Export CSV</span>
+              <span>Export PDF</span>
             </button>
           )}
         </div>

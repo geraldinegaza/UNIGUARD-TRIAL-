@@ -81,6 +81,9 @@ export interface Responder {
   name: string;
   unit: string;
   contact: string;
+  /** the barangay the responder belongs to (null: shared) */
+  barangay_id: string | null;
+  status: 'available' | 'on_duty' | 'off_duty';
 }
 
 export type AdvisoryType = 'emergency_alert' | 'preparedness';
@@ -117,6 +120,9 @@ export interface EvacuationCenter {
   facilities?: string[];
   contact_person?: string;
   contact_phone?: string;
+  /** flagged by the LGU or the barangay so the PNP sends a patrol */
+  needs_patrol?: boolean;
+  needs_patrol_at?: string | null;
 }
 
 export interface EmergencyHotline {
@@ -193,6 +199,9 @@ export interface ReliefDistribution {
   required_docs: string[];
   note: string;
   active: boolean;
+  /** a PNP escort the LGU or the barangay asked for (migration 155) */
+  escort_status: 'none' | 'requested' | 'confirmed';
+  escort_note: string;
 }
 
 export interface Beneficiary {
@@ -313,7 +322,30 @@ export interface QueuedReport {
 
 /* ------------------------------------------------------------- dispatch units */
 export type UnitType = 'BFP' | 'PNP' | 'Rescue' | 'Hospital';
-export type DispatchStage = 'sent' | 'acknowledged' | 'en_route' | 'on_scene' | 'done';
+// on_scene onwards depends on the team: BFP under_control -> fire_out, Rescue
+// on_hold (resume returns on scene), Ambulance transporting -> arrived_hospital
+export type DispatchStage =
+  | 'sent'
+  | 'acknowledged'
+  | 'en_route'
+  | 'on_scene'
+  | 'under_control'
+  | 'fire_out'
+  | 'on_hold'
+  | 'transporting'
+  | 'arrived_hospital'
+  | 'done'
+  | 'declined';
+export type DispatchAction = Exclude<DispatchStage, 'sent' | 'declined'> | 'resume';
+
+/** Live data the responding team keeps on a dispatch (update_dispatch_field_data) */
+export interface DispatchFieldData {
+  hospital_id?: string;
+  rescue_details?: { stranded_count: number; location: string; special_needs: string };
+  rescue_tally?: { rescued: number; injured: number; missing: number; destinations: { kind: string; ref_id: string; count: number }[] };
+  checklist_done?: string[];
+  evac_tally?: { people?: number }[];
+}
 
 export interface DispatchUnit {
   id: string;
@@ -343,6 +375,10 @@ export interface Dispatch {
   done_at: string | null;
   after_action: string;
   after_action_at: string | null;
+  after_action_meta: Record<string, unknown>;
+  decline_reason: string;
+  hold_reason: string;
+  field_data: DispatchFieldData;
   report: {
     code: string;
     hazard_type: string;
@@ -368,7 +404,9 @@ export interface UnitPersonnel {
 
 export interface UnitEquipment {
   id: string;
+  /** the custom label, or the catalog label it was added with ('' for an older catalog row) */
   label: string;
+  catalog_id: string | null;
   identifier: string;
   status: 'available' | 'deployed' | 'maintenance' | 'unavailable';
   condition: string;
@@ -509,4 +547,50 @@ export interface CaptainContact {
   barangay: string;
   captain_name: string;
   captain_phone: string;
+}
+
+/** "Need help" on a dispatch, answered by the LGU */
+export interface HelpRequest {
+  id: string;
+  dispatch_id: string;
+  kind: 'general' | 'water_tanker' | 'extra_personnel' | 'beyond_capacity';
+  message: string;
+  status: 'sent' | 'acknowledged' | 'resolved';
+  created_at: string;
+  /** who asked: a dispatch unit, or a barangay official for the Response Team */
+  unit_id?: string | null;
+  barangay_id?: string | null;
+  /** the dispatch it is about (the LGU inbox) */
+  team?: string;
+  report_code?: string;
+}
+
+/** An active hospital that is accepting patients (the ambulance and rescue picker) */
+export interface AcceptingHospital {
+  id: string;
+  name: string;
+  available: number | null;
+}
+
+export interface EquipmentCatalogItem {
+  id: string;
+  unit_type: string;
+  label: string;
+}
+
+/** PNP: a shelter flagged as needing a patrol */
+export interface PatrolShelter {
+  id: string;
+  name: string;
+  barangay: string;
+  needs_patrol_at: string | null;
+}
+
+/** PNP: a relief distribution with an escort requested or confirmed */
+export interface ReliefEscort {
+  id: string;
+  title: string;
+  barangay: string;
+  escort_status: 'requested' | 'confirmed';
+  escort_note: string;
 }

@@ -27,7 +27,9 @@ import {
   ChevronRight,
   X,
   Truck,
-  Settings
+  Settings,
+  Plus,
+  Map as MapIcon,
 } from 'lucide-react';
 import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
@@ -35,6 +37,7 @@ import { t } from '../lib/i18n';
 import * as repo from '../services/repo';
 import { relTime } from '../lib/util';
 import { TriadEmblem, UniGuardLockup, portalForRole } from '../brand';
+import { SIDEBAR_OPS_TABS } from './SuperAdminPortal';
 
 export interface DashboardSidebarProps {
   activeTab: string;
@@ -172,6 +175,13 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   const liveAdvisoryCount = data.advisories.filter((a) => a.severity !== 'low').length;
   const openShelterCount = data.centers.filter((c) => c.status === 'open').length;
   const isLgu = currentUser.role === 'lgu_admin';
+  // Super Admin in Operations: screens the Super Admin sidebar already links to are left out here
+  const inOps = (tab: string) => !!onExitOps && SIDEBAR_OPS_TABS.includes(tab);
+  // barangay: open incidents in the official's own barangay, as the home's Active Incidents card counts them
+  const openIncidentCount =
+    currentUser.role === 'barangay'
+      ? data.reports.filter((r) => r.barangay_id === currentUser.barangay_id && r.status !== 'resolved' && r.status !== 'rejected').length
+      : 0;
 
   // Close popups on outside click
   useEffect(() => {
@@ -201,7 +211,8 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Navigation Items exclusively for the Resident Portal: Home, Relief, Shelters, Hotlines
+  // Navigation Items for the Resident Portal, in the reference build's order.
+  // "Report a Hazard" opens the report form rather than a page.
   const residentNavItems = [
     {
       id: 'home',
@@ -211,10 +222,31 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       badge: null,
     },
     {
+      id: 'report',
+      label: 'Report a Hazard',
+      shortLabel: 'Report',
+      icon: Plus,
+      badge: null,
+    },
+    {
       id: 'relief',
       label: 'Relief',
       shortLabel: 'Relief',
       icon: HeartHandshake,
+      badge: null,
+    },
+    {
+      id: 'advisories',
+      label: 'Advisories',
+      shortLabel: 'Advisories',
+      icon: Megaphone,
+      badge: null,
+    },
+    {
+      id: 'hazard_map',
+      label: 'Hazard Map',
+      shortLabel: 'Map',
+      icon: MapIcon,
       badge: null,
     },
     {
@@ -232,6 +264,13 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       badge: null,
     },
     {
+      id: 'notifications',
+      label: 'Notifications',
+      shortLabel: 'Alerts',
+      icon: Bell,
+      badge: unreadCount ? String(unreadCount > 9 ? '9+' : unreadCount) : null,
+    },
+    {
       id: 'settings',
       label: 'Settings',
       shortLabel: 'Settings',
@@ -239,6 +278,12 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       badge: null,
     },
   ];
+  // a sidebar item opens its page, or the report form for "Report a Hazard"
+  const openResidentItem = (id: string) => {
+    if (id === 'report') onOpenReportModal?.();
+    else if (id === 'home') setActiveTab('overview');
+    else setActiveTab(id);
+  };
 
   // Navigation Items for Admin and Operations Staff (matching initial draft screenshot)
   const adminNavItems = [
@@ -254,7 +299,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       label: 'Incidents',
       shortLabel: 'Incidents',
       icon: AlertTriangle,
-      badge: null,
+      badge: openIncidentCount ? String(openIncidentCount) : null,
     },
     {
       id: 'advisories',
@@ -284,6 +329,18 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       icon: Construction,
       badge: null,
     },
+    // Barangay officials: their Response Team (dispatches, roster, equipment)
+    ...(currentUser.role === 'barangay'
+      ? [
+          {
+            id: 'response_team',
+            label: 'Response Team',
+            shortLabel: 'Team',
+            icon: Shield,
+            badge: null,
+          },
+        ]
+      : []),
     {
       id: 'sos_log',
       label: 'SOS Log',
@@ -354,7 +411,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     };
   }, [adminNavItems.length]);
 
-  const navItems = isResident ? residentNavItems : adminNavItems;
+  const navItems = isResident ? residentNavItems : adminNavItems.filter((item) => !inOps(item.id));
 
   // LDRRMO & Barangay Portal Top Navigation Bar (matching reference image style transfer)
   if (!isResident) {
@@ -417,7 +474,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             ref={navScrollRef}
             className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1"
           >
-            {adminNavItems.map((item) => {
+            {navItems.map((item) => {
               const isActive =
                 activeTab === item.id ||
                 (item.id === 'home' && (activeTab === 'overview' || activeTab === 'home')) ||
@@ -788,18 +845,20 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                 {/* Users and the Activity Log are Super Admin screens, in the Super Admin console */}
 
                 {/* Reports & documentation: situation reports, damage assessments, incident summaries */}
-                <button
-                  onClick={() => {
-                    setActiveTab('reports');
-                    setIsMenuOpen(false);
-                  }}
-                  className={`w-full px-3 py-2 text-left text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
-                    isBarangay ? 'text-[#011025] hover:bg-[#C2E8FF]/30' : 'text-neutral-700 hover:bg-neutral-100'
-                  }`}
-                >
-                  <FileText className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
-                  <span>Reports & Documents</span>
-                </button>
+                {!inOps('reports') && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('reports');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full px-3 py-2 text-left text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
+                      isBarangay ? 'text-[#011025] hover:bg-[#C2E8FF]/30' : 'text-neutral-700 hover:bg-neutral-100'
+                    }`}
+                  >
+                    <FileText className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
+                    <span>Reports & Documents</span>
+                  </button>
+                )}
 
                 {/* Offline Sync */}
                 <button
@@ -816,18 +875,20 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                 </button>
 
                 {/* Settings: alerts, language, offline, templates */}
-                <button
-                  onClick={() => {
-                    setActiveTab('settings');
-                    setIsMenuOpen(false);
-                  }}
-                  className={`w-full px-3 py-2 text-left text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
-                    isBarangay ? 'text-[#011025] hover:bg-[#C2E8FF]/30' : 'text-neutral-700 hover:bg-neutral-100'
-                  }`}
-                >
-                  <Settings className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
-                  <span>{t('Settings')}</span>
-                </button>
+                {!inOps('settings') && (
+                  <button
+                    onClick={() => {
+                      setActiveTab('settings');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full px-3 py-2 text-left text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
+                      isBarangay ? 'text-[#011025] hover:bg-[#C2E8FF]/30' : 'text-neutral-700 hover:bg-neutral-100'
+                    }`}
+                  >
+                    <Settings className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
+                    <span>{t('Settings')}</span>
+                  </button>
+                )}
 
                 {onSignOut && (
                   <div className={`pt-1 border-t mt-1 ${isBarangay ? 'border-[#7EA0C5]/20' : 'border-gray-100'}`}>
@@ -933,10 +994,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             return (
               <div key={item.id} className="relative group">
                 <button
-                  onClick={() => {
-                    if (item.id === 'home') setActiveTab('overview');
-                    else setActiveTab(item.id);
-                  }}
+                  onClick={() => openResidentItem(item.id)}
                   className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
                     isActive
                       ? 'bg-white text-[#991B1B] shadow-[0_4px_16px_rgba(0,0,0,0.15)] font-bold'
@@ -948,6 +1006,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   <Icon className={`w-5 h-5 shrink-0 transition-colors ${
                     isActive ? 'text-[#991B1B]' : 'text-rose-100'
                   }`} />
+                  {item.badge && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-white ring-2 ring-[#991B1B]" aria-hidden="true" />}
                 </button>
 
                 {/* Floating Tooltip in minimized mode */}
@@ -961,10 +1020,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           return (
             <button
               key={item.id}
-              onClick={() => {
-                if (item.id === 'home') setActiveTab('overview');
-                else setActiveTab(item.id);
-              }}
+              onClick={() => (isResident ? openResidentItem(item.id) : item.id === 'home' ? setActiveTab('overview') : setActiveTab(item.id))}
               className={`w-full rounded-2xl py-2.5 px-3.5 flex items-center justify-between text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer text-left ${
                 isActive
                   ? isResident

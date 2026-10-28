@@ -155,3 +155,22 @@ export function compressImage(file: File): Promise<Blob> {
     img.src = url;
   });
 }
+
+// The phone's share sheet when there is one, otherwise the clipboard.
+export async function shareOrCopy(title: string, text: string, url: string): Promise<'shared' | 'copied' | 'failed'> {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      await navigator.share({ title, text, url });
+      return 'shared';
+    }
+  } catch (e: any) {
+    // the person closed the share sheet: not a failure worth reporting
+    if (e?.name === 'AbortError') return 'shared';
+  }
+  try {
+    await navigator.clipboard.writeText([title, text, url].filter(Boolean).join('\n\n'));
+    return 'copied';
+  } catch {
+    return 'failed';
+  }
+}

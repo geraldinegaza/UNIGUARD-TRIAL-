@@ -41,8 +41,15 @@ import {
   HospitalCapacity,
   UnitType,
   DispatchEvent,
+  DispatchAction,
+  DispatchFieldData,
   PatientNotice,
   CaptainContact,
+  HelpRequest,
+  AcceptingHospital,
+  EquipmentCatalogItem,
+  PatrolShelter,
+  ReliefEscort,
   InventoryItem,
   DistributionLogEntry,
   DamageAssessment,
@@ -100,6 +107,16 @@ export interface RepoState {
   dispatchEvents: DispatchEvent[];
   patientNotices: PatientNotice[];
   captains: CaptainContact[];
+  helpRequests: HelpRequest[];
+  acceptingHospitals: AcceptingHospital[];
+  equipmentCatalog: EquipmentCatalogItem[];
+  patrolShelters: PatrolShelter[];
+  reliefEscorts: ReliefEscort[];
+  /** LGU: every Need Help message from a unit or a barangay official */
+  helpInbox: HelpRequest[];
+  // barangay official: the Response Team's dispatches and the barangay's equipment
+  teamDispatches: Dispatch[];
+  teamEquipment: UnitEquipment[];
   // Phase 3 operations data, loaded by the screens that use it
   inventory: InventoryItem[];
   distributionLog: DistributionLogEntry[];
@@ -167,6 +184,14 @@ let state: RepoState = {
   dispatchEvents: [],
   patientNotices: [],
   captains: [],
+  helpRequests: [],
+  acceptingHospitals: [],
+  equipmentCatalog: [],
+  patrolShelters: [],
+  reliefEscorts: [],
+  helpInbox: [],
+  teamDispatches: [],
+  teamEquipment: [],
   inventory: [],
   distributionLog: [],
   assessments: [],
@@ -332,6 +357,8 @@ function toCenter(c: Row): EvacuationCenter {
       : [],
     contact_person: c.contact_person || '',
     contact_phone: c.contact_phone || '',
+    needs_patrol: !!c.needs_patrol,
+    needs_patrol_at: c.needs_patrol_at || null,
   };
 }
 
@@ -384,6 +411,8 @@ const toRelief = (r: Row): ReliefDistribution => ({
   required_docs: jsonList(r.required_docs),
   note: r.note || '',
   active: r.active !== false,
+  escort_status: r.escort_status === 'requested' || r.escort_status === 'confirmed' ? r.escort_status : 'none',
+  escort_note: r.escort_note || '',
 });
 
 const toBeneficiary = (b: Row): Beneficiary => ({
@@ -601,6 +630,7 @@ let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 const REALTIME_TABLES = [
   'reports', 'advisories', 'notifications', 'evacuation_centers', 'emergency_hotlines', 'relief_distributions',
   'authorized_beneficiaries', 'preparedness_guides', 'faqs', 'road_work_posts', 'road_status', 'sos_log',
+  'dispatch_help_requests',
 ];
 
 function subscribeRealtime() {
@@ -614,6 +644,7 @@ function subscribeRealtime() {
         reloadTimer = setTimeout(() => {
           loadAll();
           if (table === 'sos_log' && state.user && state.user.role !== 'citizen') loadSos();
+          if (table === 'dispatch_help_requests' && (state.user?.role === 'lgu_admin' || state.user?.role === 'super_admin')) loadHelpInbox().catch(() => undefined);
         }, 400);
       });
     });
@@ -645,7 +676,8 @@ export function setUser(user: User | null) {
       reports: [], notifications: [], beneficiaries: [], sosLog: [], othersReview: [], users: [], audit: [], responders: [],
       changeRequests: [], units: [], unitMembers: [], unitRequests: [], myUnit: null, dispatches: [], personnel: [],
       equipment: [], capacity: null, dispatchEvents: [], patientNotices: [], captains: [], inventory: [], distributionLog: [], assessments: [], sitreps: [], overdue: [],
-      shelterTrend: [],
+      shelterTrend: [], helpRequests: [], acceptingHospitals: [], equipmentCatalog: [], patrolShelters: [], reliefEscorts: [], helpInbox: [],
+      teamDispatches: [], teamEquipment: [],
     });
   }
 }
@@ -728,8 +760,17 @@ export async function createReport(input: ReportInput): Promise<{ queued: boolea
   return { queued: false, code: row.code || null };
 }
 
-export async function corroborate(reportId: string, note = ''): Promise<{ corroborations: number; verified: boolean }> {
-  const { data, error } = await client().rpc('corroborate_report', { p_report_id: reportId, p_note: note });
+// With the resident's position the server checks they are within 500 m of the hazard
+export async function corroborate(
+  reportId: string,
+  note = '',
+  at?: { lat: number; lng: number } | null
+): Promise<{ corroborations: number; verified: boolean }> {
+  const { data, error } = await client().rpc('corroborate_report', {
+    p_report_id: reportId,
+    p_note: note,
+    ...(at ? { p_lat: at.lat, p_lng: at.lng } : {}),
+  });
   if (error) fail(error);
   await loadAll();
   return { corroborations: (data && data.corroborations) || 0, verified: !!(data && data.verified) };
@@ -770,7 +811,16 @@ export async function reportHistory(reportId: string): Promise<StatusHistoryEntr
 export async function loadResponders(): Promise<Responder[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.from('responders').select('*').order('name');
-  const responders = error ? [] : (data || []).map((r: Row) => ({ id: r.id, name: r.name, unit: r.unit || '', contact: r.contact || '' }));
+  const responders = error
+    ? []
+    : (data || []).map((r: Row) => ({
+        id: r.id,
+        name: r.name,
+        unit: r.unit || '',
+        contact: r.contact || '',
+        barangay_id: r.barangay_id || null,
+        status: r.status || 'available',
+      }));
   set({ responders });
   return responders;
 }
@@ -867,9 +917,20 @@ export function acknowledgeAlert(advisoryId: string) {
 /* ----------------------------------------------------------------- centres */
 export async function updateCenter(
   id: string,
-  updates: Partial<Pick<EvacuationCenter, 'status' | 'current_occupancy' | 'capacity' | 'facilities' | 'contact_person' | 'contact_phone' | 'notes'>>
+  updates: Partial<Pick<EvacuationCenter, 'status' | 'current_occupancy' | 'capacity' | 'facilities' | 'contact_person' | 'contact_phone' | 'notes' | 'needs_patrol' | 'latitude' | 'longitude'>>
 ): Promise<void> {
   const patch: Row = {};
+  // the map pin and Waze navigation (Edit Location)
+  if (updates.latitude !== undefined && updates.longitude !== undefined) {
+    patch.lat = updates.latitude;
+    patch.lng = updates.longitude;
+  }
+  if (updates.needs_patrol !== undefined) {
+    patch.needs_patrol = updates.needs_patrol;
+    // keep the time it was first flagged; clear it when the flag comes off
+    const current = state.centers.find((c) => c.id === id);
+    patch.needs_patrol_at = updates.needs_patrol ? (current?.needs_patrol && current.needs_patrol_at) || new Date().toISOString() : null;
+  }
   if (updates.facilities !== undefined) patch.facilities = updates.facilities;
   if (updates.contact_person !== undefined) patch.contact_person = updates.contact_person;
   if (updates.contact_phone !== undefined) patch.contact_phone = updates.contact_phone;
@@ -1224,6 +1285,24 @@ export async function submitSos(pos: { lat: number | null; lng: number | null; a
   if (error && isNetworkError(error)) return queue();
   if (error) fail(error);
   return { id: (data && data.id) || null, reach: data && typeof data.reach === 'number' ? data.reach : null, queued: false };
+}
+
+/** Officials (own barangay) and the LGU: acknowledge or resolve an SOS; the sender is notified and it is audited. */
+export async function updateSosStatus(sosId: string, status: 'acknowledged' | 'resolved'): Promise<void> {
+  await rpcOrFail('update_sos_status', { p_sos_id: sosId, p_status: status });
+  await loadSos();
+}
+
+// Sends an unexpected error to the client error log, at most once per message
+// a session, so the LGU can see what failed on residents' phones.
+const loggedErrors = new Set<string>();
+export function logClientError(message: string, context: Record<string, unknown> = {}): void {
+  const text = String(message || '').slice(0, 500);
+  if (!supabase || !state.user || !text || loggedErrors.has(text) || loggedErrors.size > 20) return;
+  loggedErrors.add(text);
+  supabase
+    .rpc('log_client_error', { p_message: text, p_context: { ...context, build: CONFIG.BUILD, path: location.hash || location.pathname } })
+    .then(() => undefined, () => undefined);
 }
 
 export async function loadSos(): Promise<void> {
@@ -1631,6 +1710,10 @@ const toDispatch = (d: Row): Dispatch => ({
   done_at: d.done_at || null,
   after_action: d.after_action || '',
   after_action_at: d.after_action_at || null,
+  after_action_meta: d.after_action_meta && typeof d.after_action_meta === 'object' ? d.after_action_meta : {},
+  decline_reason: d.decline_reason || '',
+  hold_reason: d.hold_reason || '',
+  field_data: d.field_data && typeof d.field_data === 'object' ? (d.field_data as DispatchFieldData) : {},
   report: d.report
     ? {
         code: d.report.code || '',
@@ -1644,6 +1727,30 @@ const toDispatch = (d: Row): Dispatch => ({
         created_at: d.report.created_at,
       }
     : null,
+});
+
+const toEquipment = (e: Row): UnitEquipment => ({
+  id: e.id,
+  label: e.custom_label || '',
+  catalog_id: e.catalog_id || null,
+  identifier: e.identifier || '',
+  status: e.status || 'available',
+  condition: e.condition || '',
+  last_checked_at: e.last_checked_at || null,
+  notes: e.notes || '',
+});
+
+const toHelpRequest = (h: Row): HelpRequest => ({
+  id: h.id,
+  dispatch_id: h.dispatch_id,
+  kind: h.kind || 'general',
+  message: h.message || '',
+  status: h.status || 'sent',
+  created_at: h.created_at,
+  unit_id: h.unit_id ?? null,
+  barangay_id: h.barangay_id ?? null,
+  team: h.report_dispatches?.team || '',
+  report_code: h.report_dispatches?.reports?.code || '',
 });
 
 const toRequest = (r: Row): UnitRequest => ({
@@ -1679,6 +1786,57 @@ export async function loadDispatchUnits(): Promise<void> {
   const members = await c.from('profiles').select('*').eq('role', 'dispatch_team').order('full_name');
   patch.unitMembers = members.error ? [] : (members.data || []).map((p: Row) => toUser(p));
   set(patch);
+  await loadHelpInbox().catch(() => undefined);
+}
+
+/** LGU: Need Help messages from units and barangay officials, and relief escorts in play. */
+export async function loadHelpInbox(): Promise<void> {
+  if (!supabase) return;
+  const c = supabase;
+  let help = await c
+    .from('dispatch_help_requests')
+    .select('*, report_dispatches(team, reports(code))')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  // an older schema without the relationship: the rows alone still help
+  if (help.error) help = await c.from('dispatch_help_requests').select('*').order('created_at', { ascending: false }).limit(100);
+  const escorts = await c
+    .from('relief_distributions')
+    .select('id, title, barangay, escort_status, escort_note')
+    .neq('escort_status', 'none')
+    .order('distribution_at', { ascending: false });
+  set({
+    helpInbox: help.error ? [] : (help.data || []).map(toHelpRequest),
+    reliefEscorts: escorts.error
+      ? []
+      : (escorts.data || []).map((r: Row) => ({
+          id: r.id,
+          title: r.title || '',
+          barangay: r.barangay || '',
+          escort_status: r.escort_status,
+          escort_note: r.escort_note || '',
+        })),
+  });
+}
+
+/** LGU: a help request moves forward only, sent → acknowledged → resolved; the requester is notified. */
+export async function updateHelpRequest(id: string, status: 'acknowledged' | 'resolved'): Promise<void> {
+  await rpcOrFail('update_help_request', { p_id: id, p_status: status });
+  await loadHelpInbox();
+}
+
+/** LGU, or the official of that barangay: the equipment of one unit (the per-unit Equipment window). */
+export async function loadUnitEquipment(unitId: string): Promise<UnitEquipment[]> {
+  const { data, error } = await client().from('dispatch_equipment').select('*').eq('owner_unit_id', unitId).order('created_at', { ascending: false });
+  if (error) fail(error);
+  return (data || []).map(toEquipment);
+}
+
+/** The equipment types a unit of this type can register. */
+export async function loadEquipmentCatalog(unitType: string): Promise<{ id: string; unit_type: string; label: string }[]> {
+  const { data, error } = await client().from('equipment_catalog').select('id, unit_type, label').eq('unit_type', unitType).order('label');
+  if (error) fail(error);
+  return (data || []).map((e: Row) => ({ id: e.id, unit_type: e.unit_type, label: e.label || '' }));
 }
 
 export async function createDispatchUnit(input: { name: string; unit_type: UnitType; contact_number: string; address: string }): Promise<void> {
@@ -1724,7 +1882,9 @@ export async function inviteUnitMember(unitId: string, email: string, unitRole: 
 
 export async function decideUnitRequest(id: string, decision: 'approved' | 'declined' | 'done', note = ''): Promise<void> {
   await rpcOrFail('decide_unit_request', { p_request_id: id, p_decision: decision, p_note: note });
-  await loadDispatchUnits();
+  // a unit admin closing their own approved request sees their unit's list
+  if (state.user?.dispatch_unit_id) await loadMyUnit();
+  else await loadDispatchUnits();
 }
 
 /** Officials and LGU send a team (and for BFP / PNP / Rescue, a unit) to a verified report. */
@@ -1776,17 +1936,7 @@ export async function loadMyUnit(): Promise<void> {
           on_duty: !!p.on_duty,
           shift_start: p.shift_start || null,
         })),
-    equipment: equipment.error
-      ? []
-      : (equipment.data || []).map((e: Row) => ({
-          id: e.id,
-          label: e.custom_label || 'Equipment',
-          identifier: e.identifier || '',
-          status: e.status || 'available',
-          condition: e.condition || '',
-          last_checked_at: e.last_checked_at || null,
-          notes: e.notes || '',
-        })),
+    equipment: equipment.error ? [] : (equipment.data || []).map(toEquipment),
     unitRequests: requests.error ? [] : (requests.data || []).map(toRequest),
     capacity: capacity.data
       ? {
@@ -1800,13 +1950,14 @@ export async function loadMyUnit(): Promise<void> {
   });
 }
 
-export async function respondToDispatch(dispatchId: string, action: 'acknowledged' | 'en_route' | 'on_scene' | 'done', note = ''): Promise<void> {
+export async function respondToDispatch(dispatchId: string, action: DispatchAction, note = ''): Promise<void> {
   await rpcOrFail('dispatch_respond', { p_dispatch_id: dispatchId, p_action: action, p_note: note });
   await loadMyUnit();
 }
 
-export async function submitAfterAction(dispatchId: string, text: string): Promise<void> {
-  await rpcOrFail('submit_after_action', { p_dispatch_id: dispatchId, p_text: text, p_meta: {} });
+/** The after-action report; meta holds the team's fields (the server checks which are allowed) */
+export async function submitAfterAction(dispatchId: string, text: string, meta: Record<string, unknown> = {}): Promise<void> {
+  await rpcOrFail('submit_after_action', { p_dispatch_id: dispatchId, p_text: text, p_meta: meta });
   await loadMyUnit();
 }
 
@@ -1824,13 +1975,48 @@ export async function addPersonnel(input: { name: string; role: string; phone: s
   await loadMyUnit();
 }
 
-export async function addEquipment(input: { label: string; identifier: string }): Promise<void> {
-  if (!state.user || !state.user.dispatch_unit_id) return;
-  const { error } = await client()
-    .from('dispatch_equipment')
-    .insert({ owner_unit_id: state.user.dispatch_unit_id, custom_label: input.label.trim(), identifier: input.identifier.trim() });
-  if (error) fail(error);
+/** Unit admin: a catalog type (or "Other" with a custom label) for their own unit */
+/** A unit admin adds to their own unit; the LGU passes `ownerUnitId` to add to any unit. */
+export async function addEquipment(
+  input: { catalogId: string | null; customLabel: string; identifier: string; condition: string; notes: string },
+  ownerUnitId?: string
+): Promise<void> {
+  const unitId = ownerUnitId || state.user?.dispatch_unit_id;
+  if (!unitId) return;
+  await rpcOrFail('add_equipment', {
+    p_owner_unit_id: unitId,
+    p_owner_barangay_id: null,
+    p_catalog_id: input.catalogId,
+    p_custom_label: input.catalogId ? '' : input.customLabel.trim(),
+    p_identifier: input.identifier.trim(),
+    p_condition: input.condition,
+    p_notes: input.notes.trim(),
+  });
   await loadMyUnit();
+}
+
+/** Unit admin or barangay official: the owner and type stay; customLabel null keeps the current label */
+export async function updateEquipment(equipmentId: string, input: { customLabel: string | null; identifier: string; condition: string; notes: string }): Promise<void> {
+  await rpcOrFail('update_equipment', {
+    p_equipment_id: equipmentId,
+    p_identifier: input.identifier.trim(),
+    p_custom_label: input.customLabel === null ? null : input.customLabel.trim(),
+    p_condition: input.condition,
+    p_notes: input.notes.trim(),
+  });
+  await reloadDispatchData();
+}
+
+/** Unit admin or barangay official: retire (stays listed as unavailable) or delete (only if never used on a dispatch) */
+export async function removeEquipment(equipmentId: string, retire: boolean): Promise<void> {
+  await rpcOrFail('remove_equipment', { p_equipment_id: equipmentId, p_retire: retire });
+  await reloadDispatchData();
+}
+
+// how many dispatches used this equipment, which decides between retire and delete
+export async function equipmentUseCount(equipmentId: string): Promise<number> {
+  const n = await rpcOrFail('equipment_use_count', { p_equipment_id: equipmentId });
+  return Number(n) || 0;
 }
 
 export async function setEquipmentStatus(equipmentId: string, status: UnitEquipment['status'], note = ''): Promise<void> {
@@ -2205,14 +2391,45 @@ export async function loadDispatchExtras(): Promise<void> {
   const c = supabase;
   const unitId = state.user.dispatch_unit_id;
   const ids = state.dispatches.map((d) => d.id);
-  const [events, notices, captains] = await Promise.all([
-    ids.length
-      ? c.from('report_dispatch_events').select('*').in('dispatch_id', ids).order('created_at', { ascending: false })
-      : Promise.resolve({ data: [], error: null } as { data: Row[]; error: null }),
+  const none = Promise.resolve({ data: [], error: null } as { data: Row[]; error: null });
+  const unitType = state.myUnit?.unit_type || '';
+  const isPnp = unitType === 'PNP';
+  const [events, notices, captains, help, hospitals, capacities, catalog, patrol, escorts] = await Promise.all([
+    ids.length ? c.from('report_dispatch_events').select('*').in('dispatch_id', ids).order('created_at', { ascending: false }) : none,
     c.from('patient_notices').select('*').eq('unit_id', unitId).order('created_at', { ascending: false }),
     c.from('barangays').select('name, captain_name, captain_phone').eq('active', true).order('name'),
+    c.from('dispatch_help_requests').select('*').eq('unit_id', unitId).order('created_at', { ascending: false }),
+    // the hospital picker: active hospitals whose capacity says accepting
+    c.from('dispatch_units').select('id, name').eq('unit_type', 'Hospital').eq('active', true).order('name'),
+    c.from('hospital_capacity').select('unit_id, available').eq('accepting', true),
+    unitType ? c.from('equipment_catalog').select('id, unit_type, label').eq('unit_type', unitType).order('label') : none,
+    // PNP only: shelters flagged for a patrol and relief escorts
+    isPnp ? c.from('evacuation_centers').select('id, name, barangay, needs_patrol_at').eq('needs_patrol', true).order('needs_patrol_at', { ascending: false }) : none,
+    isPnp ? c.from('relief_distributions').select('id, title, barangay, escort_status, escort_note').neq('escort_status', 'none').order('distribution_at', { ascending: false }) : none,
   ]);
+  const accepting = new Map<string, number | null>(
+    capacities.error ? [] : (capacities.data || []).map((h: Row) => [h.unit_id as string, h.available == null ? null : int(h.available)])
+  );
   set({
+    helpRequests: help.error ? [] : (help.data || []).map(toHelpRequest),
+    acceptingHospitals: hospitals.error
+      ? []
+      : (hospitals.data || [])
+          .filter((h: Row) => accepting.has(h.id))
+          .map((h: Row) => ({ id: h.id, name: h.name || 'Hospital', available: accepting.get(h.id) ?? null })),
+    equipmentCatalog: catalog.error ? [] : (catalog.data || []).map((e: Row) => ({ id: e.id, unit_type: e.unit_type, label: e.label || '' })),
+    patrolShelters: patrol.error
+      ? []
+      : (patrol.data || []).map((s: Row) => ({ id: s.id, name: s.name || '', barangay: s.barangay || '', needs_patrol_at: s.needs_patrol_at || null })),
+    reliefEscorts: escorts.error
+      ? []
+      : (escorts.data || []).map((r: Row) => ({
+          id: r.id,
+          title: r.title || '',
+          barangay: r.barangay || '',
+          escort_status: r.escort_status,
+          escort_note: r.escort_note || '',
+        })),
     dispatchEvents: events.error
       ? []
       : (events.data || []).map((e: Row) => ({
@@ -2242,9 +2459,145 @@ export async function loadDispatchExtras(): Promise<void> {
   });
 }
 
-export async function ackPatientNotice(noticeId: string): Promise<void> {
-  await rpcOrFail('ack_patient_notice', { p_notice_id: noticeId, p_status: 'acknowledged' });
+// A hospital acknowledges an incoming-patient notice, or marks it arrived or cancelled
+export async function ackPatientNotice(noticeId: string, status: 'acknowledged' | 'arrived' | 'cancelled' = 'acknowledged'): Promise<void> {
+  await rpcOrFail('ack_patient_notice', { p_notice_id: noticeId, p_status: status });
   await loadDispatchExtras();
+}
+
+// "Can't respond": the dispatcher and the LGU are told to pick another team
+export async function declineDispatch(dispatchId: string, reason: string): Promise<void> {
+  await rpcOrFail('decline_dispatch', { p_dispatch_id: dispatchId, p_reason: reason });
+  await reloadDispatchData();
+}
+
+// "Need help" on a dispatch; the LGU acknowledges and resolves it
+export async function requestDispatchHelp(dispatchId: string, kind: HelpRequest['kind'], message: string): Promise<void> {
+  await rpcOrFail('create_help_request', { p_dispatch_id: dispatchId, p_kind: kind, p_message: message });
+  await reloadDispatchData();
+}
+
+// Rescue details and tally, or the hospital an ambulance is taking the patient to
+export async function saveDispatchFieldData(dispatchId: string, patch: DispatchFieldData): Promise<void> {
+  await rpcOrFail('update_dispatch_field_data', { p_dispatch_id: dispatchId, p_patch: patch });
+  await loadMyUnit();
+}
+
+// Tell an accepting hospital that patients are coming
+export async function sendPatientNotice(hospitalId: string, reportId: string | null, patients: number, condition: string): Promise<void> {
+  await rpcOrFail('send_patient_notice', {
+    p_unit_id: hospitalId,
+    p_report_id: reportId,
+    p_patients: Math.max(1, Math.floor(patients) || 1),
+    p_condition: condition,
+    p_eta: null,
+  });
+}
+
+// PNP: a road closure from a dispatch goes on the Road Status list
+export async function postRoadClosure(
+  dispatchId: string,
+  input: { roadName: string; note: string; segmentFrom: string; segmentTo: string; estimatedReopen: string | null }
+): Promise<void> {
+  await rpcOrFail('post_road_closure', {
+    p_dispatch_id: dispatchId,
+    p_road_name: input.roadName,
+    p_note: input.note,
+    p_lat: null,
+    p_lng: null,
+    p_segment_from: input.segmentFrom,
+    p_segment_to: input.segmentTo,
+    p_estimated_reopen: input.estimatedReopen,
+  });
+}
+
+export async function reopenRoadClosure(dispatchId: string): Promise<void> {
+  await rpcOrFail('reopen_road_closure', { p_dispatch_id: dispatchId });
+}
+
+// PNP: confirm the escort the LGU or a barangay official asked for
+export async function confirmReliefEscort(distributionId: string): Promise<void> {
+  await rpcOrFail('confirm_relief_escort', { p_distribution_id: distributionId });
+  await loadDispatchExtras();
+}
+
+// LGU or the barangay official: ask the PNP to escort a relief distribution
+export async function requestReliefEscort(distributionId: string, note: string): Promise<void> {
+  await rpcOrFail('request_relief_escort', { p_distribution_id: distributionId, p_note: note });
+  await loadAll();
+}
+
+/* ============================= barangay official: the Response Team screen */
+// The barangay's Response Team dispatches (the server limits them to the
+// official's own barangay), their help requests, and the barangay's equipment
+export async function loadResponseTeam(): Promise<void> {
+  if (!supabase || !state.user || state.user.role !== 'barangay') return;
+  const c = supabase;
+  const none = Promise.resolve({ data: [], error: null } as { data: Row[]; error: null });
+  const brgy = state.user.barangay_uuid || null;
+  const [dispatches, equipment, catalog] = await Promise.all([
+    c
+      .from('report_dispatches')
+      .select('*, report:reports(*)')
+      .eq('team', 'Barangay Response Team')
+      .order('dispatched_at', { ascending: false })
+      .limit(60),
+    brgy ? c.from('dispatch_equipment').select('*').eq('owner_barangay_id', brgy).order('created_at', { ascending: false }) : none,
+    c.from('equipment_catalog').select('id, unit_type, label').eq('unit_type', 'Barangay').order('label'),
+  ]);
+  if (dispatches.error) fail(dispatches.error);
+  const teamDispatches = (dispatches.data || []).map(toDispatch);
+  const ids = teamDispatches.map((d) => d.id);
+  const help = ids.length
+    ? await c.from('dispatch_help_requests').select('*').in('dispatch_id', ids).order('created_at', { ascending: false })
+    : { data: [], error: null };
+  set({
+    teamDispatches,
+    teamEquipment: equipment.error ? [] : (equipment.data || []).map(toEquipment),
+    equipmentCatalog: catalog.error ? [] : (catalog.data || []).map((e: Row) => ({ id: e.id, unit_type: e.unit_type, label: e.label || '' })),
+    helpRequests: help.error ? [] : (help.data || []).map(toHelpRequest),
+  });
+}
+
+// after a dispatch or equipment change: the dispatch console's data, or the Response Team's
+async function reloadDispatchData(): Promise<void> {
+  if (state.user?.dispatch_unit_id) {
+    await loadMyUnit();
+    await loadDispatchExtras();
+  } else {
+    await loadResponseTeam();
+  }
+}
+
+// Barangay official: equipment owned by the barangay (a Barangay catalog type, or Other)
+export async function addBarangayEquipment(input: { catalogId: string | null; customLabel: string; identifier: string; condition: string; notes: string }): Promise<void> {
+  const brgy = state.user?.barangay_uuid;
+  if (!brgy) throw new Error('Your account is not linked to a barangay.');
+  await rpcOrFail('add_equipment', {
+    p_owner_unit_id: null,
+    p_owner_barangay_id: brgy,
+    p_catalog_id: input.catalogId,
+    p_custom_label: input.catalogId ? '' : input.customLabel.trim(),
+    p_identifier: input.identifier.trim(),
+    p_condition: input.condition,
+    p_notes: input.notes.trim(),
+  });
+  await loadResponseTeam();
+}
+
+// Barangay official: a responder goes off duty or is available again
+export async function setResponderStatus(responderId: string, status: 'available' | 'off_duty'): Promise<void> {
+  const { data, error } = await client().from('responders').update({ status }).eq('id', responderId).select('id');
+  if (error) fail(error);
+  // row security filters silently: nothing changed means it is not this barangay's responder
+  if (!data || !data.length) throw new Error('You can only update your own barangay’s responders.');
+  await loadResponders();
+}
+
+// Barangay official: assign one of the barangay's responders to a Response Team dispatch's incident
+export async function assignTeamResponder(reportId: string, responderId: string): Promise<void> {
+  await rpcOrFail('assign_responder', { p_report_id: reportId, p_responder_id: responderId });
+  await Promise.all([loadResponders(), loadAll()]);
 }
 
 // Clock in (on duty from now) or out

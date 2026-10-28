@@ -29,6 +29,8 @@ import { relTime, syncLabel } from '../lib/util';
 
 interface ResidentNotificationsViewProps {
   onNavigateTab?: (tab: string) => void;
+  /** opens the advisory, report or relief schedule a notification is about */
+  onOpenItem?: (tab: string, id?: string | null) => void;
 }
 
 
@@ -44,12 +46,14 @@ interface NotificationItem {
   category: 'critical' | 'alert' | 'advisory' | 'info';
   location?: string;
   actionTab?: string;
+  actionId?: string | null;
   actionLabel?: string;
   isRead?: boolean;
 }
 
 export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps> = ({
   onNavigateTab,
+  onOpenItem,
 }) => {
   const { notifications, lastSync } = useRepo();
 
@@ -74,13 +78,13 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
     } as const;
     const l = look[n.tone] || look.advisory;
     const link = n.advisory_id
-      ? { agency: 'Advisory', actionTab: 'advisories', actionLabel: 'Full Advisory Details' }
+      ? { agency: 'Advisory', actionTab: 'advisories', actionId: n.advisory_id, actionLabel: 'Full Advisory Details' }
       : n.relief_id
-      ? { agency: 'Relief', actionTab: 'relief', actionLabel: 'View Relief Schedule' }
+      ? { agency: 'Relief', actionTab: 'relief', actionId: n.relief_id, actionLabel: 'View Relief Schedule' }
       : n.report_id
-      ? { agency: 'Report update', actionTab: 'overview', actionLabel: 'View Your Reports' }
+      ? { agency: 'Report update', actionTab: 'my_reports', actionId: n.report_id, actionLabel: 'View Your Report' }
       : n.road_work_id
-      ? { agency: 'Road work' }
+      ? { agency: 'Road work', actionTab: 'hazard_map', actionLabel: 'View Road Status' }
       : { agency: 'UniGuard' };
     return {
       id: n.id,
@@ -274,6 +278,15 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-3 pt-1 flex-wrap">
+            {latestItem.actionTab && onOpenItem && (
+              <button
+                onClick={() => onOpenItem(latestItem.actionTab!, latestItem.actionId)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white text-red-900 hover:bg-red-50 text-xs sm:text-sm font-bold transition-all shadow-md cursor-pointer active:scale-95"
+              >
+                <span>{t(latestItem.actionLabel || 'View details')}</span>
+                <ChevronRight className="w-4 h-4 text-red-900" />
+              </button>
+            )}
             {onNavigateTab && (
               <button
                 onClick={() => onNavigateTab('shelters')}
@@ -482,15 +495,16 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
 
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div className="flex items-center gap-2">
-                          {alert.actionTab && onNavigateTab && (
+                          {alert.actionTab && (onOpenItem || onNavigateTab) && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onNavigateTab(alert.actionTab!);
+                                if (onOpenItem) onOpenItem(alert.actionTab!, alert.actionId);
+                                else onNavigateTab?.(alert.actionTab!);
                               }}
                               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
                             >
-                              <span>{alert.actionLabel || 'View Related Section'}</span>
+                              <span>{t(alert.actionLabel || 'View Related Section')}</span>
                               <ChevronRight className="w-3.5 h-3.5" />
                             </button>
                           )}

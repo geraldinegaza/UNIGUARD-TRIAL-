@@ -28,7 +28,8 @@ import { LdrrmcHotlinesView } from './components/LdrrmcHotlinesView';
 import { LdrrmcAnalyticsView } from './components/LdrrmcAnalyticsView';
 import { LdrrmcReportsView } from './components/LdrrmcReportsView';
 import { SettingsView } from './components/SettingsView';
-import { LINK_RETURN, cleanLinkFromUrl } from './lib/emailLink';
+import { LINK_RETURN, ARRIVED_BY_INVITE, cleanLinkFromUrl, clearInvitePending } from './lib/emailLink';
+import { OnboardingScreen } from './components/OnboardingScreen';
 import { MapFocus } from './lib/mapFocus';
 import { t, useT } from './lib/i18n';
 import { LdrrmcOthersReviewView } from './components/LdrrmcOthersReviewView';
@@ -36,6 +37,9 @@ import { ResidentNotificationsView } from './components/ResidentNotificationsVie
 import { LdrrmcNotificationsView } from './components/LdrrmcNotificationsView';
 import { ResidentHomeDraftView } from './components/ResidentHomeDraftView';
 import { DispatchPortal } from './components/DispatchPortal';
+import { ResponseTeamView } from './components/ResponseTeamView';
+import { ResidentHazardMapView } from './components/ResidentHazardMapView';
+import { ResidentMyReportsView } from './components/ResidentMyReportsView';
 import { SuperAdminPortal } from './components/SuperAdminPortal';
 import { DispatchUnitsView } from './components/DispatchUnitsView';
 import { StaffBottomNav } from './components/StaffMobileNav';
@@ -83,6 +87,8 @@ export default function App() {
   );
   const [authReady, setAuthReady] = useState<boolean>(false);
   const [recovery, setRecovery] = useState<boolean>(false);
+  // an invited staff account sets its password and name before the console opens
+  const [inviteFinished, setInviteFinished] = useState<boolean>(false);
   const isAuthenticated = !!currentUser && !recovery;
   // Which Triad Shield look this session gets; the status bar follows it
   const portal = portalForRole(isAuthenticated ? data.user?.role : null);
@@ -210,6 +216,10 @@ export default function App() {
   // the bottom bar's SOS button toggles the SOS panel that lives in the header
   const [sosToggleSignal, setSosToggleSignal] = useState<number>(0);
   const [slide, setSlide] = useState<{ tab: string; from: 'left' | 'right' } | null>(null);
+  // Opening one item from another screen: a report from Home, a shelter from a
+  // notification, a hazard on the map. The page it lives on scrolls to it and
+  // outlines it; `key` lets the same item be opened again.
+  const [residentFocus, setResidentFocus] = useState<{ tab: string; id: string; key: number } | null>(null);
   const changeResidentTab = (tab: string) => {
     const from = residentTabIndex(activeTab);
     const to = residentTabIndex(tab);
@@ -217,8 +227,16 @@ export default function App() {
     setSlide(sliding ? { tab, from: to > from ? 'right' : 'left' } : null);
     if (sliding && contentRef.current) contentRef.current.scrollTop = 0;
     setActiveTab(tab);
+    setResidentFocus(null); // plain navigation; openResidentItem sets one after this
     if (tab === 'overview') setTopView('Overview');
   };
+  const openResidentItem = (tab: string, id?: string | null) => {
+    if (tab === 'advisories' && id) setSelectedAdvisoryId(id);
+    changeResidentTab(tab);
+    if (id) setResidentFocus({ tab, id, key: Date.now() });
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  };
+  const focusFor = (tab: string) => (residentFocus?.tab === tab ? residentFocus : null);
   // the content area only exists once the start-up screen is gone
   useResidentSwipeTabs(contentRef, authReady && isAuthenticated && currentUser?.role === 'citizen', activeTab, changeResidentTab);
 
@@ -278,6 +296,23 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
         recovery={recovery}
         onRecoveryDone={() => setRecovery(false)}
+      />
+    );
+  }
+
+  if (auth.needsOnboarding(currentUser, ARRIVED_BY_INVITE && !inviteFinished)) {
+    return (
+      <OnboardingScreen
+        user={currentUser}
+        passwordRequired={ARRIVED_BY_INVITE && !inviteFinished}
+        onDone={() => {
+          clearInvitePending();
+          setInviteFinished(true);
+        }}
+        onSignOut={() => {
+          clearInvitePending();
+          handleSignOut();
+        }}
       />
     );
   }
@@ -471,6 +506,7 @@ export default function App() {
                     onSelectIncidentForMap={(rep) => setSelectedIncidentForMap(rep)}
                     selectedIncidentForMap={selectedIncidentForMap}
                     setActiveTab={setActiveTab}
+                    onOpenItem={openResidentItem}
                     isOnline={isOnline}
                   />
                 ) : currentUser.role === 'barangay' ? (
@@ -486,6 +522,10 @@ export default function App() {
                     onNavigateView={(view) => setTopView(view)}
                     focus={mapFocus}
                     onDataChanged={refreshData}
+                    onDispatchReport={(reportId) => {
+                      setPendingDispatchId(reportId);
+                      setActiveTab('incidents');
+                    }}
                   />
                 ) : (
                   <>
@@ -547,6 +587,19 @@ export default function App() {
               </div>
             )}
 
+            {/* Residents: the hazard map and every report they filed (reference build) */}
+            {activeTab === 'hazard_map' && currentUser.role === 'citizen' && (
+              <ResidentHazardMapView currentUser={currentUser} focus={focusFor('hazard_map')} onOpenItem={openResidentItem} />
+            )}
+            {activeTab === 'my_reports' && currentUser.role === 'citizen' && (
+              <ResidentMyReportsView
+                reports={reports}
+                onOpenReportModal={() => setIsReportModalOpen(true)}
+                focus={focusFor('my_reports')}
+                onShowOnMap={(id) => openResidentItem('hazard_map', `report:${id}`)}
+              />
+            )}
+
             {/* View 4: Evacuation Centers */}
             {activeTab === 'shelters' && (
               <div className="animate-in fade-in duration-200">
@@ -555,9 +608,10 @@ export default function App() {
                   currentUser={currentUser}
                   barangays={barangays}
                   isOnline={isOnline}
+                  focus={currentUser.role === 'citizen' ? focusFor('shelters') : null}
                   onSelectOnMap={
                     currentUser.role === 'citizen'
-                      ? undefined
+                      ? (center) => openResidentItem('hazard_map', `shelter:${center.id}`)
                       : (center) => showOnMap(center.has_location ? center.latitude : null, center.has_location ? center.longitude : null, center.name)
                   }
                 />
@@ -589,6 +643,7 @@ export default function App() {
               currentUser.role === 'citizen' ? (
                 <ResidentNotificationsView
                   onNavigateTab={(tab) => setActiveTab(tab)}
+                  onOpenItem={openResidentItem}
                 />
               ) : (
                 <LdrrmcNotificationsView
@@ -601,7 +656,7 @@ export default function App() {
             {/* View: Relief Goods & Distribution */}
             {activeTab === 'relief' && (
               currentUser.role === 'citizen' ? (
-                <ResidentReliefView barangays={barangays} currentUser={currentUser} />
+                <ResidentReliefView barangays={barangays} currentUser={currentUser} focus={focusFor('relief')} />
               ) : (
                 <LdrrmcReliefView barangays={barangays} currentUser={currentUser} />
               )
@@ -675,6 +730,17 @@ export default function App() {
             )}
 
             {/* View 10: Road Work & Infrastructure Obstructions */}
+            {activeTab === 'response_team' && currentUser.role === 'barangay' && (
+              <ResponseTeamView
+                currentUser={currentUser}
+                onNavigateTab={(tab) => setActiveTab(tab)}
+                onRedispatch={(reportId) => {
+                  setPendingDispatchId(reportId);
+                  setActiveTab('incidents');
+                }}
+              />
+            )}
+
             {activeTab === 'road_work' && (
               <LdrrmcRoadWorkView
                 barangays={barangays}

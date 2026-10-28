@@ -132,6 +132,36 @@ export async function updatePassword(newPassword: string): Promise<void> {
   if (error) throw new Error(authError(error.message, error.status));
 }
 
+// An invited staff account still has to set its password and real name. The
+// invitation names the account after its email address when no name was
+// given, so a staff account still named that way has not been completed.
+export function needsOnboarding(user: User | null, arrivedByInvite: boolean): boolean {
+  if (!user || user.role === 'citizen') return false;
+  if (arrivedByInvite) return true;
+  const prefix = (user.email || '').split('@')[0].toLowerCase();
+  const name = (user.full_name || '').trim().toLowerCase();
+  return !name || name === prefix;
+}
+
+// Sets the password (when one is typed), the name and the phone on the
+// person's own profile. Role, barangay and unit stay as the Super Admin set them.
+export async function completeOnboarding(input: { password: string; fullName: string; phone: string }): Promise<User> {
+  if (!supabase) throw new Error(NOT_CONFIGURED);
+  if (input.password) {
+    const { error } = await supabase.auth.updateUser({ password: input.password });
+    if (error) throw new Error(authError(error.message, error.status));
+  }
+  const { data: session } = await supabase.auth.getUser();
+  const me = session.user;
+  if (!me) throw new Error('Your invitation session has ended. Open the invitation email again.');
+  const { error } = await supabase
+    .from('profiles')
+    .update({ full_name: input.fullName.trim(), phone: input.phone.trim(), updated_at: new Date().toISOString() })
+    .eq('id', me.id);
+  if (error) throw new Error(friendlyError(error));
+  return apply(await loadProfile(me.id, me.email));
+}
+
 // Restores a persisted session. `onRecovery` fires when the app was opened
 // from a password recovery link, so the reset form can be shown.
 export async function restore(onRecovery: () => void): Promise<User | null> {

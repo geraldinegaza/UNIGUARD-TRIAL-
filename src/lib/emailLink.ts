@@ -28,3 +28,24 @@ export function cleanLinkFromUrl() {
     history.replaceState(null, '', location.pathname);
   } catch {}
 }
+
+// An invited official, LGU or dispatch account arrives from its invitation
+// email with no password yet. Remembered for this browser tab, so a reload
+// before they finish still shows the Complete Your Account screen.
+const INVITE_KEY = 'uniguard.invite-pending';
+function readInvite(): boolean {
+  if (typeof location === 'undefined') return false;
+  const params = new URLSearchParams(`${location.search.slice(1)}&${location.hash.replace(/^#/, '')}`);
+  try {
+    if (params.get('type') === 'invite' && !params.get('error')) sessionStorage.setItem(INVITE_KEY, '1');
+    return sessionStorage.getItem(INVITE_KEY) === '1';
+  } catch {
+    return params.get('type') === 'invite';
+  }
+}
+export const ARRIVED_BY_INVITE: boolean = readInvite();
+export function clearInvitePending() {
+  try {
+    sessionStorage.removeItem(INVITE_KEY);
+  } catch {}
+}

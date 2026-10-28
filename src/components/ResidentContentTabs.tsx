@@ -34,6 +34,8 @@ import { exportGuidesPdf } from '../lib/pdf';
 import { useRepo } from '../hooks/useRepo';
 import { GUIDE_HAZARDS } from '../lib/hazards';
 import { telHref } from '../lib/util';
+import { hasCoords, wazeUrl } from '../lib/geo';
+import { ItemFocus, useFocusItem } from '../hooks/useFocusItem';
 
 interface ReliefDistributionHub {
   id: string;
@@ -42,6 +44,10 @@ interface ReliefDistributionHub {
   schedule: string;
   status: 'Distributing Now' | 'Scheduled' | 'Completed';
   contactPerson: string;
+  contactPhone: string;
+  address: string;
+  lat: number | null;
+  lng: number | null;
   eligibility: string[];
   requiredDocs: string[];
   note: string;
@@ -63,9 +69,98 @@ const scheduleStatus = (iso: string | null): ReliefDistributionHub['status'] => 
   return day.getTime() > today.getTime() ? 'Scheduled' : 'Completed';
 };
 
-export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: UserType }> = ({
+// One distribution: where and when, who qualifies, what to bring, and a way to
+// get there or call the desk.
+const ReliefHubCard: React.FC<{ hub: ReliefDistributionHub; id?: string }> = ({ hub, id }) => (
+  <div id={id} className="bg-white rounded-3xl border border-neutral-100 p-6 shadow-sm hover:shadow-lg transition-all flex flex-col justify-between space-y-4">
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="text-xs font-black uppercase text-red-900 tracking-wider">Brgy. {hub.barangay}</span>
+          <h4 className="text-sm sm:text-base font-extrabold text-neutral-900 mt-1 break-words">{hub.location}</h4>
+        </div>
+        <span
+          className={`text-[10px] font-black uppercase px-3 py-1 rounded-full shrink-0 shadow-xs ${
+            hub.status === 'Distributing Now' ? 'bg-red-900 text-white' : 'bg-neutral-900 text-white'
+          }`}
+        >
+          {hub.status}
+        </span>
+      </div>
+
+      <div className="space-y-2 text-xs text-neutral-600">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-neutral-400 shrink-0" />
+          <span>{hub.schedule}</span>
+        </div>
+        {hub.contactPerson && (
+          <div className="flex items-center gap-2">
+            <Phone className="w-4 h-4 text-neutral-400 shrink-0" />
+            <span className="font-semibold text-neutral-800">{hub.contactPerson}</span>
+          </div>
+        )}
+      </div>
+
+      {hub.eligibility.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-wider text-neutral-400">{t("Eligibility")}</p>
+          <ul className="text-xs text-neutral-700 space-y-0.5">
+            {hub.eligibility.map((e) => (
+              <li key={e} className="flex items-start gap-1.5">
+                <Check className="w-3.5 h-3.5 text-red-900 shrink-0 mt-px" />
+                <span>{e}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {hub.requiredDocs.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-wider text-neutral-400">{t("Bring these documents")}</p>
+          <ul className="text-xs text-neutral-700 space-y-0.5">
+            {hub.requiredDocs.map((d) => (
+              <li key={d} className="flex items-start gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-red-900 shrink-0 mt-px" />
+                <span>{d}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {hub.note && <p className="text-xs text-neutral-600 leading-relaxed">{hub.note}</p>}
+    </div>
+
+    <div className="pt-3 border-t border-neutral-100 flex items-center gap-2 text-xs">
+      {hasCoords(hub.lat, hub.lng) ? (
+        <a
+          href={wazeUrl(hub.lat as number, hub.lng as number)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-900 hover:bg-red-950 text-white font-bold transition-all active:scale-95"
+        >
+          <MapPin className="w-3.5 h-3.5" />
+          <span>{t("Navigate")}</span>
+        </a>
+      ) : (
+        <span className="flex-1 text-neutral-400">{t("No coordinates on file for this distribution.")}</span>
+      )}
+      {hub.contactPhone && (
+        <a
+          href={telHref(hub.contactPhone)}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 text-red-900 hover:bg-red-900 hover:text-white border border-red-900/20 font-bold transition-all active:scale-95 shrink-0"
+        >
+          <Phone className="w-3.5 h-3.5" />
+          <span>{t("Call")}</span>
+        </a>
+      )}
+    </div>
+  </div>
+);
+
+export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: UserType; focus?: ItemFocus }> = ({
   barangays,
   currentUser,
+  focus,
 }) => {
   const { relief } = useRepo();
 
@@ -115,12 +210,28 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
           schedule: formatSchedule(r.distribution_at),
           status: scheduleStatus(r.distribution_at),
           contactPerson: [r.contact_person, r.contact_phone].filter(Boolean).join(' - '),
+          contactPhone: r.contact_phone,
+          address: r.address,
+          lat: r.lat,
+          lng: r.lng,
           eligibility: r.eligibility,
           requiredDocs: r.required_docs,
           note: r.note,
         })),
     [relief]
   );
+
+  // opened on one distribution (a map popup or a notification): show its
+  // barangay, expand the schedules and bring the card into view
+  useEffect(() => {
+    if (!focus) return;
+    const hub = activeHubs.find((h) => h.id === focus.id);
+    if (!hub) return;
+    setSelectedBarangay(barangays.some((b) => b.name.toLowerCase() === hub.barangay.toLowerCase()) ? hub.barangay : 'All');
+    setIsScheduleMinimized(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.key, activeHubs.length]);
+  useFocusItem(focus ? `relief-${focus.id}` : null, `${focus?.key}-${activeHubs.length}`);
 
   // Filter distribution hubs by selected barangay
   const filteredHubs = useMemo(() => {
@@ -411,49 +522,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
             ) : (
               /* Active Distribution Cards Grid */
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {filteredHubs.map((hub) => (
-                  <div
-                    key={hub.id}
-                    className="bg-white rounded-3xl border border-neutral-100 p-6 shadow-sm hover:shadow-lg transition-all flex flex-col justify-between space-y-4"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span className="text-xs font-black uppercase text-red-900 tracking-wider">
-                            Brgy. {hub.barangay}
-                          </span>
-                          <h4 className="text-sm sm:text-base font-extrabold text-neutral-900 mt-1">{hub.location}</h4>
-                        </div>
-
-                        <span
-                          className={`text-[10px] font-black uppercase px-3 py-1 rounded-full shrink-0 shadow-xs ${
-                            hub.status === 'Distributing Now'
-                              ? 'bg-red-900 text-white'
-                              : 'bg-neutral-900 text-white'
-                          }`}
-                        >
-                          {hub.status}
-                        </span>
-                      </div>
-
-                      <div className="space-y-2 text-xs text-neutral-600">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-neutral-400 shrink-0" />
-                          <span>{hub.schedule}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-neutral-400 shrink-0" />
-                          <span className="font-semibold text-neutral-800">{hub.contactPerson}</span>
-                        </div>
-                      </div>
-
-                    </div>
-
-                    <div className="pt-3 border-t border-neutral-100 flex items-center justify-between text-xs">
-                      <span className="text-neutral-400 text-xs">{t("Free Government Aid")}</span>
-                    </div>
-                  </div>
-                ))}
+                {filteredHubs.map((hub) => <ReliefHubCard key={hub.id} id={`relief-${hub.id}`} hub={hub} />)}
               </div>
             )}
           </div>
@@ -505,48 +574,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
             {/* Modal Content */}
             <div className="p-6 overflow-y-auto space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {activeHubs.map((hub) => (
-                  <div
-                    key={hub.id}
-                    className="bg-white rounded-3xl border border-neutral-100 p-6 shadow-sm flex flex-col justify-between space-y-4"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span className="text-xs font-black uppercase text-red-900 tracking-wider">
-                            Brgy. {hub.barangay}
-                          </span>
-                          <h4 className="text-sm sm:text-base font-extrabold text-neutral-900 mt-1">{hub.location}</h4>
-                        </div>
-                        <span
-                          className={`text-[10px] font-black uppercase px-3 py-1 rounded-full shrink-0 shadow-xs ${
-                            hub.status === 'Distributing Now'
-                              ? 'bg-red-900 text-white'
-                              : 'bg-neutral-900 text-white'
-                          }`}
-                        >
-                          {hub.status}
-                        </span>
-                      </div>
-
-                      <div className="space-y-2 text-xs text-neutral-600">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-neutral-400 shrink-0" />
-                          <span>{hub.schedule}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-neutral-400 shrink-0" />
-                          <span className="font-semibold text-neutral-800">{hub.contactPerson}</span>
-                        </div>
-                      </div>
-
-                    </div>
-
-                    <div className="pt-3 border-t border-neutral-100 flex items-center justify-between text-xs">
-                      <span className="text-neutral-400 text-xs">{t("Free Government Aid")}</span>
-                    </div>
-                  </div>
-                ))}
+                {activeHubs.map((hub) => <ReliefHubCard key={hub.id} hub={hub} />)}
               </div>
             </div>
 

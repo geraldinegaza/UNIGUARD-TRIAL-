@@ -1,6 +1,7 @@
 import { t } from '../lib/i18n';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRepo } from '../hooks/useRepo';
+import { ItemFocus, useFocusItem } from '../hooks/useFocusItem';
 import { telHref } from '../lib/util';
 import {
   EvacuationCenter,
@@ -9,7 +10,7 @@ import {
   EvacuationStatus
 } from '../types';
 import * as repo from '../services/repo';
-import { canNavigate, classifyCoords, coordMessage, fmtCoords, wazeUrl } from '../lib/geo';
+import { canNavigate, classifyCoords, coordMessage, fmtCoords, locate, wazeUrl } from '../lib/geo';
 import {
   Building2,
   Users,
@@ -46,6 +47,8 @@ interface EvacuationDirectoryProps {
   barangays: Barangay[];
   isOnline: boolean;
   onSelectOnMap?: (center: EvacuationCenter) => void;
+  /** opened on one shelter (residents), e.g. from Home or a map popup */
+  focus?: ItemFocus;
 }
 
 export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
@@ -54,6 +57,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
   barangays,
   isOnline,
   onSelectOnMap,
+  focus,
 }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'full' | 'closed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,6 +72,12 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
   const [editOtherFacilities, setEditOtherFacilities] = useState('');
   const [editContactPerson, setEditContactPerson] = useState('');
   const [editContactPhone, setEditContactPhone] = useState('');
+  const [editNeedsPatrol, setEditNeedsPatrol] = useState(false);
+  // Edit Location: the pin residents navigate to
+  const [editLat, setEditLat] = useState('');
+  const [editLng, setEditLng] = useState('');
+  const [locating, setLocating] = useState(false);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
   const { shelterTrend } = useRepo();
   const staffView = currentUser?.role !== 'citizen';
   useEffect(() => {
@@ -135,20 +145,56 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
     setEditOtherFacilities(facilities.filter((f) => !FACILITY_PRESETS.includes(f)).join(', '));
     setEditContactPerson(center.contact_person || '');
     setEditContactPhone(center.contact_phone || '');
+    setEditNeedsPatrol(!!center.needs_patrol);
+    setEditLat(center.has_location ? String(center.latitude) : '');
+    setEditLng(center.has_location ? String(center.longitude) : '');
+    setLocationNote(center.has_location ? null : 'No location yet. Residents cannot navigate here until one is set.');
+  };
+
+  const useMyLocation = async () => {
+    setLocating(true);
+    setLocationNote(null);
+    try {
+      const pos = await locate();
+      setEditLat(String(pos.lat));
+      setEditLng(String(pos.lng));
+      setLocationNote(`Your position, accurate to about ${pos.accuracy} m. Stand at the shelter entrance for the best pin.`);
+    } catch (err: any) {
+      setLocationNote(err?.message || 'Could not read your location.');
+    } finally {
+      setLocating(false);
+    }
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCenter) return;
 
+    // coordinates are saved only when they changed, and only when they are in Lingayen
+    const lat = parseFloat(editLat);
+    const lng = parseFloat(editLng);
+    const typed = editLat.trim() !== '' || editLng.trim() !== '';
+    const moved =
+      typed && (!editingCenter.has_location || lat !== editingCenter.latitude || lng !== editingCenter.longitude);
+    if (moved) {
+      const state = classifyCoords(lat, lng);
+      if (state !== 'ok') {
+        setLocationNote(coordMessage(state).replace('The stored coordinates are', 'These coordinates are') || 'Check the coordinates.');
+        return;
+      }
+    }
+
     try {
       const others = editOtherFacilities.split(',').map((f) => f.trim()).filter(Boolean);
       await repo.updateCenter(editingCenter.id, {
+        ...(moved ? { latitude: lat, longitude: lng } : {}),
         current_occupancy: Number(editOccupancy),
         status: editStatus,
         facilities: Array.from(new Set([...editFacilities, ...others])),
         contact_person: editContactPerson.trim(),
         contact_phone: editContactPhone.trim(),
+        // sent only when changed, so saving a shelter works the same as before otherwise
+        ...(editNeedsPatrol !== !!editingCenter.needs_patrol ? { needs_patrol: editNeedsPatrol } : {}),
       });
       flash(`Updated ${editingCenter.name}`);
       repo.loadShelterTrend().catch(() => {});
@@ -222,6 +268,15 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
       return true;
     });
   }, [residentSheltersList, residentFilter, residentSelectedBarangay, residentSearchQuery]);
+
+  // opened on one shelter: clear whatever filter would hide it, then bring it into view
+  useEffect(() => {
+    if (!focus) return;
+    setResidentFilter('all');
+    setResidentSelectedBarangay('all');
+    setResidentSearchQuery('');
+  }, [focus]);
+  useFocusItem(focus ? `shelter-${focus.id}` : null, focus?.key);
 
   // If currentUser is a resident, render with the exact design and layout of the Home tab
   if (isResident) {
@@ -377,6 +432,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                   return (
                     <div
                       key={s.id}
+                      id={`shelter-${s.id}`}
                       className="p-6 rounded-3xl border border-neutral-100 bg-neutral-50/50 hover:bg-red-50/30 transition-all duration-300 flex flex-col justify-between space-y-5 shadow-xs hover:shadow-lg group"
                     >
                       <div className="space-y-3.5">
@@ -486,7 +542,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                           <Download className="w-4 h-4" />
                         </button>
 
-                        {onSelectOnMap && rawCenter && (
+                        {onSelectOnMap && rawCenter?.has_location && (
                           <button
                             onClick={() => onSelectOnMap(rawCenter)}
                             className="w-10 h-10 rounded-xl bg-white hover:bg-red-50 text-red-900 border border-red-900/20 flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
@@ -1067,6 +1123,69 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                   }`} />
                 </div>
               </div>
+
+              {/* Edit Location: the pin on the map and the Waze destination */}
+              <div className={`p-3 rounded-xl space-y-2.5 ${isBarangay ? 'bg-[#C2E8FF]/10 border border-[#7EA0C5]/40' : 'bg-neutral-50/70 border border-neutral-200'}`}>
+                <span className={`block text-xs font-semibold ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`}>{t("Location")}</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={editLat}
+                    onChange={(e) => setEditLat(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="16.0206"
+                    aria-label={t("Latitude")}
+                    className={`w-full text-xs font-mono rounded-xl p-2.5 outline-hidden bg-white border ${isBarangay ? 'border-[#7EA0C5]/40 focus:border-[#052659]' : 'border-neutral-200 focus:border-neutral-400'}`}
+                  />
+                  <input
+                    value={editLng}
+                    onChange={(e) => setEditLng(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="120.2306"
+                    aria-label={t("Longitude")}
+                    className={`w-full text-xs font-mono rounded-xl p-2.5 outline-hidden bg-white border ${isBarangay ? 'border-[#7EA0C5]/40 focus:border-[#052659]' : 'border-neutral-200 focus:border-neutral-400'}`}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={useMyLocation}
+                    disabled={locating}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11px] font-semibold cursor-pointer disabled:opacity-50 ${
+                      isBarangay ? 'bg-[#C2E8FF]/40 text-[#052659] hover:bg-[#C2E8FF]/70' : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-100'
+                    }`}
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    {locating ? t("Locating…") : t("Use my location")}
+                  </button>
+                  {canNavigate(parseFloat(editLat), parseFloat(editLng)) && (
+                    <a
+                      href={wazeUrl(parseFloat(editLat), parseFloat(editLng))}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`text-[11px] font-semibold underline ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`}
+                    >
+                      {t("Check in Waze")}
+                    </a>
+                  )}
+                </div>
+                {locationNote && <p className={`text-[11px] ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>{locationNote}</p>}
+              </div>
+
+              {/* the PNP console lists the shelters flagged here */}
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl cursor-pointer ${
+                isBarangay ? 'bg-[#C2E8FF]/10 border border-[#7EA0C5]/40' : 'bg-neutral-50/70 border border-neutral-200'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={editNeedsPatrol}
+                  onChange={(e) => setEditNeedsPatrol(e.target.checked)}
+                  className={`mt-0.5 w-4 h-4 shrink-0 ${isBarangay ? 'accent-[#052659]' : 'accent-neutral-900'}`}
+                />
+                <span>
+                  <span className={`block text-xs font-semibold ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`}>{t("Needs a PNP patrol")}</span>
+                  <span className={`block text-[11px] mt-0.5 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>{t("The PNP sees this shelter on its console until you clear it.")}</span>
+                </span>
+              </label>
 
               <div className={`flex items-center justify-end gap-2.5 pt-2 border-t ${
                 isBarangay ? 'border-[#7EA0C5]/20' : 'border-neutral-100'

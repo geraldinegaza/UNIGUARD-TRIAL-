@@ -50,3 +50,25 @@ export function hazardDisplayLabel(text: string | null | undefined, otherText?: 
   if (h.key === 'other' && otherText && otherText.trim()) return `${h.label}: ${otherText.trim()}`;
   return h.label;
 }
+
+// The teams that usually answer each hazard, best first. The dispatch form
+// lists these first and marks them "(Suggested)"; every team stays pickable.
+const SUGGESTED_TEAMS: Record<string, string[]> = {
+  flood: ['Barangay Response Team', 'Rescue Unit'],
+  river_overflow: ['Barangay Response Team', 'Rescue Unit'],
+  drainage_blockage: ['Barangay Response Team', 'Rescue Unit'],
+  storm_surge: ['Barangay Response Team', 'Rescue Unit'],
+  coastal_erosion: ['Barangay Response Team', 'Rescue Unit'],
+  strong_wind: ['Barangay Response Team'],
+  fallen_tree: ['Barangay Response Team'],
+  landslide: ['Rescue Unit', 'Ambulance', 'Barangay Response Team'],
+  earthquake: ['Rescue Unit', 'Ambulance', 'Barangay Response Team'],
+  road_damage: ['PNP', 'Barangay Response Team'],
+  vehicular_accident: ['PNP', 'Ambulance'],
+  fire: ['BFP', 'Barangay Response Team'],
+  power_line: ['BFP', 'Barangay Response Team'],
+};
+
+export function suggestedTeams(hazard: string | null | undefined): string[] {
+  return (SUGGESTED_TEAMS[classifyHazard(hazard).key] || []).slice();
+}

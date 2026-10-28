@@ -130,6 +130,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         return t('Incidents');
       case 'advisories':
         return t('Advisories');
+      case 'hazard_map':
+        return t('Hazard Map');
+      case 'my_reports':
+        return t('My Reports');
       case 'road_work':
         return t('Road Work');
       case 'sos_log':

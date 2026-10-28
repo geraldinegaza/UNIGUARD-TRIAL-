@@ -52,9 +52,28 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
   // Last successful sync, from the data store
   const { lastSync, queue } = useRepo();
   const isResident = currentUser?.role === 'citizen';
-  const syncTimeFormatted = lastSync
-    ? new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-    : '—';
+  // "Today, 14:05", "Yesterday, 19:25" or the date for anything older
+  const syncTimeFormatted = (() => {
+    if (!lastSync) return '—';
+    const d = new Date(lastSync);
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000);
+    if (days === 0) return `${t('Today')}, ${time}`;
+    if (days === 1) return `${t('Yesterday')}, ${time}`;
+    return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+  })();
+
+  // the app opens without a signal once a service worker controls this page
+  const [worksOffline, setWorksOffline] = useState(
+    () => typeof navigator !== 'undefined' && !!navigator.serviceWorker?.controller
+  );
+  useEffect(() => {
+    const sw = typeof navigator !== 'undefined' ? navigator.serviceWorker : undefined;
+    if (!sw) return;
+    const update = () => setWorksOffline(!!sw.controller);
+    sw.addEventListener('controllerchange', update);
+    return () => sw.removeEventListener('controllerchange', update);
+  }, []);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -320,7 +339,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
               <div className="flex items-center justify-between">
                 <span className={isBarangay ? 'text-[#5482B4] font-medium' : 'text-neutral-500 font-medium'}>{t("Last Successful Sync")}</span>
                 <span className={`font-mono font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
-                  {syncTimeFormatted} today
+                  {syncTimeFormatted}
                 </span>
               </div>
 
@@ -333,6 +352,11 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
                 }`}>
                   {pendingOutboxCount} waiting
                 </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className={isBarangay ? 'text-[#5482B4] font-medium' : 'text-neutral-500 font-medium'}>{t("Works without internet")}</span>
+                <span className={`font-mono font-medium ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>{worksOffline ? t('Yes') : t('Not yet')}</span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -441,7 +465,7 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
             {t("Cached on This Device")}
           </h3>
           <span className={`text-xs font-mono font-medium ${isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'}`}>
-            Synced Today, {syncTimeFormatted}
+            Synced {syncTimeFormatted}
           </span>
         </div>
 

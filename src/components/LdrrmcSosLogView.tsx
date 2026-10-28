@@ -72,6 +72,25 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
 
   const [filterStatus, setFilterStatus] = useState<'all' | 'Active' | 'Resolved'>('all');
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Acknowledge tells the sender help is being arranged; Mark resolved closes it.
+  // Both notify the sender and are written to the activity log.
+  const setStatus = async (event: SosEvent, status: 'acknowledged' | 'resolved') => {
+    setBusyId(event.id);
+    try {
+      await repo.updateSosStatus(event.id, status);
+      setActionNotice(
+        status === 'acknowledged'
+          ? `SOS from ${event.citizenName} acknowledged. They were told help is being arranged.`
+          : `SOS from ${event.citizenName} marked resolved.`
+      );
+    } catch (e: any) {
+      setActionNotice(e?.message || 'Could not update this SOS.');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   // Format relative time: e.g. "9h 36m ago"
   const formatTimeAgo = (isoString: string) => {
@@ -182,7 +201,7 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
                   : isBarangay ? 'text-[#5482B4] hover:text-[#011025] hover:bg-[#C2E8FF]/40' : 'text-neutral-600 hover:text-neutral-900 hover:bg-white/60'
               }`}
             >
-              Active Distress ({events.filter((e) => e.status === 'Active').length})
+              Active Distress ({events.filter((e) => e.status !== 'Resolved').length})
             </button>
             <button
               onClick={() => setFilterStatus('Resolved')}
@@ -214,7 +233,7 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
               </p>
             </div>
           ) : (
-            <table className="w-full text-left border-collapse min-w-[760px]">
+            <table className="w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className={`text-[11px] font-medium border-b ${
                   isBarangay ? 'bg-[#C2E8FF]/5 text-[#5482B4] border-[#7EA0C5]/20' : 'bg-neutral-50/50 text-neutral-400 border-neutral-100'
@@ -354,6 +373,19 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
                           </button>
                         )}
 
+                        {event.status !== 'Resolved' && (
+                          <button
+                            type="button"
+                            disabled={busyId === event.id}
+                            onClick={() => setStatus(event, event.status === 'Active' ? 'acknowledged' : 'resolved')}
+                            className={`h-8 px-3.5 rounded-full text-xs font-semibold shrink-0 cursor-pointer disabled:opacity-50 transition-colors ${
+                              isBarangay ? 'bg-[#052659] hover:bg-[#011025] text-white' : 'bg-neutral-900 hover:bg-black text-white'
+                            }`}
+                          >
+                            {busyId === event.id ? 'Saving…' : event.status === 'Active' ? 'Acknowledge' : 'Mark resolved'}
+                          </button>
+                        )}
+
                         {/* SOS Right Pill - Equal width/height container */}
                         <span className={`w-20 h-8 rounded-full inline-flex items-center justify-center text-center text-xs font-medium tracking-wide shadow-2xs shrink-0 ${
                           isBarangay
@@ -362,7 +394,7 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
                               : 'bg-[#5482B4] text-white'
                             : 'bg-[#70757a] text-white'
                         }`}>
-                          {event.status === 'Active' ? 'SOS' : 'Handled'}
+                          {event.status === 'Active' ? 'SOS' : event.status === 'Responding' ? 'Responding' : 'Handled'}
                         </span>
                       </div>
                     </td>

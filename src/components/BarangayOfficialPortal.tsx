@@ -7,6 +7,7 @@ import {
   Users,
   ShieldAlert,
   Radio,
+  RefreshCw,
   Layers,
   MapPin,
   Clock,
@@ -49,6 +50,8 @@ export interface BarangayOfficialPortalProps {
   onNavigateTab?: (tab: string) => void;
   onNavigateView?: (view: 'Overview' | 'Trends' | 'Analytics') => void;
   onDataChanged?: () => void;
+  /** open the dispatch form for a verified report (Recent Incidents quick action) */
+  onDispatchReport?: (reportId: string) => void;
 }
 
 // Format relative time (e.g., "10h 51m ago", "15m ago")
@@ -79,6 +82,7 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
   onNavigateTab,
   onNavigateView,
   onDataChanged,
+  onDispatchReport,
 }) => {
   // 1. Identify and scope strictly to the Official's Barangay Jurisdiction
   const store = useRepo();
@@ -90,6 +94,10 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
   const [isRefreshingMap, setIsRefreshingMap] = useState(false);
   const [showLayersDropdown, setShowLayersDropdown] = useState(false);
   const [isDeclareEmergencyModalOpen, setIsDeclareEmergencyModalOpen] = useState(false);
+  // the sync strip's Refresh data, and the quick actions on Recent Incidents
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [actingId, setActingId] = useState<string | null>(null);
+  const [homeNotice, setHomeNotice] = useState<string | null>(null);
 
   // Form State for Declare Emergency Modal (Scoped to Barangay)
   const [emergencyTitle, setEmergencyTitle] = useState('');
@@ -163,6 +171,50 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   }, [scopedReports]);
+
+  // Escalated to the LGU: unverified for more than 30 minutes, or a life-safety hazard
+  const escalatedReports = useMemo(() => sortedReports.filter((r) => r.escalates_to_lgu), [sortedReports]);
+
+  const flashHome = (message: string) => {
+    setHomeNotice(message);
+    setTimeout(() => setHomeNotice(null), 4000);
+  };
+  const refreshHome = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await repo.loadAll();
+    } catch (err: any) {
+      flashHome(err?.message || 'Could not refresh the data.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+  // Verify / Dispatch / Resolve from the Recent Incidents list, as in the reference build
+  const quickAction = async (report: IncidentReport) => {
+    if (actingId) return;
+    if (report.status === 'verified') {
+      onDispatchReport?.(report.id);
+      return;
+    }
+    const next = report.status === 'unverified' ? 'verified' : 'resolved';
+    setActingId(report.id);
+    try {
+      await repo.advanceStatus(
+        report.id,
+        next,
+        next === 'verified' ? `Manually verified by ${currentUser.full_name}` : `Resolved by ${currentUser.full_name}`
+      );
+      flashHome(next === 'verified' ? `${report.code} verified` : `${report.code} resolved`);
+      onDataChanged?.();
+    } catch (err: any) {
+      flashHome(err?.message || 'Could not update the incident.');
+    } finally {
+      setActingId(null);
+    }
+  };
+  const quickLabel = (r: IncidentReport) =>
+    r.status === 'unverified' ? 'Verify' : r.status === 'verified' && onDispatchReport ? 'Dispatch' : r.status === 'dispatched' ? 'Resolve' : null;
 
   // Selected incident object
   const activeSelectedIncident = useMemo(() => {
@@ -471,6 +523,119 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Sync status: live synced data, or the last data this device saved */}
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3 rounded-[22px] bg-white border border-[#7EA0C5]/30 border-l-4 ${
+          isRealtimeActive ? 'border-l-[#052659]' : 'border-l-[#E9B872]'
+        } shadow-[0_2px_12px_rgba(1,16,37,0.03)]`}
+      >
+        <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+          <span
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+              isRealtimeActive ? 'bg-[#C2E8FF]/60 text-[#052659] border-[#7EA0C5]/40' : 'bg-[#FDF0DC] text-[#8A5A12] border-[#E9B872]/50'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5" />
+            {isRealtimeActive ? 'Live' : 'Offline'}
+          </span>
+          <span className="text-xs text-[#5482B4]">
+            {isRealtimeActive ? 'Synced' : 'Showing the last synced data ·'}{' '}
+            {store.lastSync
+              ? new Date(store.lastSync).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : 'not yet'}
+          </span>
+        </div>
+        <button
+          onClick={refreshHome}
+          disabled={isSyncing}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium text-[#052659] bg-white hover:bg-[#C2E8FF]/30 border border-[#7EA0C5]/40 transition-all shadow-2xs cursor-pointer active:scale-95 disabled:opacity-60"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-[#5482B4] ${isSyncing ? 'animate-spin' : ''}`} />
+          <span>{isSyncing ? 'Refreshing…' : 'Refresh data'}</span>
+        </button>
+      </div>
+
+      {homeNotice && (
+        <p className="text-xs text-[#052659] bg-[#C2E8FF]/40 border border-[#7EA0C5]/40 rounded-2xl px-4 py-2.5">{homeNotice}</p>
+      )}
+
+      {/* Escalated to the LGU: a flag next to the status, not a status of its own */}
+      {escalatedReports.length > 0 && (
+        <div className="bg-white rounded-[24px] border border-[#7EA0C5]/30 border-l-4 border-l-[#C0392B] shadow-[0_2px_12px_rgba(1,16,37,0.03)] overflow-hidden">
+          <div className="px-5 sm:px-6 pt-4 pb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-[#C0392B]" />
+              <h2 className="text-sm font-semibold text-[#C0392B]">{escalatedReports.length} escalated to LGU</h2>
+            </div>
+            <span className="text-[11px] text-[#5482B4]">Stale (&gt;30 min) or life-safety hazard</span>
+          </div>
+          <p className="px-5 sm:px-6 text-[11px] leading-relaxed text-[#5482B4]">
+            <span className="font-semibold text-[#011025]">Escalated</span> is not a status. It is a separate flag for reports that need LGU
+            intervention: a report still unverified after 30 minutes (stale), or a life-safety hazard (fire, power line, accident, landslide)
+            that goes straight to the LGU. Verifying it here still works.
+          </p>
+          <div className="mt-2 divide-y divide-[#7EA0C5]/15 max-h-[260px] overflow-y-auto">
+            {escalatedReports.slice(0, 6).map((report) => (
+              <div
+                key={report.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setSelectedIncidentId(report.id);
+                  if (onSelectReport) onSelectReport(report);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedIncidentId(report.id);
+                    if (onSelectReport) onSelectReport(report);
+                  }
+                }}
+                className="px-5 sm:px-6 py-3 flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 hover:bg-[#C2E8FF]/15 transition-colors cursor-pointer"
+              >
+                <span className="w-2 h-2 rounded-full bg-[#C0392B] shrink-0" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-[#011025]">{report.hazard_type}</span>
+                    <span className="font-sans text-[10px] font-medium text-[#052659] bg-[#C2E8FF]/40 border border-[#7EA0C5]/30 px-2 py-0.5 rounded-full">
+                      {report.code}
+                    </span>
+                    <span
+                      className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                        report.is_severity_bypass ? 'bg-[#FBE3E2] text-[#9B2C2C]' : 'bg-[#FDF0DC] text-[#8A5A12]'
+                      }`}
+                    >
+                      {report.is_severity_bypass ? 'Life-safety' : 'Stale'}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[#5482B4]">
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {barangayName}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {formatRelativeTime(report.created_at)}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#052659] bg-[#C2E8FF]/40 border border-[#7EA0C5]/30 px-2.5 py-0.5 rounded-full shrink-0">
+                  {report.status === 'unverified' ? 'Reported' : report.status}
+                </span>
+              </div>
+            ))}
+          </div>
+          {escalatedReports.length > 6 && onNavigateTab && (
+            <button
+              onClick={() => onNavigateTab('incidents')}
+              className="w-full px-6 py-2.5 text-xs font-medium text-[#052659] hover:bg-[#C2E8FF]/20 border-t border-[#7EA0C5]/15 cursor-pointer"
+            >
+              View all {escalatedReports.length} in Incidents
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 2. Top Metric Cards (4 KPI Cards strictly scoped to Barangay) */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5 w-full">
@@ -864,6 +1029,25 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
                     </div>
                     <span className="text-[11px] text-[#7EA0C5] shrink-0">{formatRelativeTime(report.created_at)}</span>
                   </div>
+
+                  {/* quick action: advance the report without opening it */}
+                  {quickLabel(report) && (
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[#5482B4]">
+                        {report.status === 'unverified' ? 'Reported' : report.status}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          quickAction(report);
+                        }}
+                        disabled={actingId !== null}
+                        className="px-3.5 py-1 rounded-full text-[11px] font-medium text-[#052659] bg-white hover:bg-[#052659] hover:text-white border border-[#7EA0C5]/40 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {actingId === report.id ? 'Saving…' : quickLabel(report)}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Progressive Disclosure: Details revealed on hover or click */}
                   <div className={`overflow-hidden transition-all duration-200 ${

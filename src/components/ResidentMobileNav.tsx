@@ -23,6 +23,8 @@ import { PortalTag } from '../brand';
 
 export const RESIDENT_TOP_TABS: { id: string; label: string }[] = [
   { id: 'relief', label: 'Relief' },
+  { id: 'advisories', label: 'Advisories' },
+  { id: 'hazard_map', label: 'Map' },
   { id: 'guides', label: 'Guides' },
   { id: 'faqs', label: 'FAQs' },
 ];

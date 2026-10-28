@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
+import { shareOrCopy } from '../lib/util';
 import { TemplatePicker } from './TemplatePicker';
 import { BrandLoader, portalForRole } from '../brand';
 import {
@@ -106,6 +107,14 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
 
   // Selected advisory for full modal reading
   const [activeModalAdvisory, setActiveModalAdvisory] = useState<Advisory | null>(null);
+  const [modalNotice, setModalNotice] = useState<string | null>(null);
+  useEffect(() => setModalNotice(null), [activeModalAdvisory]);
+
+  const shareAdvisory = async (adv: Advisory) => {
+    const res = await shareOrCopy(adv.title, adv.content, `${location.origin}${location.pathname}#advisories`);
+    if (res === 'copied') setModalNotice('Copied. Paste it into a message to share it.');
+    else if (res === 'failed') setModalNotice('Sharing is not available on this device.');
+  };
 
   // Automatically open designated advisory when redirected from Alert Banner
   useEffect(() => {
@@ -580,7 +589,31 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-2 flex items-center justify-end gap-2.5">
+                {modalNotice && (
+                  <p role="status" className={`text-[11px] font-medium ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`}>
+                    {modalNotice}
+                  </p>
+                )}
+                <div className="pt-2 flex flex-wrap items-center justify-end gap-2.5">
+                  <button
+                    onClick={() => shareAdvisory(activeModalAdvisory)}
+                    className={`px-5 py-2 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                      isBarangay ? 'text-[#052659] border-[#7EA0C5]/50 hover:bg-[#C2E8FF]/30' : 'text-neutral-800 border-neutral-200 hover:bg-neutral-100'
+                    }`}
+                  >
+                    Share
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await repo.saveOffline();
+                      setModalNotice('Saved on this device. It opens without a signal.');
+                    }}
+                    className={`px-5 py-2 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                      isBarangay ? 'text-[#052659] border-[#7EA0C5]/50 hover:bg-[#C2E8FF]/30' : 'text-neutral-800 border-neutral-200 hover:bg-neutral-100'
+                    }`}
+                  >
+                    Save offline
+                  </button>
                   <button
                     onClick={() => {
                       setActiveModalAdvisory(null);

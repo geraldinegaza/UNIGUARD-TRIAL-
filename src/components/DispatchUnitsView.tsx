@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Truck, Plus, X, Users, Inbox, Check, Ban, Mail, Phone, MapPin, Search, Trash2, Pencil } from 'lucide-react';
+import { Truck, Plus, X, Users, Inbox, Check, Ban, Mail, Phone, MapPin, Search, Trash2, Pencil, LifeBuoy, ShieldCheck } from 'lucide-react';
 import { DispatchUnit, UnitType, User } from '../types';
 import * as repo from '../services/repo';
 import { useRepo } from '../hooks/useRepo';
 import { relTime } from '../lib/util';
+import { UnitEquipmentPanel } from './UnitEquipmentPanel';
 
 // Dispatch units (BFP, PNP, Rescue, Hospital) for the LGU console. The LGU
 // creates and edits units and decides their support requests. Only the Super
@@ -13,6 +14,13 @@ import { relTime } from '../lib/util';
 const TYPES: UnitType[] = ['BFP', 'PNP', 'Rescue', 'Hospital'];
 const TYPE_LABEL: Record<UnitType, string> = { BFP: 'Fire (BFP)', PNP: 'Police (PNP)', Rescue: 'Rescue', Hospital: 'Hospital' };
 const KIND_LABEL: Record<string, string> = { fuel: 'Fuel', personnel: 'Personnel', equipment: 'Equipment', mutual_aid: 'Mutual aid', other: 'Other' };
+// Need Help from a dispatch in the field
+const HELP_LABEL: Record<string, string> = {
+  general: 'Need help',
+  water_tanker: 'Water tanker',
+  extra_personnel: 'Extra personnel',
+  beyond_capacity: 'Beyond capacity',
+};
 
 interface DispatchUnitsViewProps {
   /** the Super Admin may invite and disable unit members */
@@ -27,7 +35,7 @@ const primary = 'inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rou
 const ghost = 'inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200/80 cursor-pointer disabled:opacity-50 transition-colors';
 
 export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageAccounts = false }) => {
-  const { units, unitMembers, unitRequests } = useRepo();
+  const { units, unitMembers, unitRequests, helpInbox, reliefEscorts } = useRepo();
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showNew, setShowNew] = useState(false);
@@ -81,6 +89,7 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
 
   const membersOf = (unitId: string): User[] => unitMembers.filter((m) => m.dispatch_unit_id === unitId);
   const pending = unitRequests.filter((r) => r.status === 'pending');
+  const openHelp = helpInbox.filter((h) => h.status !== 'resolved');
   const q = search.trim().toLowerCase();
   const shown = q
     ? units.filter((u) => [u.name, u.unit_type, u.address, u.contact_number].some((f) => (f || '').toLowerCase().includes(q)))
@@ -229,6 +238,81 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
         </div>
       )}
 
+      {/* Need Help messages from units and barangay officials in the field */}
+      {helpInbox.length > 0 && (
+        <div className={`${card} overflow-hidden`}>
+          <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50 flex items-center gap-2">
+            <LifeBuoy className="w-4 h-4 text-neutral-700" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-900">Dispatch help requests</h2>
+            <span className="ml-auto text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-700">
+              {openHelp.length} open · {helpInbox.length} total
+            </span>
+          </div>
+          <ul className="divide-y divide-neutral-100">
+            {helpInbox.map((h) => (
+              <li key={h.id} className="px-6 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-semibold text-neutral-900">
+                    {h.unit_id ? unitName(h.unit_id) : 'Barangay Response Team'} · {HELP_LABEL[h.kind] || h.kind}
+                    {h.report_code ? <span className="font-mono font-medium text-neutral-500"> · {h.report_code}</span> : null}
+                  </span>
+                  <span className="block text-[11px] text-neutral-500 mt-0.5">
+                    {h.message || 'No message'} · {relTime(h.created_at)}
+                  </span>
+                </span>
+                {h.status === 'resolved' ? (
+                  <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 text-neutral-700 border border-neutral-200">
+                    Resolved
+                  </span>
+                ) : h.status === 'acknowledged' ? (
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200">
+                      Acknowledged
+                    </span>
+                    <button type="button" disabled={busy} onClick={() => run(() => repo.updateHelpRequest(h.id, 'resolved'), 'Help request resolved')} className={primary}>
+                      <Check className="w-4 h-4" />
+                      Resolve
+                    </button>
+                  </span>
+                ) : (
+                  <button type="button" disabled={busy} onClick={() => run(() => repo.updateHelpRequest(h.id, 'acknowledged'), 'Help request acknowledged. The team was told.')} className={`${primary} shrink-0`}>
+                    Acknowledge
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Relief distributions with a PNP escort requested or confirmed */}
+      {reliefEscorts.length > 0 && (
+        <div className={`${card} overflow-hidden`}>
+          <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-neutral-700" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-900">Relief escorts</h2>
+            <span className="ml-auto text-[11px] text-neutral-500">The PNP confirms an escort from their console</span>
+          </div>
+          <ul className="divide-y divide-neutral-100">
+            {reliefEscorts.map((r) => (
+              <li key={r.id} className="px-6 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-semibold text-neutral-900">{r.title || 'Relief distribution'}</span>
+                  <span className="block text-[11px] text-neutral-500 mt-0.5">{[r.barangay ? `Brgy. ${r.barangay}` : 'Municipality-wide', r.escort_note].filter(Boolean).join(' · ')}</span>
+                </span>
+                <span
+                  className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${
+                    r.escort_status === 'confirmed' ? 'bg-[#18181b] text-white border-transparent' : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}
+                >
+                  {r.escort_status === 'confirmed' ? 'Escort confirmed' : 'Escort requested'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Units, by type */}
       {grouped.map(({ type, list }) => (
         <div key={type} className={`${card} overflow-hidden`}>
@@ -367,6 +451,9 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
                 Save
               </button>
             </div>
+
+            {/* Equipment: the LGU registers and maintains any unit's equipment */}
+            <UnitEquipmentPanel unit={openUnit} onNotice={flash} />
 
             {/* Members */}
             <div className="pt-4 border-t border-neutral-100">

@@ -9,7 +9,7 @@ import {
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { OverdueQueuePanel } from './OverdueQueuePanel';
-import { HAZARD_LABELS } from '../lib/hazards';
+import { HAZARD_LABELS, suggestedTeams } from '../lib/hazards';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -179,6 +179,20 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
     'MDRRMO Rescue': 'Rescue',
     Ambulance: 'Hospital',
   };
+  // every pickable team, the ones that usually answer this hazard first
+  const DISPATCH_TEAMS: [string, string][] = [
+    ['Barangay Response Team', 'Barangay Response Team'],
+    ['BFP', 'BFP (fire)'],
+    ['PNP', 'PNP (police)'],
+    ['Rescue Unit', 'Rescue unit'],
+    ['Ambulance', 'Ambulance (hospital)'],
+  ];
+  const suggested = dispatchModalReport ? suggestedTeams(dispatchModalReport.hazard_type) : [];
+  const teamOptions = [...DISPATCH_TEAMS].sort((a, b) => {
+    const ai = suggested.indexOf(a[0]);
+    const bi = suggested.indexOf(b[0]);
+    return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+  });
   const teamUnitType = TEAM_UNIT_TYPE[dispatchTeamName];
   const teamUnits = units.filter((u) => u.active && u.unit_type === teamUnitType);
   const [latestNote, setLatestNote] = useState('');
@@ -186,7 +200,12 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
   useEffect(() => {
     if (dispatchModalReport) {
       setAssignedTeam('');
-      setDispatchTeamName('Barangay Response Team');
+      // a report already dispatched is asking for another team (Beyond capacity), so skip the Response Team
+      const picks = suggestedTeams(dispatchModalReport.hazard_type);
+      const again = dispatchModalReport.status === 'dispatched';
+      setDispatchTeamName(
+        (again ? picks.find((t) => t !== 'Barangay Response Team') || 'Rescue Unit' : picks[0]) || 'Barangay Response Team'
+      );
       setDispatchUnitId('');
       setDispatchEtaMin(15);
       repo.loadResponders();
@@ -213,7 +232,8 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
   useEffect(() => {
     if (!openDispatchFor) return;
     const rep = reports.find((r) => r.id === openDispatchFor);
-    if (rep && rep.status === 'verified') {
+    // a dispatched report can take another team (Response Team: Beyond our capacity)
+    if (rep && (rep.status === 'verified' || rep.status === 'dispatched')) {
       setDispatchModalReport(rep);
       setDispatchNotes('');
     }
@@ -1404,11 +1424,12 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
                       : 'bg-neutral-50/70 border-neutral-200 text-neutral-800 focus:bg-white focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400/50'
                   } border rounded-xl p-2.5 outline-hidden transition-all`}
                   >
-                    <option value="Barangay Response Team">Barangay Response Team</option>
-                    <option value="BFP">BFP (fire)</option>
-                    <option value="PNP">PNP (police)</option>
-                    <option value="Rescue Unit">Rescue unit</option>
-                    <option value="Ambulance">Ambulance (hospital)</option>
+                    {teamOptions.map(([value, text]) => (
+                      <option key={value} value={value}>
+                        {text}
+                        {suggested.includes(value) ? ' (Suggested)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>

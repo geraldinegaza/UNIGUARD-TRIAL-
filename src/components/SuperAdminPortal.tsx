@@ -28,7 +28,7 @@ import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { relTime, download, toCSV } from '../lib/util';
 import { exportPdf, fileStamp } from '../lib/pdf';
-import { TriadEmblem } from '../brand';
+import { TriadEmblem, THEMES, type Portal } from '../brand';
 
 // Super Admin console. Initial draft of the layout: a light sidebar with the
 // account breakdown and recent activity, a warm yellow hero with the section
@@ -63,37 +63,207 @@ const ROLE_PILL: Record<UserRole, string> = {
 
 const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
-/** Flat illustration for the hero: the Triad Shield on a plinth, flanked by the portals it joins. */
-const HeroArt: React.FC = () => (
-  <svg viewBox="0 0 360 230" className="w-full h-full" aria-hidden="true">
-    {/* arched doorway behind the shield */}
-    <path d="M150 210V92a50 50 0 0 1 100 0v118" fill="#FFF6DA" stroke="#E9A825" strokeWidth="6" />
-    <path d="M168 210V98a32 32 0 0 1 64 0v112" fill="#3A2A08" opacity="0.9" />
-    <path d="M200 66v144M168 120h64M168 160h64" stroke="#F6C445" strokeWidth="2" opacity="0.6" />
-    {/* plinth and shield */}
-    <rect x="176" y="186" width="48" height="24" rx="4" fill="#E9A825" />
-    <g transform="translate(170 118) scale(0.94)">
-      <path d="M30.4 5.3C24 8.2 17.5 9.9 9.5 11.2V30C9.5 32.3 9.7 34.4 10.1 36.4H30.4Z" fill="#FFFFFF" />
-      <path d="M33.6 5.3C40 8.2 46.5 9.9 54.5 11.2V30C54.5 32.3 54.3 34.4 53.9 36.4H33.6Z" fill="#FDE68A" />
-      <path d="M10.9 40.2C16.8 37.6 22.6 42.8 32 40.2C41.4 37.6 47.2 42.8 53.1 40.2C49.6 48.8 42.2 55.6 32 60.5C21.8 55.6 14.4 48.8 10.9 40.2Z" fill="#FBBF24" />
-      <circle cx="32" cy="21.5" r="5.6" fill="#B7791F" />
-      <circle cx="32" cy="21.5" r="2.4" fill="#FFFFFF" />
+// Triad Shield geometry (64 unit grid), as in brand/TriadEmblem
+const SHIELD_LEFT = 'M30.4 5.3C24 8.2 17.5 9.9 9.5 11.2V30C9.5 32.3 9.7 34.4 10.1 36.4H30.4Z';
+const SHIELD_RIGHT = 'M33.6 5.3C40 8.2 46.5 9.9 54.5 11.2V30C54.5 32.3 54.3 34.4 53.9 36.4H33.6Z';
+const SHIELD_KEEL = 'M10.9 40.2C16.8 37.6 22.6 42.8 32 40.2C41.4 37.6 47.2 42.8 53.1 40.2C49.6 48.8 42.2 55.6 32 60.5C21.8 55.6 14.4 48.8 10.9 40.2Z';
+
+// one portal's shield in its own colours, centred on (x, y)
+const HeroShield: React.FC<{ portal: Portal; x: number; y: number; size: number; filter?: string }> = ({ portal, x, y, size, filter }) => {
+  const c = THEMES[portal].emblem.light;
+  const k = size / 64;
+  return (
+    <g transform={`translate(${x - size / 2} ${y - size / 2}) scale(${k})`} filter={filter}>
+      <path d={SHIELD_LEFT} fill={c.left} />
+      <path d={SHIELD_RIGHT} fill={c.right} />
+      <path d={SHIELD_KEEL} fill={c.keel} />
+      <circle cx="32" cy="21.5" r="5.6" fill={c.hub} />
+      <circle cx="32" cy="21.5" r="2.4" fill={c.dot} />
     </g>
-    {/* lantern */}
-    <path d="M110 40v18" stroke="#3A2A08" strokeWidth="2" />
-    <path d="M100 58h20l-3 26h-14z" fill="#3A2A08" />
-    <rect x="104" y="64" width="12" height="14" rx="2" fill="#FFD66B" />
-    {/* potted plants */}
-    <g>
-      <path d="M58 182h34l-4 28H62z" fill="#F08A24" />
-      <path d="M75 182c-6-18-22-20-26-30 12 2 20 8 26 18 4-14 14-22 28-24-6 10-16 20-28 36z" fill="#4C7A5A" />
+  );
+};
+
+// the four portals ride a tilted orbit around the Super Admin's shield
+const HUB = { x: 180, y: 76 };
+const ORBIT = { rx: 128, ry: 50 };
+const onOrbit = (deg: number) => ({
+  x: Math.round(HUB.x + ORBIT.rx * Math.cos((deg * Math.PI) / 180)),
+  y: Math.round(HUB.y + ORBIT.ry * Math.sin((deg * Math.PI) / 180)),
+});
+const HERO_NODES = (
+  [
+    { portal: 'resident', label: 'Residents', deg: 208, labelAbove: true },
+    { portal: 'barangay', label: 'Barangay', deg: 332, labelAbove: true },
+    { portal: 'command', label: 'LDRRMO', deg: 152, labelAbove: false },
+    { portal: 'dispatch', label: 'Dispatch', deg: 28, labelAbove: false },
+  ] as { portal: Portal; label: string; deg: number; labelAbove: boolean }[]
+).map((n) => ({ ...n, ...onOrbit(n.deg) }));
+// sparkles scattered over the scene: x, y, size, delay (s)
+const SPARKLES: [number, number, number, number][] = [
+  [118, 18, 5, 0],
+  [250, 14, 4, 1.1],
+  [28, 104, 4, 0.6],
+  [336, 120, 5, 1.7],
+  [214, 136, 3.5, 2.3],
+];
+// eight rays, after the sun on the Philippine flag
+const RAYS = Array.from({ length: 8 }, (_, i) => i * 45);
+
+// "Every portal, one view": the Super Admin's gold shield on a sun burst, the
+// four portals' shields riding an orbit around it, and curved links that carry
+// data in. No containers: everything stands on the gold hero. It all sits in
+// the top 145 units, because the stat cards overlap the bottom of the art.
+// Motion stops for people who ask for reduced motion.
+// each portal shield opens the accounts of that portal's role
+const PORTAL_ROLE: Partial<Record<Portal, UserRole>> = { resident: 'citizen', barangay: 'barangay', command: 'lgu_admin', dispatch: 'dispatch' };
+
+const HeroArt: React.FC<{ onPickRole?: (role: UserRole) => void }> = ({ onPickRole }) => (
+  <svg viewBox="0 0 360 230" className="w-full h-full ug-hero-art" role="group" aria-label="The four portals">
+    <defs>
+      <radialGradient id="ugHeroGlow">
+        <stop offset="0%" stopColor="#FFF6DA" stopOpacity="0.95" />
+        <stop offset="45%" stopColor="#FFE7A3" stopOpacity="0.45" />
+        <stop offset="100%" stopColor="#FFE7A3" stopOpacity="0" />
+      </radialGradient>
+      <radialGradient id="ugHeroHalo">
+        <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.7" />
+        <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+      </radialGradient>
+      <linearGradient id="ugHeroRay" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stopColor="#FFF6DA" stopOpacity="0.85" />
+        <stop offset="100%" stopColor="#FFF6DA" stopOpacity="0" />
+      </linearGradient>
+      <filter id="ugHeroLift" x="-30%" y="-30%" width="160%" height="170%">
+        <feDropShadow dx="0" dy="3" stdDeviation="2.5" floodColor="#5C3A0A" floodOpacity="0.28" />
+      </filter>
+    </defs>
+    <style>{`
+      .ug-hero-art .rays { transform-origin: ${HUB.x}px ${HUB.y}px; animation: ug-hero-spin 40s linear infinite; }
+      .ug-hero-art .flow { animation: ug-hero-flow 2.4s linear infinite; }
+      .ug-hero-art .beacon { transform-origin: 0 0; animation: ug-hero-spin 10s linear infinite; }
+      .ug-hero-art .float { animation: ug-hero-float 5s ease-in-out infinite; }
+      .ug-hero-art .node { cursor: pointer; outline: none; }
+      .ug-hero-art .node .ring { opacity: 0; transition: opacity .2s; }
+      .ug-hero-art .node:hover .ring, .ug-hero-art .node:focus-visible .ring { opacity: 1; }
+      .ug-hero-art .node:hover .halo { transform: scale(1.25); }
+      .ug-hero-art .node .halo { transform-box: fill-box; transform-origin: center; transition: transform .2s; }
+      .ug-hero-art .twinkle { transform-box: fill-box; transform-origin: center; animation: ug-hero-twinkle 3s ease-in-out infinite; }
+      @keyframes ug-hero-spin { to { transform: rotate(360deg); } }
+      @keyframes ug-hero-flow { from { stroke-dashoffset: 26; } to { stroke-dashoffset: 0; } }
+      @keyframes ug-hero-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+      @keyframes ug-hero-twinkle { 0%, 100% { opacity: .25; transform: scale(.6); } 50% { opacity: 1; transform: scale(1); } }
+      @media (prefers-reduced-motion: reduce) { .ug-hero-art * { animation: none !important; } }
+    `}</style>
+
+    {/* sparkles */}
+    {SPARKLES.map(([x, y, r, delay]) => (
+      <path
+        key={`${x}-${y}`}
+        className="twinkle"
+        style={{ animationDelay: `${delay}s` }}
+        d={`M${x} ${y - r}Q${x} ${y} ${x + r} ${y}Q${x} ${y} ${x} ${y + r}Q${x} ${y} ${x - r} ${y}Q${x} ${y} ${x} ${y - r}Z`}
+        fill="#FFF6DA"
+      />
+    ))}
+
+    {/* back half of the orbit, behind the sun */}
+    <path
+      d={`M${HUB.x - ORBIT.rx} ${HUB.y}A${ORBIT.rx} ${ORBIT.ry} 0 0 1 ${HUB.x + ORBIT.rx} ${HUB.y}`}
+      fill="none"
+      stroke="#FFF6DA"
+      strokeWidth="1.6"
+      strokeDasharray="1 7"
+      strokeLinecap="round"
+      opacity="0.8"
+    />
+
+    {/* sun burst and glow behind the Super Admin's shield */}
+    <circle cx={HUB.x} cy={HUB.y} r="64" fill="url(#ugHeroGlow)" />
+    <g className="rays">
+      {RAYS.map((deg) => (
+        <path
+          key={deg}
+          transform={`rotate(${deg} ${HUB.x} ${HUB.y})`}
+          d={`M${HUB.x - 7} ${HUB.y - 30}L${HUB.x} ${HUB.y - 62}L${HUB.x + 7} ${HUB.y - 30}Z`}
+          fill="url(#ugHeroRay)"
+        />
+      ))}
     </g>
-    <g>
-      <path d="M282 186h30l-4 24h-22z" fill="#F08A24" />
-      <path d="M297 186c-4-14-18-18-22-26 10 2 18 8 22 16 4-12 12-18 24-20-6 8-14 18-24 30z" fill="#4C7A5A" />
+
+    {/* curved links from each portal into the centre, with data flowing in */}
+    {HERO_NODES.map((n) => {
+      const d = `M${n.x} ${n.y}Q${(n.x + HUB.x) / 2} ${n.labelAbove ? HUB.y - 34 : HUB.y + 34} ${HUB.x} ${HUB.y}`;
+      return (
+        <g key={`${n.portal}-link`}>
+          <path d={d} fill="none" stroke="#FFF6DA" strokeWidth="1.6" opacity="0.5" />
+          <path className="flow" d={d} fill="none" stroke="#FFFFFF" strokeWidth="2.6" strokeLinecap="round" strokeDasharray="2 24" />
+        </g>
+      );
+    })}
+
+    {/* the Super Admin's shield */}
+    <g className="float">
+      <HeroShield portal="admin" x={HUB.x} y={HUB.y + 2} size={62} filter="url(#ugHeroLift)" />
     </g>
-    {/* floor line */}
-    <path d="M20 210h320" stroke="#E9A825" strokeWidth="2" opacity="0.5" />
+
+    {/* front half of the orbit, in front of the sun, with its travelling beacon */}
+    <path
+      d={`M${HUB.x - ORBIT.rx} ${HUB.y}A${ORBIT.rx} ${ORBIT.ry} 0 0 0 ${HUB.x + ORBIT.rx} ${HUB.y}`}
+      fill="none"
+      stroke="#FFF6DA"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      opacity="0.85"
+    />
+    <g transform={`translate(${HUB.x} ${HUB.y}) scale(1 ${ORBIT.ry / ORBIT.rx})`}>
+      <g className="beacon">
+        <circle cx={ORBIT.rx} cy="0" r="9" fill="url(#ugHeroHalo)" />
+        <circle cx={ORBIT.rx} cy="0" r="3.4" fill="#FFFFFF" />
+      </g>
+    </g>
+
+    {/* the four portals, standing on the gold with a soft halo, no tile */}
+    {HERO_NODES.map((n, i) => {
+      const role = PORTAL_ROLE[n.portal];
+      const pick = onPickRole && role ? () => onPickRole(role) : undefined;
+      return (
+      <g
+        key={n.portal}
+        className={`float${pick ? ' node' : ''}`}
+        style={{ animationDelay: `${i * 0.6}s` }}
+        role={pick ? 'button' : undefined}
+        tabIndex={pick ? 0 : undefined}
+        aria-label={pick ? `${n.label} accounts` : undefined}
+        onClick={pick}
+        onKeyDown={
+          pick
+            ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  pick();
+                }
+              }
+            : undefined
+        }
+      >
+        {pick && <circle className="ring" cx={n.x} cy={n.y + 1} r="19" fill="none" stroke="#FFFFFF" strokeWidth="1.6" strokeDasharray="3 3" />}
+        <circle className="halo" cx={n.x} cy={n.y} r="20" fill="url(#ugHeroHalo)" />
+        <HeroShield portal={n.portal} x={n.x} y={n.y + 1} size={30} filter="url(#ugHeroLift)" />
+        <text
+          x={n.x}
+          y={n.labelAbove ? n.y - 21 : n.y + 28}
+          textAnchor="middle"
+          fontSize="8.5"
+          fontWeight="800"
+          letterSpacing="1.2"
+          fill="#5C3A0A"
+          fontFamily="inherit"
+        >
+          {n.label.toUpperCase()}
+        </text>
+      </g>
+      );
+    })}
   </svg>
 );
 
@@ -112,6 +282,8 @@ const SIDE_MENU: { tab: string; label: string; icon: typeof Users }[] = [
   { tab: 'reports', label: 'Reports & Documents', icon: FileText },
   { tab: 'analytics', label: 'Analytics', icon: BarChart3 },
 ];
+// screens this menu already links to; the Operations navigation leaves them out
+export const SIDEBAR_OPS_TABS = SIDE_MENU.map((m) => m.tab).filter((tab) => tab !== 'overview');
 
 // activity log labels and where each kind of record can be opened
 // reference build: actions grouped into kinds for the activity filter
@@ -197,6 +369,15 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
   const [loadError, setLoadError] = useState<string | null>(null);
+  // the day picked on the calendar or the pulse chart (today to start)
+  const [selectedDay, setSelectedDay] = useState<Date>(() => new Date());
+  // accounts list: one role, or every role
+  const [accountRole, setAccountRole] = useState<UserRole | 'all'>('all');
+  const showRole = (role: UserRole | 'all') => {
+    setAccountRole(role);
+    setQuery('');
+    setView('accounts');
+  };
   // activity log filters
   const [actQuery, setActQuery] = useState('');
   const [actRole, setActRole] = useState('all');
@@ -223,7 +404,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   }, []);
 
   useEffect(() => {
-    Promise.all([repo.loadUsers(), repo.loadAudit(500), repo.loadSos(), repo.loadChangeRequests(), repo.loadDispatchUnits()]).catch((e: any) =>
+    Promise.all([repo.loadUsers(), repo.loadAudit(500), repo.loadSos(), repo.loadChangeRequests(), repo.loadDispatchUnits(), repo.loadResponders()]).catch((e: any) =>
       setLoadError(e?.message || 'Some sections could not be loaded.')
     );
   }, []);
@@ -261,7 +442,9 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
 
   const q = query.trim().toLowerCase();
   const accounts = data.users.filter(
-    (u) => !q || [u.full_name, u.email, u.barangay_name].some((f) => (f || '').toLowerCase().includes(q))
+    (u) =>
+      (accountRole === 'all' || u.role === accountRole) &&
+      (!q || [u.full_name, u.email, u.barangay_name].some((f) => (f || '').toLowerCase().includes(q)))
   );
 
   const initial = (currentUser.full_name || 'S').trim().charAt(0).toUpperCase();
@@ -423,6 +606,33 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   };
 
   /* ---------------------------------------------------------- calendar */
+  // a picked day: what happened on it, from the reports, SOS calls and activity log
+  const pickDay = (d: Date) => {
+    setSelectedDay(d);
+    if (d.getMonth() !== month.getMonth() || d.getFullYear() !== month.getFullYear()) setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+  };
+  const sosByDay = useMemo(() => {
+    const byDay: Record<string, number> = {};
+    data.sosLog.forEach((x) => {
+      const k = dayKey(new Date(x.created_at));
+      byDay[k] = (byDay[k] || 0) + 1;
+    });
+    return byDay;
+  }, [data.sosLog]);
+  const selKey = dayKey(selectedDay);
+  const dayReports = data.reports.filter((r) => dayKey(new Date(r.created_at)) === selKey);
+  const daySos = data.sosLog.filter((x) => dayKey(new Date(x.created_at)) === selKey);
+  const dayActivity = data.audit.filter((a) => dayKey(new Date(a.timestamp)) === selKey);
+  // the activity log filter takes a local calendar date (YYYY-MM-DD)
+  const openDayActivity = () => {
+    const d = selectedDay;
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    clearActivity();
+    setActFrom(k);
+    setActTo(k);
+    setView('activity');
+  };
+
   const calendar = (() => {
     const first = month.getDay();
     const daysIn = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
@@ -430,9 +640,10 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
       Array.from({ length: daysIn }, (_, i) => i + 1)
     );
     const today = new Date();
+    const onThisMonth = month.getMonth() === today.getMonth() && month.getFullYear() === today.getFullYear();
     return (
       <div className="rounded-2xl border border-neutral-100 p-3">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between gap-1 mb-2">
           <button
             type="button"
             onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
@@ -444,14 +655,25 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
           <span className="text-[12px] font-semibold text-neutral-700">
             {month.toLocaleDateString([], { month: 'long', year: 'numeric' })}
           </span>
-          <button
-            type="button"
-            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-            aria-label="Next month"
-            className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-500 hover:bg-neutral-100 cursor-pointer"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          <span className="flex items-center gap-0.5">
+            {!onThisMonth && (
+              <button
+                type="button"
+                onClick={() => pickDay(new Date())}
+                className="h-7 px-2 rounded-full text-[10px] font-bold text-[#8A5A00] hover:bg-[#FFF3C9] cursor-pointer"
+              >
+                Today
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+              aria-label="Next month"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-500 hover:bg-neutral-100 cursor-pointer"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </span>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-neutral-400 mb-1">
           {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
@@ -462,33 +684,85 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
           {cells.map((n, i) => {
             if (!n) return <span key={i} />;
             const d = new Date(month.getFullYear(), month.getMonth(), n);
-            const count = series.byDay[dayKey(d)] || 0;
-            const isToday = dayKey(d) === dayKey(today);
+            const k = dayKey(d);
+            const count = series.byDay[k] || 0;
+            const sos = sosByDay[k] || 0;
+            const isToday = k === dayKey(today);
+            const isPicked = k === selKey;
             return (
               <button
                 type="button"
                 key={i}
-                onClick={() => {
-                  // the filter takes a local calendar date (YYYY-MM-DD)
-                  const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                  clearActivity();
-                  setActFrom(k);
-                  setActTo(k);
-                  setView('activity');
-                }}
-                title={`${count ? `${count} report${count === 1 ? '' : 's'} · ` : ''}open this day's activity`}
-                className={`h-6 rounded-md text-[10px] leading-6 tabular-nums cursor-pointer hover:ring-1 hover:ring-[#F2B21B] ${
+                onClick={() => pickDay(d)}
+                aria-pressed={isPicked}
+                aria-label={`${d.toLocaleDateString([], { month: 'long', day: 'numeric' })}: ${count} report${count === 1 ? '' : 's'}${sos ? `, ${sos} SOS` : ''}`}
+                className={`relative h-6 rounded-md text-[10px] leading-6 tabular-nums cursor-pointer hover:ring-1 hover:ring-[#F2B21B] ${
                   isToday
                     ? 'bg-[#F2B21B] text-white font-bold'
                     : count
                     ? 'bg-[#FFF1C2] text-[#8A5A00] font-semibold'
                     : 'text-neutral-500'
-                }`}
+                } ${isPicked ? 'ring-2 ring-[#C98A0B] ring-offset-1' : ''}`}
               >
                 {n}
+                {sos > 0 && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-[#E5484D]" aria-hidden="true" />}
               </button>
             );
           })}
+        </div>
+
+        {/* the picked day */}
+        <div className="mt-3 pt-3 border-t border-neutral-100">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-[12px] font-bold text-neutral-800">
+              {selectedDay.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+            </p>
+            <p className="text-[11px] text-neutral-400 tabular-nums">
+              {dayReports.length} report{dayReports.length === 1 ? '' : 's'} · {daySos.length} SOS · {dayActivity.length} activit{dayActivity.length === 1 ? 'y' : 'ies'}
+            </p>
+          </div>
+          {dayReports.length > 0 ? (
+            <ul className="mt-2 space-y-1">
+              {dayReports.slice(0, 3).map((r) => (
+                <li key={r.id} className="flex items-center gap-2 text-[11px]">
+                  <span className="font-mono font-semibold text-[#8A5A00] shrink-0">{r.code}</span>
+                  <span className="truncate text-neutral-600">
+                    {r.hazard_type} · {r.barangay_name || '—'}
+                  </span>
+                </li>
+              ))}
+              {dayReports.length > 3 && <li className="text-[11px] text-neutral-400">and {dayReports.length - 3} more</li>}
+            </ul>
+          ) : (
+            <p className="mt-2 text-[11px] text-neutral-400">No reports filed this day.</p>
+          )}
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {onOpenOperations && dayReports.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onOpenOperations('incidents')}
+                className="h-7 px-3 rounded-full bg-[#FFF3C9] text-[#8A5A00] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer hover:bg-[#FFE9A3]"
+              >
+                Incidents <ArrowUpRight className="w-3 h-3" />
+              </button>
+            )}
+            {onOpenOperations && daySos.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onOpenOperations('sos_log')}
+                className="h-7 px-3 rounded-full bg-[#FDE4E4] text-[#A12C2C] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer hover:bg-[#FBD3D3]"
+              >
+                SOS Log <ArrowUpRight className="w-3 h-3" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={openDayActivity}
+              className="h-7 px-3 rounded-full bg-neutral-100 text-neutral-600 text-[11px] font-bold cursor-pointer hover:bg-neutral-200"
+            >
+              Day’s activity
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -496,6 +770,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
 
   /* ---------------------------------------------------------- pieces */
 
+  const isLive = data.source === 'supabase' && data.online;
   const pulseCard = (
     <section className="bg-white rounded-[22px] p-5 shadow-[0_24px_50px_-24px_rgba(58,42,8,0.35)] flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
@@ -503,7 +778,15 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
           <h3 className="text-[18px] font-bold text-neutral-800 leading-tight">System pulse</h3>
           <p className="text-[12px] text-neutral-400 mt-0.5">Reports filed per day</p>
         </div>
-        <span className="text-[11px] font-semibold text-[#8A5A00] bg-[#FFF3C9] rounded-full px-2.5 py-1">Live</span>
+        <span
+          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-2.5 py-1 ${
+            isLive ? 'text-[#8A5A00] bg-[#FFF3C9]' : 'text-neutral-500 bg-neutral-100'
+          }`}
+          title={isLive ? 'Updates arrive as they happen' : 'Showing the last data this device saved'}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-[#E9A825] animate-pulse' : 'bg-neutral-400'}`} aria-hidden="true" />
+          {isLive ? 'Live' : 'Offline'}
+        </span>
       </div>
       <div className="flex gap-2">
         {([7, 14] as const).map((n) => (
@@ -511,24 +794,38 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
             key={n}
             type="button"
             onClick={() => setRange(n)}
+            aria-pressed={range === n}
             className={`h-8 px-3.5 rounded-full text-[12px] font-semibold cursor-pointer ${
-              range === n ? 'bg-[#F2B21B] text-white' : 'bg-neutral-100 text-neutral-500'
+              range === n ? 'bg-[#F2B21B] text-white' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'
             }`}
           >
             {n} days
           </button>
         ))}
       </div>
-      {/* skyline-style bars */}
-      <div className="h-32 rounded-2xl bg-gradient-to-b from-[#F4F2FB] to-white px-3 pt-3 flex items-end gap-1" role="img" aria-label={`Reports per day over the last ${range} days`}>
-        {series.days.map(({ d, n }, i) => (
-          <div key={i} className="flex-1 min-w-0 flex flex-col items-center justify-end h-full" title={`${d.toLocaleDateString()}: ${n}`}>
-            <div
-              className={`w-full rounded-t-md ${i === series.days.length - 1 ? 'bg-[#F2B21B]' : 'bg-[#B9B3E6]'}`}
-              style={{ height: `${Math.max(6, (n / series.max) * 100)}%` }}
-            />
-          </div>
-        ))}
+      {/* skyline-style bars: tap one to pick that day */}
+      <div className="h-32 rounded-2xl bg-gradient-to-b from-[#F4F2FB] to-white px-3 pt-3 flex items-end gap-1" aria-label={`Reports per day over the last ${range} days`}>
+        {series.days.map(({ d, n }, i) => {
+          const picked = dayKey(d) === selKey;
+          return (
+            <button
+              type="button"
+              key={i}
+              onClick={() => pickDay(d)}
+              aria-pressed={picked}
+              aria-label={`${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}: ${n} report${n === 1 ? '' : 's'}`}
+              title={`${d.toLocaleDateString()}: ${n}`}
+              className="group flex-1 min-w-0 flex flex-col items-center justify-end h-full cursor-pointer"
+            >
+              <span
+                className={`block w-full rounded-t-md transition-colors ${
+                  picked ? 'bg-[#C98A0B]' : i === series.days.length - 1 ? 'bg-[#F2B21B]' : 'bg-[#B9B3E6] group-hover:bg-[#9E96DB]'
+                }`}
+                style={{ height: `${Math.max(6, (n / series.max) * 100)}%` }}
+              />
+            </button>
+          );
+        })}
       </div>
       {calendar}
       <button
@@ -542,48 +839,81 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
     </section>
   );
 
-  const statCard = (title: string, Icon: typeof Users, tint: string, a: { label: string; value: number }, b: { label: string; value: number }) => (
-    <div className="bg-white rounded-[22px] p-5 shadow-[0_20px_40px_-24px_rgba(58,42,8,0.4)]">
-      <div className="flex items-center justify-between">
-        <h4 className="text-[13px] font-semibold text-neutral-700">{title}</h4>
-        <span className="w-6 h-6 rounded-full bg-[#FFF3C9] text-[#C98A0B] flex items-center justify-center">
-          <ArrowUpRight className="w-3.5 h-3.5" />
-        </span>
-      </div>
-      <div className="mt-4 flex items-center gap-4">
-        <span className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0 ${tint}`}>
-          <Icon className="w-6 h-6" />
-        </span>
-        <div className="flex-1 grid grid-cols-2 gap-3">
-          {[a, b].map((x) => (
-            <div key={x.label} className="min-w-0">
-              <p className="text-[11px] text-neutral-400 truncate">{x.label}</p>
-              <p className="text-[24px] font-bold text-neutral-800 tabular-nums leading-tight">{x.value}</p>
-            </div>
-          ))}
+  // a stat card opens the Operations screen it summarises
+  const statCard = (
+    title: string,
+    Icon: typeof Users,
+    tint: string,
+    a: { label: string; value: number },
+    b: { label: string; value: number },
+    tab: string
+  ) => {
+    const body = (
+      <>
+        <div className="flex items-center justify-between">
+          <h4 className="text-[13px] font-semibold text-neutral-700">{title}</h4>
+          <span className="w-6 h-6 rounded-full bg-[#FFF3C9] text-[#C98A0B] flex items-center justify-center transition-colors group-hover:bg-[#F2B21B] group-hover:text-white">
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </span>
         </div>
-      </div>
-    </div>
-  );
+        <div className="mt-4 flex items-center gap-4">
+          <span className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0 ${tint}`}>
+            <Icon className="w-6 h-6" />
+          </span>
+          <div className="flex-1 grid grid-cols-2 gap-3">
+            {[a, b].map((x) => (
+              <div key={x.label} className="min-w-0">
+                <p className="text-[11px] text-neutral-400 truncate">{x.label}</p>
+                <p className="text-[24px] font-bold text-neutral-800 tabular-nums leading-tight">{x.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+    const cls = 'bg-white rounded-[22px] p-5 shadow-[0_20px_40px_-24px_rgba(58,42,8,0.4)]';
+    return onOpenOperations ? (
+      <button type="button" onClick={() => onOpenOperations(tab)} className={`${cls} group text-left cursor-pointer transition-shadow hover:shadow-[0_24px_44px_-22px_rgba(58,42,8,0.5)]`}>
+        {body}
+      </button>
+    ) : (
+      <div className={cls}>{body}</div>
+    );
+  };
 
   const overview = (
     <>
       {/* stat cards resting on the hero floor */}
       <div className="relative z-10 -mt-14 sm:-mt-16 px-4 sm:px-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {statCard('Reports this week', FileText, 'bg-gradient-to-br from-[#F6A33A] to-[#E9781C]', { label: 'Filed', value: reportsWeek.length }, { label: 'Still open', value: openReports })}
-        {statCard('SOS calls this week', Siren, 'bg-gradient-to-br from-[#F6C445] to-[#E9A825]', { label: 'Received', value: sosWeek.length }, { label: 'Unhandled', value: sosOpen })}
+        {statCard('Reports this week', FileText, 'bg-gradient-to-br from-[#F6A33A] to-[#E9781C]', { label: 'Filed', value: reportsWeek.length }, { label: 'Still open', value: openReports }, 'incidents')}
+        {statCard('SOS calls this week', Siren, 'bg-gradient-to-br from-[#F6C445] to-[#E9A825]', { label: 'Received', value: sosWeek.length }, { label: 'Unhandled', value: sosOpen }, 'sos_log')}
       </div>
       <div className="px-4 sm:px-8 mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Resolved this week', value: resolvedWeek },
-          { label: 'Responder units', value: data.responders.length },
-          { label: 'Open shelters', value: data.centers.filter((c) => c.status === 'open').length },
-        ].map((s) => (
-          <div key={s.label} className="bg-white/70 rounded-2xl px-5 py-4 flex items-center justify-between">
-            <span className="text-[12px] text-neutral-500">{s.label}</span>
-            <span className="text-[18px] font-bold text-neutral-800 tabular-nums">{s.value}</span>
-          </div>
-        ))}
+          { label: 'Resolved this week', value: resolvedWeek, tab: 'incidents' },
+          { label: 'Responder units', value: data.responders.length, tab: 'incidents' },
+          { label: 'Open shelters', value: data.centers.filter((c) => c.status === 'open').length, tab: 'shelters' },
+        ].map((s) =>
+          onOpenOperations ? (
+            <button
+              type="button"
+              key={s.label}
+              onClick={() => onOpenOperations(s.tab)}
+              className="group bg-white/70 hover:bg-white rounded-2xl px-5 py-4 flex items-center justify-between gap-3 text-left cursor-pointer transition-colors"
+            >
+              <span className="text-[12px] text-neutral-500">{s.label}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-[18px] font-bold text-neutral-800 tabular-nums">{s.value}</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-[#C98A0B]" />
+              </span>
+            </button>
+          ) : (
+            <div key={s.label} className="bg-white/70 rounded-2xl px-5 py-4 flex items-center justify-between">
+              <span className="text-[12px] text-neutral-500">{s.label}</span>
+              <span className="text-[18px] font-bold text-neutral-800 tabular-nums">{s.value}</span>
+            </div>
+          )
+        )}
       </div>
     </>
   );
@@ -591,7 +921,9 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   const accountsView = (
     <div className="px-4 sm:px-8 pt-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 className="text-[20px] font-bold text-neutral-800">All accounts</h2>
+        <h2 className="text-[20px] font-bold text-neutral-800">
+          {accountRole === 'all' ? 'All accounts' : ROLES.find((r) => r.role === accountRole)?.label || 'Accounts'}
+        </h2>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
         <button
           type="button"
@@ -622,6 +954,25 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
           />
         </label>
         </div>
+      </div>
+      {/* one role, or every role (the sidebar's role rows and the hero's portals set it too) */}
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Show accounts by role">
+        {[{ role: 'all' as const, label: 'All' }, ...ROLES].map(({ role, label }) => (
+          <button
+            key={role}
+            type="button"
+            onClick={() => setAccountRole(role)}
+            aria-pressed={accountRole === role}
+            className={`h-8 px-3.5 rounded-full text-[12px] font-semibold cursor-pointer transition-colors ${
+              accountRole === role ? 'bg-[#F2B21B] text-white shadow-sm' : 'bg-white text-neutral-600 hover:bg-[#FFF3C9] hover:text-[#8A5A00]'
+            }`}
+          >
+            {label}
+            <span className={`ml-1.5 tabular-nums ${accountRole === role ? 'text-white/80' : 'text-neutral-400'}`}>
+              {role === 'all' ? totalAccounts : roleCounts[role] || 0}
+            </span>
+          </button>
+        ))}
       </div>
       {newAcctNote && !newAcct && <p className="mb-3 px-1 text-[12px] font-semibold text-[#8A5A00]">{newAcctNote}</p>}
       {newAcct && (
@@ -1258,45 +1609,17 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
         <div className="h-full w-full max-w-[1500px] flex overflow-hidden sm:rounded-[26px] bg-[#F4F2EE] shadow-[0_40px_80px_-40px_rgba(40,40,70,0.45)]">
           {/* ---------------- left sidebar (desktop) */}
           <aside className="hidden lg:flex w-[270px] shrink-0 flex-col bg-white px-6 py-7 overflow-y-auto">
-            <div className="flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-lg bg-[#F2B21B] flex items-center justify-center">
-                <TriadEmblem portal="admin" variant="reverse" size={20} />
-              </span>
-              <span className="text-[15px] font-extrabold text-neutral-800">UniGuard</span>
+            {/* the application name leads; the console's name sits under it */}
+            <div className="flex items-center gap-2">
+              <TriadEmblem portal="admin" size={30} />
+              <span className="text-[22px] font-extrabold tracking-tight text-neutral-900 leading-none">UniGuard</span>
             </div>
 
-            <h1 className="mt-9 text-[24px] font-extrabold text-neutral-900 leading-tight">System Admin</h1>
-            <div className="mt-4 flex items-center justify-between text-[12px] text-neutral-400">
-              <span>Accounts by role</span>
-              <span className="font-semibold text-neutral-600">{totalAccounts}</span>
-            </div>
-
-            <ul className="mt-4 space-y-4">
-              {ROLES.map(({ role, label, icon: Icon }) => {
-                const n = roleCounts[role] || 0;
-                const pct = totalAccounts ? (n / totalAccounts) * 100 : 0;
-                return (
-                  <li key={role}>
-                    <button type="button" onClick={() => { setView('accounts'); setQuery(''); }} className="w-full text-left cursor-pointer group">
-                      <span className="flex items-center gap-3">
-                        <Icon className="w-4 h-4 text-neutral-400 group-hover:text-[#C98A0B]" />
-                        <span className="flex-1 text-[13px] text-neutral-700">{label}</span>
-                        <span className="text-[12px] font-semibold text-neutral-500 tabular-nums">{n}</span>
-                      </span>
-                      <span className="mt-2 ml-7 block h-1 rounded-full bg-neutral-100 overflow-hidden">
-                        <span className="block h-full rounded-full bg-gradient-to-r from-[#F6C445] to-[#F2A50F]" style={{ width: `${pct}%` }} />
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {/* menu: the LDRRMO screens the Super Admin opens in the gold Operations view */}
+            <h1 className="mt-6 text-[14px] font-bold text-neutral-800 leading-tight">System Admin</h1>
+            {/* the LDRRMO screens the Super Admin opens in the gold Operations view */}
             {onOpenOperations && (
               <>
-                <h2 className="mt-9 text-[13px] font-bold text-neutral-800">Menu</h2>
-                <nav aria-label="Operations menu" className="mt-3 space-y-1">
+                <nav aria-label="Operations menu" className="mt-4 -mx-3 space-y-0.5">
                   {SIDE_MENU.map(({ tab, label, icon: Icon }) => (
                     <button
                       key={tab}
@@ -1318,14 +1641,48 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
               </>
             )}
 
-            <button
-              type="button"
-              onClick={onSignOut}
-              className="mt-auto shrink-0 h-11 rounded-full bg-gradient-to-r from-[#F6C445] to-[#F2A50F] text-white text-[13px] font-bold flex items-center justify-between px-5 shadow-[0_10px_20px_-10px_rgba(242,165,15,0.9)] cursor-pointer"
+            {/* a section label under the menu, set apart by a hairline */}
+            <div
+              className={`${onOpenOperations ? 'mt-7 pt-6 border-t border-neutral-100' : 'mt-6'} flex items-center justify-between text-[10.5px] font-semibold uppercase tracking-[0.12em] text-neutral-400`}
             >
-              <span>Sign out</span>
-              <LogOut className="w-4 h-4" />
-            </button>
+              <span>Accounts by role</span>
+              <span className="text-[12px] tracking-normal text-neutral-500 tabular-nums">{totalAccounts}</span>
+            </div>
+
+            <ul className="mt-4 space-y-4">
+              {ROLES.map(({ role, label, icon: Icon }) => {
+                const n = roleCounts[role] || 0;
+                const pct = totalAccounts ? (n / totalAccounts) * 100 : 0;
+                return (
+                  <li key={role}>
+                    <button type="button" onClick={() => showRole(role)} aria-label={`${label}: ${n} account${n === 1 ? '' : 's'}`} className="w-full text-left cursor-pointer group">
+                      <span className="flex items-center gap-3">
+                        <Icon className="w-4 h-4 text-neutral-400 group-hover:text-[#C98A0B]" />
+                        <span className="flex-1 text-[13px] text-neutral-600">{label}</span>
+                        <span className="text-[12px] font-semibold text-neutral-500 tabular-nums">{n}</span>
+                      </span>
+                      <span className="mt-2 ml-7 block h-1 rounded-full bg-neutral-100 overflow-hidden">
+                        <span className="block h-full rounded-full bg-gradient-to-r from-[#F6C445] to-[#F2A50F]" style={{ width: `${pct}%` }} />
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* pinned to the bottom, with room above it even when the sidebar is full */}
+            <div className="mt-auto pt-8 shrink-0">
+              <button
+                type="button"
+                onClick={onSignOut}
+                className="group w-full h-10 pl-4 pr-1.5 rounded-full bg-gradient-to-r from-[#F6C445] to-[#F2A50F] text-white text-[12.5px] font-bold flex items-center justify-between shadow-[0_8px_16px_-10px_rgba(242,165,15,0.9)] cursor-pointer transition-all duration-200 hover:from-[#F2B93A] hover:to-[#E9950A] hover:shadow-[0_10px_20px_-10px_rgba(233,149,10,0.95)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F2A50F] focus-visible:ring-offset-2"
+              >
+                <span>Sign out</span>
+                <span className="w-7 h-7 rounded-full bg-white/25 flex items-center justify-center transition-colors group-hover:bg-white/35">
+                  <LogOut className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+                </span>
+              </button>
+            </div>
           </aside>
 
           {/* ---------------- main column */}
@@ -1405,7 +1762,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                     <div className="mt-5 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setView('accounts')}
+                        onClick={() => showRole('all')}
                         className="h-10 px-5 rounded-full bg-[#F28C0F] text-white text-[13px] font-bold shadow-md cursor-pointer"
                       >
                         Manage accounts
@@ -1423,7 +1780,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
                     </div>
                   </div>
                   <div className="hidden md:block h-[230px] self-end">
-                    <HeroArt />
+                    <HeroArt onPickRole={showRole} />
                   </div>
                 </div>
               ) : (
