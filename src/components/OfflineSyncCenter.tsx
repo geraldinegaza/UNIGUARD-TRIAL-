@@ -254,10 +254,11 @@ export const OfflineSyncCenter: React.FC<OfflineSyncCenterProps> = ({
 
       {/* 2. Page Title Header: Exact wording from Screenshot */}
       <div className="px-1">
-        <h1 className={`text-xl sm:text-2xl font-semibold ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'} tracking-tight`}>
+        {/* residents see the page name in the top bar from tablet width up, so this heading is for phones only */}
+        <h1 className={`text-xl sm:text-2xl font-semibold ${isResident ? 'md:hidden' : ''} ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'} tracking-tight`}>
           {t("Offline Readiness")}
         </h1>
-        <p className={`text-xs sm:text-sm ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'} mt-0.5 max-w-2xl leading-relaxed`}>
+        <p className={`text-xs sm:text-sm ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'} mt-0.5 ${isResident ? 'md:mt-0' : ''} max-w-2xl leading-relaxed`}>
           {t("Progressive web app caching keeps the essentials available when networks fail.")}
         </p>
       </div>

@@ -64,8 +64,9 @@ export const SettingsView: React.FC<Props> = ({ currentUser, isSuperAdmin = fals
   return (
     <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-300 max-w-4xl">
       <div className="px-1">
-        <h1 className={ui.h1}>{t('Settings')}</h1>
-        <p className={`${ui.sub} mt-0.5`}>{t('Alerts, language and offline use on this device.')}</p>
+        {/* residents see "Settings" in the top bar from tablet width up, so the page heading is for phones only */}
+        <h1 className={`${ui.h1} ${role === 'citizen' ? 'md:hidden' : ''}`}>{t('Settings')}</h1>
+        <p className={`${ui.sub} mt-0.5 ${role === 'citizen' ? 'md:mt-0' : ''}`}>{t('Alerts, language and offline use on this device.')}</p>
       </div>
 
       <div className={`flex items-center gap-1.5 overflow-x-auto scrollbar-none p-1.5 rounded-full border w-fit max-w-full ${ui.tabs}`} role="tablist">
@@ -349,7 +350,7 @@ const TemplatesTab: React.FC<{ ui: UI; canEdit: boolean }> = ({ ui, canEdit }) =
       </ul>
 
       {editing && (
-        <div className={`fixed inset-0 z-50 ${ui.modalBack} backdrop-blur-xs flex items-center justify-center p-3 sm:p-4`}>
+        <div className={`fixed inset-0 z-50 ${ui.modalBack} flex items-center justify-center p-3 sm:p-4`}>
           <form onSubmit={save} className={`bg-white rounded-[24px] max-w-2xl w-full max-h-[calc(100dvh-1.5rem)] overflow-y-auto shadow-2xl border ${ui.modal}`}>
             <div className={`sticky top-0 bg-white px-5 sm:px-6 py-4 border-b ${ui.border} flex items-center justify-between`}>
               <h3 className={`font-semibold text-base ${ui.ink}`}>{editing === 'new' ? t('New template') : t('Edit template')}</h3>

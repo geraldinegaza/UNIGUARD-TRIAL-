@@ -80,7 +80,7 @@ const RESPONDER_PILL: Record<string, string> = {
 
 const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; footer: React.ReactNode }> = ({ title, onClose, children, footer }) => (
   <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
-    <div className="absolute inset-0 bg-[#011025]/50 backdrop-blur-xs" onClick={onClose} aria-hidden="true" />
+    <div className="absolute inset-0 bg-[#011025]/50" onClick={onClose} aria-hidden="true" />
     <div className="relative w-full sm:max-w-md max-h-[90dvh] overflow-y-auto bg-white rounded-t-[24px] sm:rounded-[24px] border border-[#7EA0C5]/40 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5 shadow-xl">
       <div className="flex items-center justify-between gap-3 mb-4">
         <h3 className="text-base font-semibold text-[#011025]">{title}</h3>

@@ -41,9 +41,16 @@ export const HotlineDirectory: React.FC<HotlineDirectoryProps> = ({
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
-      {/* 1. Header: Save Offline action bar matching Home styling */}
-      <div className="flex items-center justify-end pb-1">
+    <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-200">
+      {/* 1. What this page is, with Save Offline beside it (one row, no empty band) */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          {/* the top bar names the page from tablet width up; phones get the heading here */}
+          <h1 className="md:hidden text-xl font-extrabold text-neutral-900 tracking-tight">{t("Hotlines")}</h1>
+          <p className="text-xs sm:text-sm text-neutral-500">
+            {t("Emergency Hotline Directory for barangay and municipal offices.")}
+          </p>
+        </div>
         <button
           onClick={handleSaveOffline}
           className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-95 w-fit shrink-0"

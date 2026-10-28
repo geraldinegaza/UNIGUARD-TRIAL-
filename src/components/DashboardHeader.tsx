@@ -121,7 +121,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       case 'sos':
         return t('Emergency SOS');
       case 'offline_sync':
-        return t('Offline Sync');
+        return t('Offline Readiness');
       case 'notifications':
         return t('Notifications');
       case 'incidents':
@@ -129,7 +129,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       case 'triage':
         return t('Incidents');
       case 'advisories':
-        return t('Advisories');
+        return t('Advisories and Alerts');
       case 'hazard_map':
         return t('Hazard Map');
       case 'my_reports':
@@ -449,7 +449,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
   return (
     <header className={`px-3.5 sm:px-6 lg:px-8 py-1 md:py-5 flex flex-row flex-nowrap items-center justify-between gap-2 md:gap-4 sticky top-0 z-15 w-full ${
-      isResident ? 'border-b border-neutral-100 bg-white/95 backdrop-blur-md' : 'border-b border-neutral-200/60 bg-[#f4f4f6]/90 backdrop-blur-md'
+      isResident ? 'border-b border-neutral-100 bg-white' : 'border-b border-neutral-200/60 bg-[#f4f4f6]'
     }`}>
       {/* Brand Lockup */}
       <div className="flex items-center justify-between gap-2 min-w-0 shrink-0 md:shrink md:flex-1">
@@ -691,8 +691,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               {/* Background blur overlay when SOS popover is open */}
               {isSosOpen && (
                 <div
-                  className="fixed inset-0 bg-neutral-950/50 backdrop-blur-md z-40 transition-all duration-200 cursor-pointer"
-                  style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+                  className="fixed inset-0 bg-neutral-950/50 z-40 transition-all duration-200 cursor-pointer"
                   onClick={() => setIsSosOpen(false)}
                 />
               )}
@@ -855,7 +854,29 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </div>
           )}
 
-          {/* 1. Notifications (Shared for Residents, Barangay Officials, and LGU) */}
+            {/* 1. Report Hazard (+ sign with hover tooltip; residents only), before the notifications */}
+            {isResident && (
+              <div className="relative group">
+                <button
+                  onClick={onOpenReportModal}
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border border-neutral-200 hover:bg-red-900 text-neutral-800 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95"
+                  title={t("Report Hazard")}
+                  aria-label={t("Report Hazard")}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+
+                {/* Tooltip on hover saying "Report Hazard" */}
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
+                  <div className="w-1.5 h-1.5 -mb-0.5 rotate-45 bg-neutral-900 border-t border-l border-neutral-800" />
+                  <span className="relative z-10 py-1 px-2.5 text-[10px] font-bold leading-none text-white whitespace-nowrap bg-neutral-900 rounded-lg shadow-lg border border-neutral-800">
+                    {t("Report Hazard")}
+                  </span>
+                </div>
+              </div>
+            )}
+
+          {/* 2. Notifications (Shared for Residents, Barangay Officials, and LGU) */}
             <div className="relative group">
               <button
                 onClick={() => {
@@ -904,8 +925,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               {/* Background blur overlay when Notifications dropdown is open */}
               {isNotificationsOpen && (
                 <div
-                  className="fixed inset-0 bg-neutral-950/50 backdrop-blur-md z-40 transition-all duration-200 cursor-pointer"
-                  style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+                  className="fixed inset-0 bg-neutral-950/50 z-40 transition-all duration-200 cursor-pointer"
                   onClick={() => setIsNotificationsOpen(false)}
                 />
               )}
@@ -1144,28 +1164,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               )}
             </div>
 
-            {/* 2. Report Hazard (+ sign with hover tooltip - Residents & Barangay Officials only) */}
-            {isResident && (
-              <div className="relative group">
-                <button
-                  onClick={onOpenReportModal}
-                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white border border-neutral-200 hover:bg-red-900 text-neutral-800 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95"
-                  title={t("Report Hazard")}
-                  aria-label={t("Report Hazard")}
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-
-                {/* Tooltip on hover saying "Report Hazard" */}
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
-                  <div className="w-1.5 h-1.5 -mb-0.5 rotate-45 bg-neutral-900 border-t border-l border-neutral-800" />
-                  <span className="relative z-10 py-1 px-2.5 text-[10px] font-bold leading-none text-white whitespace-nowrap bg-neutral-900 rounded-lg shadow-lg border border-neutral-800">
-                    {t("Report Hazard")}
-                  </span>
-                </div>
-              </div>
-            )}
-
             {/* 3. Menu (Rightmost) with Profile inside. On resident phones the menu lives in the bottom bar. */}
             <div className={`relative group ${isCitizen ? 'max-md:hidden' : ''}`}>
               <button
@@ -1203,8 +1201,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               {/* Background blur overlay when Menu is open */}
               {isMenuOpen && (
                 <div
-                  className="fixed inset-0 bg-neutral-950/50 backdrop-blur-md z-40 transition-all duration-200 cursor-pointer"
-                  style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+                  className="fixed inset-0 bg-neutral-950/50 z-40 transition-all duration-200 cursor-pointer"
                   onClick={() => setIsMenuOpen(false)}
                 />
               )}
@@ -1392,7 +1389,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
       {/* "View All Notifications" Modal for Admin */}
       {isAllNotificationsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/60 animate-in fade-in duration-200">
           <div
             className="fixed inset-0"
             onClick={() => setIsAllNotificationsModalOpen(false)}

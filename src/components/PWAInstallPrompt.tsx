@@ -45,7 +45,7 @@ export const PWAInstallPrompt: React.FC = () => {
   return (
     <aside
       aria-label={t("Install UniGuard Application")}
-      className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 right-4 sm:right-auto z-40 max-w-sm bg-slate-900/95 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 backdrop-blur-xs flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4"
+      className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 right-4 sm:right-auto z-40 max-w-sm bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4"
     >
       <div className="flex items-center gap-2.5">
         <span className="p-2 rounded-xl bg-[#b91c1c] text-white shrink-0">

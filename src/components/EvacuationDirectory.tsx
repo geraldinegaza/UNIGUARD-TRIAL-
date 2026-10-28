@@ -1,7 +1,8 @@
 import { t } from '../lib/i18n';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRepo } from '../hooks/useRepo';
-import { ItemFocus, useFocusItem } from '../hooks/useFocusItem';
+import { ItemFocus, openable, useFocusItem } from '../hooks/useFocusItem';
+import { DetailBar, DetailModal, DetailRow } from './DetailModal';
 import { telHref } from '../lib/util';
 import {
   EvacuationCenter,
@@ -30,6 +31,7 @@ import {
   CheckCircle,
   ExternalLink,
   Edit3,
+  FileText,
   ChevronDown,
   ChevronUp,
   ChevronRight,
@@ -66,6 +68,10 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
   
   // Quick Edit Modal
   const [editingCenter, setEditingCenter] = useState<EvacuationCenter | null>(null);
+  // Details: the full record of one shelter (reference build "Details")
+  const [detailCenter, setDetailCenter] = useState<EvacuationCenter | null>(null);
+  // Edit Location opens the editor with the coordinates focused
+  const [focusLocation, setFocusLocation] = useState(false);
   const [editOccupancy, setEditOccupancy] = useState<number>(0);
   const [editStatus, setEditStatus] = useState<EvacuationStatus>('open');
   const [editFacilities, setEditFacilities] = useState<string[]>([]);
@@ -269,6 +275,106 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
     });
   }, [residentSheltersList, residentFilter, residentSelectedBarangay, residentSearchQuery]);
 
+  // the Details pop-up, for residents (read-only) and staff (with Edit / Edit Location)
+  const detailView = detailCenter
+    ? (() => {
+        const c = evacuationCenters.find((x) => x.id === detailCenter.id) || detailCenter;
+        const pct = c.capacity > 0 ? Math.min(100, Math.round((c.current_occupancy / c.capacity) * 100)) : 0;
+        const tone = isResident ? 'resident' : isBarangay ? 'barangay' : 'staff';
+        const statusLabel = c.status === 'open' ? 'Open' : c.status === 'full' ? 'Full' : 'Closed';
+        const btn = 'inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold cursor-pointer transition-colors';
+        const dark = isResident ? 'bg-red-900 hover:bg-red-800 text-white' : isBarangay ? 'bg-[#052659] hover:bg-[#011025] text-white' : 'bg-[#18181b] hover:bg-neutral-800 text-white';
+        const soft = isResident ? 'bg-red-50 text-red-900 border border-red-900/20 hover:bg-red-100' : 'bg-white text-neutral-800 border border-neutral-200 hover:bg-neutral-100';
+        return (
+          <DetailModal
+            title={c.name}
+            subtitle={c.barangay_name ? `Barangay ${c.barangay_name}` : undefined}
+            tone={tone}
+            onClose={() => setDetailCenter(null)}
+            actions={
+              <>
+                {c.contact_phone && (
+                  <a href={telHref(c.contact_phone)} className={`${btn} ${soft}`}>
+                    <Phone className="w-3.5 h-3.5" />
+                    {t('Call')}
+                  </a>
+                )}
+                {onSelectOnMap && c.has_location && (
+                  <button type="button" onClick={() => { setDetailCenter(null); onSelectOnMap(c); }} className={`${btn} ${soft}`}>
+                    <MapPin className="w-3.5 h-3.5" />
+                    {t('Show on map')}
+                  </button>
+                )}
+                {!isResident && (
+                  <button type="button" onClick={() => { setDetailCenter(null); setFocusLocation(true); handleOpenEdit(c); }} className={`${btn} ${soft}`}>
+                    <MapPin className="w-3.5 h-3.5" />
+                    {t('Edit Location')}
+                  </button>
+                )}
+                {!isResident && (
+                  <button type="button" onClick={() => { setDetailCenter(null); setFocusLocation(false); handleOpenEdit(c); }} className={`${btn} ${soft}`}>
+                    <Edit3 className="w-3.5 h-3.5" />
+                    {t('Edit')}
+                  </button>
+                )}
+                {c.has_location && canNavigate(c.latitude, c.longitude) && (
+                  <a href={wazeUrl(c.latitude, c.longitude)} target="_blank" rel="noopener noreferrer" className={`${btn} ${dark}`}>
+                    <Compass className="w-3.5 h-3.5" />
+                    {t('Navigate with Waze')}
+                  </a>
+                )}
+              </>
+            }
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  c.status === 'open' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : c.status === 'full' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-neutral-100 text-neutral-500 border border-neutral-200'
+                }`}
+              >
+                {t(statusLabel)}
+              </span>
+              <span className="text-xs font-mono text-neutral-600">
+                {c.current_occupancy} / {c.capacity} {t('slots')} · {pct}%
+              </span>
+            </div>
+            <DetailBar pct={pct} color={pct >= 100 ? '#B91C1C' : pct >= 80 ? '#D97706' : '#15803D'} />
+            {(c.facilities || []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {(c.facilities || []).map((f) => (
+                  <span key={f} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700">
+                    <Check className="w-3 h-3" />
+                    {f}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div>
+              <DetailRow tone={tone} label={t('Barangay')} value={c.barangay_name} />
+              <DetailRow tone={tone} label={t('Address')} value={c.address} />
+              <DetailRow tone={tone} label={t('Capacity')} value={c.capacity} />
+              <DetailRow tone={tone} label={t('Current occupancy')} value={c.current_occupancy} />
+              <DetailRow tone={tone} label={t('Slots left')} value={Math.max(0, c.capacity - c.current_occupancy)} />
+              <DetailRow tone={tone} label={t('Contact person')} value={c.contact_person} />
+              <DetailRow
+                tone={tone}
+                label={t('Contact phone')}
+                value={c.contact_phone ? <a href={telHref(c.contact_phone)} className="underline">{c.contact_phone}</a> : ''}
+              />
+              <DetailRow tone={tone} label={t('Coordinates')} value={c.has_location ? fmtCoords(c.latitude, c.longitude) : t('Not recorded')} />
+              {c.notes && <DetailRow tone={tone} label={t('Notes')} value={c.notes} />}
+              {!isResident && <DetailRow tone={tone} label={t('Needs a PNP patrol')} value={c.needs_patrol ? t('Yes') : t('No')} />}
+            </div>
+            {c.has_location && !canNavigate(c.latitude, c.longitude) && (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                {coordMessage(classifyCoords(c.latitude, c.longitude))}
+              </p>
+            )}
+          </DetailModal>
+        );
+      })()
+    : null;
+
   // opened on one shelter: clear whatever filter would hide it, then bring it into view
   useEffect(() => {
     if (!focus) return;
@@ -433,7 +539,9 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                     <div
                       key={s.id}
                       id={`shelter-${s.id}`}
-                      className="p-6 rounded-3xl border border-neutral-100 bg-neutral-50/50 hover:bg-red-50/30 transition-all duration-300 flex flex-col justify-between space-y-5 shadow-xs hover:shadow-lg group"
+                      {...openable(() => rawCenter && setDetailCenter(rawCenter))}
+                      aria-label={`${s.name}: ${t('Details')}`}
+                      className="p-6 rounded-3xl border border-neutral-100 bg-neutral-50/50 hover:bg-red-50/30 transition-all duration-300 flex flex-col justify-between space-y-5 shadow-xs hover:shadow-lg group cursor-pointer"
                     >
                       <div className="space-y-3.5">
                         {/* Top: Name & Status Badge */}
@@ -515,8 +623,8 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                         )}
                       </div>
 
-                      {/* Card Action Buttons */}
-                      <div className="pt-4 border-t border-neutral-200/70 flex items-center gap-2">
+                      {/* Card Action Buttons: taps here act on the button, not the card */}
+                      <div className="pt-4 border-t border-neutral-200/70 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() =>
                             navigateTo(s.raw, (m) => {
@@ -528,6 +636,14 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                         >
                           <Compass className="w-3.5 h-3.5" />
                           <span>{t("Navigate with Waze")}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => rawCenter && setDetailCenter(rawCenter)}
+                          className="px-3.5 h-10 rounded-xl bg-white hover:bg-red-50 text-red-900 border border-red-900/20 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+                        >
+                          {t("Details")}
                         </button>
 
                         <button
@@ -559,6 +675,8 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
             )}
           </div>
         </div>
+
+        {detailView}
 
         {/* Offline Notification Toast */}
         {savedOfflineNotice && (
@@ -969,9 +1087,21 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 </button>
 
                 {/* Secondary Utility Actions: Edit Occupancy & Pin on Map */}
-                <div className="flex items-center justify-between text-[11px] pt-1">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] pt-1">
                   <button
-                    onClick={() => handleOpenEdit(center)}
+                    onClick={() => setDetailCenter(center)}
+                    className={`flex items-center gap-1 cursor-pointer font-semibold ${
+                      isBarangay ? 'text-[#052659] hover:text-[#011025]' : 'text-neutral-800 hover:text-black'
+                    }`}
+                  >
+                    <FileText className="w-3 h-3" />
+                    <span>{t("Details")}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFocusLocation(false);
+                      handleOpenEdit(center);
+                    }}
                     className={`flex items-center gap-1 cursor-pointer font-medium ${
                       isBarangay ? 'text-[#5482B4] hover:text-[#052659]' : 'text-neutral-500 hover:text-neutral-900'
                     }`}
@@ -1010,8 +1140,10 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
       )}
 
       {/* Admin Update Evacuation Stats Modal */}
+      {detailView}
+
       {editingCenter && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className={`bg-white rounded-[24px] max-w-md w-full max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 shadow-2xl animate-in zoom-in-95 ${
             isBarangay ? 'border border-[#7EA0C5]/40' : 'border border-neutral-200/80'
           }`}>
@@ -1129,6 +1261,7 @@ export const EvacuationDirectory: React.FC<EvacuationDirectoryProps> = ({
                 <span className={`block text-xs font-semibold ${isBarangay ? 'text-[#052659]' : 'text-neutral-700'}`}>{t("Location")}</span>
                 <div className="grid grid-cols-2 gap-2">
                   <input
+                    autoFocus={focusLocation}
                     value={editLat}
                     onChange={(e) => setEditLat(e.target.value)}
                     inputMode="decimal"

@@ -71,7 +71,7 @@ export const EmergencyAlertNotificationModal: React.FC<EmergencyAlertNotificatio
       role="dialog"
       aria-modal="true"
       aria-labelledby="emergency-alert-title"
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-neutral-900/40 backdrop-blur-xs transition-opacity duration-300"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-neutral-900/40 transition-opacity duration-300"
     >
       {/* Alert Card styled to match reference dashboard card aesthetic */}
       <div className="relative w-full max-w-lg bg-white rounded-[24px] border border-neutral-200/80 shadow-2xl overflow-hidden p-5 sm:p-6 animate-in fade-in zoom-in-95 duration-200">

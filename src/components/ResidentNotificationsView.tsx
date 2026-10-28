@@ -26,6 +26,7 @@ import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { AppNotification } from '../types';
 import { relTime, syncLabel } from '../lib/util';
+import { StatCard } from './StatCard';
 
 interface ResidentNotificationsViewProps {
   onNavigateTab?: (tab: string) => void;
@@ -174,80 +175,31 @@ export const ResidentNotificationsView: React.FC<ResidentNotificationsViewProps>
         </button>
       </div>
 
-      {/* 2. Three KPI Metric Cards with icons, bold labels, and tabular figures (Matching Home Cards) */}
+      {/* 2. Three figures: white at rest, the signature dark red while hovered (as on Home) */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 w-full">
-        {/* Card 1: Delivered Today (Signature Hero Dark Red Card) */}
-        <div className="bg-gradient-to-br from-red-800 via-red-900 to-red-950 text-white col-span-2 lg:col-span-1 rounded-3xl p-5 sm:p-7 shadow-xl hover:shadow-2xl border border-red-900/40 flex flex-col justify-between min-w-0 w-full relative overflow-hidden group transition-all duration-300">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-red-100/80">
-                {t("Delivered Today")}
-              </p>
-              <p className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight font-mono tabular-nums mt-2">
-                {deliveredToday}
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-white/15 text-white border border-white/20 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform shrink-0">
-              <Bell className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="mt-6 pt-4 border-t border-white/15 flex items-center gap-2 text-xs text-red-100/90 font-medium">
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span>{t("Active push notifications delivered to device")}</span>
-          </div>
-        </div>
-
-        {/* Card 2: Unread Bulletins (Clean White Floating Card) */}
-        <div className="bg-white rounded-3xl p-4 sm:p-7 shadow-xl hover:shadow-2xl border border-neutral-100/80 transition-all duration-300 flex flex-col justify-between group min-w-0 w-full">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                {t("Unread Alerts")}
-              </p>
-              <p className="text-3xl sm:text-5xl font-extrabold text-neutral-900 group-hover:text-red-900 transition-colors tracking-tight font-mono tabular-nums mt-2">
-                {unreadCount}
-              </p>
-            </div>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-50 text-red-900 border border-red-100/60 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform shrink-0">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-          </div>
-          <div className="mt-4 pt-3 sm:mt-6 sm:pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
-            <span className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${unreadCount > 0 ? 'bg-red-900' : 'bg-emerald-600'}`} />
-              <span>{unreadCount > 0 ? 'Pending acknowledgement' : 'All alerts acknowledged'}</span>
-            </span>
-            <span className="font-mono font-bold text-neutral-700 tabular-nums">
-              {unreadCount === 0 ? 'All Cleared' : 'Needs Review'}
-            </span>
-          </div>
-        </div>
-
-        {/* Card 3: Delivery Channel (Clean White Floating Card) */}
-        <div className="bg-white rounded-3xl p-4 sm:p-7 shadow-xl hover:shadow-2xl border border-neutral-100/80 transition-all duration-300 flex flex-col justify-between group min-w-0 w-full">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                {t("Delivery Channel")}
-              </p>
-              <p className="text-2xl sm:text-3xl font-extrabold text-red-900 group-hover:text-red-800 transition-colors tracking-tight font-mono tabular-nums mt-3">
-                {t("Push + Inbox")}
-              </p>
-            </div>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-50 text-red-900 border border-red-100/60 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform shrink-0">
-              <Radio className="w-6 h-6" />
-            </div>
-          </div>
-          <div className="mt-4 pt-3 sm:mt-6 sm:pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-900" />
-              <span>{t("Offline queue verified")}</span>
-            </span>
-            <span className="font-mono font-bold text-red-900 tabular-nums">
-              {t("Active")}
-            </span>
-          </div>
-        </div>
+        <StatCard
+          className="col-span-2 lg:col-span-1"
+          label={t("Delivered Today")}
+          value={deliveredToday}
+          note={t("Active push notifications delivered to device")}
+          icon={Bell}
+        />
+        <StatCard
+          label={t("Unread Alerts")}
+          value={unreadCount}
+          note={unreadCount > 0 ? t('Pending acknowledgement') : t('All alerts acknowledged')}
+          dotClass={unreadCount > 0 ? 'bg-red-900' : 'bg-emerald-600'}
+          aside={unreadCount === 0 ? t('All Cleared') : t('Needs Review')}
+          icon={AlertTriangle}
+        />
+        <StatCard
+          label={t("Delivery Channel")}
+          value={t("Push + Inbox")}
+          textValue
+          note={t("Offline queue verified")}
+          aside={t("Active")}
+          icon={Radio}
+        />
       </div>
 
       {/* 3. Hero Latest Broadcast Alert Card with Collapsible Safety Directives (Matching Home Push Alert Card) */}

@@ -4,6 +4,7 @@ import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { classifyCoords, coordMessage, locate } from '../lib/geo';
 import { RoadCause, RoadCondition } from '../types';
+import { RoadStatusDetail } from './RoadStatusDetail';
 import {
   Construction,
   Megaphone,
@@ -144,6 +145,8 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
   // Modal for adding extra road status overlay
   const [isOverlayModalOpen, setIsOverlayModalOpen] = useState(false);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  // Details: the full road status record, with Edit and Open in Waze
+  const [detailRoadId, setDetailRoadId] = useState<string | null>(null);
 
   const flash = (message: string, ms = 3500) => {
     setActionNotice(message);
@@ -905,6 +908,18 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
                         </button>
                       )}
 
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDetailRoadId(post.id);
+                        }}
+                        className={`text-[11px] font-semibold hover:underline cursor-pointer ${
+                          isBarangay ? 'text-[#052659] hover:text-[#011025]' : 'text-neutral-900 hover:text-black'
+                        }`}
+                      >
+                        Details
+                      </button>
+
                       {onSelectOnMap && (
                         <button
                           onClick={() => onSelectOnMap(post)}
@@ -936,6 +951,15 @@ export const LdrrmcRoadWorkView: React.FC<LdrrmcRoadWorkViewProps> = ({
           )}
         </div>
       </div>
+      {detailRoadId && (
+        <RoadStatusDetail
+          roadId={detailRoadId}
+          tone={isBarangay ? 'barangay' : 'staff'}
+          canEdit={currentUser.role !== 'citizen'}
+          onClose={() => setDetailRoadId(null)}
+          onSaved={(m) => flash(m)}
+        />
+      )}
     </div>
   );
 };

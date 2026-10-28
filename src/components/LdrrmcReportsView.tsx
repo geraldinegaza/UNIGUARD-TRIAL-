@@ -790,7 +790,7 @@ const DnaTab: React.FC<{
       </div>
 
       {editing && (
-        <div className={`fixed inset-0 z-50 ${t.modalBack} backdrop-blur-xs flex items-center justify-center p-3 sm:p-4`}>
+        <div className={`fixed inset-0 z-50 ${t.modalBack} flex items-center justify-center p-3 sm:p-4`}>
           <form onSubmit={save} className={`bg-white rounded-[24px] max-w-2xl w-full max-h-[calc(100dvh-1.5rem)] overflow-y-auto shadow-2xl border ${t.modal}`}>
             <div className={`sticky top-0 z-10 bg-white px-5 sm:px-6 py-4 border-b ${t.border} flex items-center justify-between gap-3`}>
               <h3 className={`font-semibold text-base ${t.ink}`}>{editing === 'new' ? 'New Damage & Needs Assessment' : 'Edit Assessment'}</h3>

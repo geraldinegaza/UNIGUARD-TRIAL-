@@ -373,6 +373,7 @@ const toHotline = (h: Row): EmergencyHotline => ({
   scope: h.scope || PLACE.areaAll,
   description: h.description || '',
   active: h.active !== false,
+  category: h.category || '',
 });
 
 const toNotification = (n: Row): AppNotification => ({
@@ -593,9 +594,16 @@ export async function loadAll(): Promise<void> {
       const all = (hotlines.data || []).map(toHotline);
       // a resident sees the citywide numbers and their own barangay's, never another barangay's desk
       const me = state.user;
+      // (a desk saved without its barangay link still names its barangay, e.g. "Poblacion Barangay Desk")
+      const mine = (me?.barangay_name || '').toLowerCase();
+      const others = (state.barangays || []).map((b) => b.name.toLowerCase()).filter((n) => n && n !== mine);
+      const namesOther = (h: EmergencyHotline) => {
+        const text = `${h.agency_name} ${h.scope}`.toLowerCase();
+        return others.some((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(text)) && !(mine && text.includes(mine));
+      };
       patch.hotlines =
-        me && me.role === 'citizen' && me.barangay_uuid
-          ? all.filter((h) => !h.barangay_uuid || h.barangay_uuid === me.barangay_uuid)
+        me && me.role === 'citizen'
+          ? all.filter((h) => (h.barangay_uuid ? h.barangay_uuid === me.barangay_uuid : !namesOther(h)))
           : all;
     }
     if (!notifications.error) patch.notifications = (notifications.data || []).map(toNotification);

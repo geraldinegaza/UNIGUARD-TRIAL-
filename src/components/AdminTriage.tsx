@@ -1397,7 +1397,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
 
       {/* 4. Dispatch Modal */}
       {dispatchModalReport && (
-        <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} backdrop-blur-xs flex items-center justify-center p-4`}>
+        <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} flex items-center justify-center p-4`}>
           <div className={`bg-white rounded-[24px] max-w-md w-full p-6 shadow-xl border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200'} animate-in zoom-in-95 duration-200`}>
             <div className="mb-1">
               <h3 className={`font-semibold ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'} text-base tracking-tight`}>
@@ -1527,7 +1527,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
 
       {/* 5. Resolve Incident Modal */}
       {resolveModalReport && (
-        <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} backdrop-blur-xs flex items-center justify-center p-4`}>
+        <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} flex items-center justify-center p-4`}>
           <div className={`bg-white rounded-[24px] max-w-md w-full p-6 shadow-xl border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200'} animate-in zoom-in-95 duration-200`}>
             <div className="flex items-center gap-2 mb-1">
               <CheckCircle className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
@@ -1585,7 +1585,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
 
       {/* 6. Reject / Dismiss Modal */}
       {rejectModalReport && (
-        <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} backdrop-blur-xs flex items-center justify-center p-4`}>
+        <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} flex items-center justify-center p-4`}>
           <div className={`bg-white rounded-[24px] max-w-md w-full p-6 shadow-xl border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200'} animate-in zoom-in-95 duration-200`}>
             <div className="flex items-center gap-2 mb-1">
               <Ban className={`w-4 h-4 ${isBarangay ? 'text-[#052659]' : 'text-neutral-800'}`} />
@@ -1652,7 +1652,7 @@ export const AdminTriage: React.FC<AdminTriageProps> = ({
       )}
       {/* Super Admin: correct an incident record (reference build) */}
       {editRecord && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4" onClick={() => setEditRecord(null)}>
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setEditRecord(null)}>
           <form
             role="dialog"
             aria-label={`Edit incident ${editRecord.code}`}

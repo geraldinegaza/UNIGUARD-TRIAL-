@@ -362,7 +362,7 @@ export const DispatchUnitsView: React.FC<DispatchUnitsViewProps> = ({ canManageA
 
       {/* Unit panel */}
       {openUnit && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-neutral-950/50 backdrop-blur-xs p-0 sm:p-6" onClick={() => setOpenUnit(null)}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-neutral-950/50 p-0 sm:p-6" onClick={() => setOpenUnit(null)}>
           <div
             role="dialog"
             aria-label={`Unit ${openUnit.name}`}

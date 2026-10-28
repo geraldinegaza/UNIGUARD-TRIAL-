@@ -222,13 +222,6 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       badge: null,
     },
     {
-      id: 'report',
-      label: 'Report a Hazard',
-      shortLabel: 'Report',
-      icon: Plus,
-      badge: null,
-    },
-    {
       id: 'relief',
       label: 'Relief',
       shortLabel: 'Relief',
@@ -418,10 +411,10 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     const isBarangay = currentUser.role === 'barangay';
 
     return (
-      <header className={`w-full px-3 sm:px-5 py-2 sm:py-2.5 flex flex-wrap lg:flex-nowrap items-center justify-between gap-1.5 sm:gap-2.5 backdrop-blur-md shrink-0 z-30 transition-colors ${
+      <header className={`w-full px-3 sm:px-5 py-2 sm:py-2.5 flex flex-wrap lg:flex-nowrap items-center justify-between gap-1.5 sm:gap-2.5 shrink-0 z-30 transition-colors ${
         isBarangay
-          ? 'bg-[#f4f7fb]/95 border-b border-[#7EA0C5]/30'
-          : 'bg-[#f4f4f6]/95 border-b border-gray-200/70'
+          ? 'bg-[#f4f7fb] border-b border-[#7EA0C5]/30'
+          : 'bg-[#f4f4f6] border-b border-gray-200/70'
       }`}>
         {/* Brand/Logo (Left): Style the brand name container as a thin, outlined pill */}
         <div className={`rounded-full px-3 sm:px-4 py-1.5 flex items-center gap-2 min-w-0 shrink max-w-[calc(100%-8rem)] sm:max-w-none transition-all ${
@@ -456,7 +449,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         </div>
 
         {/* Navigation Links: Visibly organized container with horizontal scroll and dynamic fade masks */}
-        <div className={`relative hidden md:block flex-1 min-w-0 order-last lg:order-none basis-full lg:basis-0 max-w-full lg:max-w-[640px] xl:max-w-[720px] shrink rounded-full backdrop-blur-xs shadow-2xs p-1 overflow-hidden mx-0 lg:mx-2.5 ${
+        <div className={`relative hidden md:block flex-1 min-w-0 order-last lg:order-none basis-full lg:basis-0 max-w-full lg:max-w-[640px] xl:max-w-[720px] shrink rounded-full shadow-2xs p-1 overflow-hidden mx-0 lg:mx-2.5 ${
           isBarangay
             ? 'bg-white/80 border border-[#7EA0C5]/40'
             : 'bg-white/70 border border-gray-200/60'

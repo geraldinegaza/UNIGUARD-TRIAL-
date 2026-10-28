@@ -411,7 +411,7 @@ export default function App() {
           <div className="fixed inset-0 z-50 lg:hidden flex pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
             {/* Backdrop */}
             <div
-              className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
+              className="fixed inset-0 bg-slate-950/70 transition-opacity"
               onClick={() => setIsMobileSidebarOpen(false)}
             />
             {/* Sidebar drawer content */}

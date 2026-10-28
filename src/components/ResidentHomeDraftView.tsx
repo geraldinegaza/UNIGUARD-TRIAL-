@@ -25,6 +25,7 @@ import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { relTime, syncLabel, telHref } from '../lib/util';
 import { openable } from '../hooks/useFocusItem';
+import { StatCard } from './StatCard';
 
 export interface ResidentHomeDraftViewProps {
   currentUser: User;
@@ -180,85 +181,31 @@ export const ResidentHomeDraftView: React.FC<ResidentHomeDraftViewProps> = ({
         </button>
       </div>
 
-      {/* 2. Three KPI Metric Cards with icons, bold labels, and tabular figures */}
+      {/* 2. Three figures. Each card is white and turns the signature dark red
+             while hovered or focused, and opens its page when tapped. */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 w-full">
-        {/* Card 1: In Your Barangay (Signature Hero Dark Red Card) */}
-        <div
-          {...openable(() => setActiveTab('hazard_map'))}
-          className="bg-gradient-to-br from-red-800 via-red-900 to-red-950 text-white col-span-2 lg:col-span-1 rounded-3xl p-5 sm:p-7 shadow-xl hover:shadow-2xl border border-red-900/40 flex flex-col justify-between min-w-0 w-full relative overflow-hidden group transition-all duration-300 cursor-pointer"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-red-100/80">
-                {t("In Your Barangay")}
-              </p>
-              <p className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight font-mono tabular-nums mt-2">
-                {inYourBarangayCount}
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-white/15 text-white border border-white/20 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform shrink-0">
-              <AlertTriangle className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="mt-6 pt-4 border-t border-white/15 flex items-center gap-2 text-xs text-red-100/90 font-medium">
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span>{t("Active ground hazard reports")}</span>
-          </div>
-        </div>
-
-        {/* Card 2: Shelters Open (Clean White Floating Card) */}
-        <div
-          {...openable(() => setActiveTab('shelters'))}
-          className="bg-white rounded-3xl p-4 sm:p-7 shadow-xl hover:shadow-2xl border border-neutral-100/80 transition-all duration-300 flex flex-col justify-between cursor-pointer group min-w-0 w-full"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                {t("Shelters Open")}
-              </p>
-              <p className="text-3xl sm:text-5xl font-extrabold text-neutral-900 group-hover:text-red-900 transition-colors tracking-tight font-mono tabular-nums mt-2">
-                {openSheltersCount}
-              </p>
-            </div>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-50 text-red-900 border border-red-100/60 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform shrink-0">
-              <Building2 className="w-6 h-6" />
-            </div>
-          </div>
-          <div className="mt-4 pt-3 sm:mt-6 sm:pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-900" />
-              <span>{t("Available for intake")}</span>
-            </span>
-            <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:text-red-900 transition-transform group-hover:translate-x-1" />
-          </div>
-        </div>
-
-        {/* Card 3: Active Advisories (Clean White Floating Card) */}
-        <div
-          {...openable(() => setActiveTab('advisories'))}
-          className="bg-white rounded-3xl p-4 sm:p-7 shadow-xl hover:shadow-2xl border border-neutral-100/80 transition-all duration-300 flex flex-col justify-between cursor-pointer group min-w-0 w-full"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                {t("Active Advisories")}
-              </p>
-              <p className="text-3xl sm:text-5xl font-extrabold text-red-900 group-hover:text-red-800 transition-colors tracking-tight font-mono tabular-nums mt-2">
-                {activeAdvisoriesCount}
-              </p>
-            </div>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-50 text-red-900 border border-red-100/60 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform shrink-0">
-              <Bell className="w-6 h-6" />
-            </div>
-          </div>
-          <div className="mt-4 pt-3 sm:mt-6 sm:pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500 font-medium">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-900" />
-              <span>{t("Official bulletins")}</span>
-            </span>
-            <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:text-red-900 transition-transform group-hover:translate-x-1" />
-          </div>
-        </div>
+        <StatCard
+          className="col-span-2 lg:col-span-1"
+          label={t("In Your Barangay")}
+          value={inYourBarangayCount}
+          note={t("Active ground hazard reports")}
+          icon={AlertTriangle}
+          onOpen={() => setActiveTab('hazard_map')}
+        />
+        <StatCard
+          label={t("Shelters Open")}
+          value={openSheltersCount}
+          note={t("Available for intake")}
+          icon={Building2}
+          onOpen={() => setActiveTab('shelters')}
+        />
+        <StatCard
+          label={t("Active Advisories")}
+          value={activeAdvisoriesCount}
+          note={t("Official bulletins")}
+          icon={Bell}
+          onOpen={() => setActiveTab('advisories')}
+        />
       </div>
 
       {/* 3. Hero Critical Push Alert Card (Matching Screenshot 1) */}

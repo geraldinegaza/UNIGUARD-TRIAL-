@@ -220,7 +220,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
       {/* 1. Header Banner matching Dark Red Hero Palette */}
       <div className="rounded-3xl p-7 sm:p-8 text-white shadow-2xl relative overflow-hidden bg-gradient-to-br from-red-800 via-red-900 to-red-950 border border-red-950/40">
         <div className="relative z-10 max-w-3xl space-y-3">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-bold tracking-wider uppercase border border-white/20 backdrop-blur-xs shadow-sm">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-bold tracking-wider uppercase border border-white/20 shadow-sm">
             <HeartHandshake className="w-4 h-4 text-white" />
             <span>{t("Relief Assistance Information")}</span>
           </div>
@@ -358,7 +358,7 @@ export const ResidentReliefView: React.FC<{ barangays: Barangay[]; currentUser: 
 
       {/* View All Relief Schedules Modal */}
       {isViewAllModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
           <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl border border-neutral-100 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="p-6 border-b border-neutral-100 flex items-center justify-between bg-neutral-900 text-white">
@@ -575,7 +575,7 @@ export const ResidentGuidesView: React.FC = () => {
       {/* 1. Header Banner matching Red, Maroon, Black Palette */}
       <div className="rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-[#000000] via-[#4e0009] to-[#b60015] border border-[#4e0009]">
         <div className="relative z-10 max-w-3xl space-y-2.5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 text-white text-[10px] font-black tracking-widest uppercase border border-white/20 backdrop-blur-xs">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 text-white text-[10px] font-black tracking-widest uppercase border border-white/20">
             <BookOpen className="w-3.5 h-3.5 text-white" />
             <span>{t("Disaster Preparedness")}</span>
           </div>
@@ -803,7 +803,7 @@ export const ResidentFaqsView: React.FC = () => {
       {/* 1. Header Banner matching Red, Maroon, Black Palette */}
       <div className="rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-[#000000] via-[#4e0009] to-[#b60015] border border-[#4e0009]">
         <div className="relative z-10 max-w-3xl space-y-2.5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 text-white text-[10px] font-black tracking-widest uppercase border border-white/20 backdrop-blur-xs">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 text-white text-[10px] font-black tracking-widest uppercase border border-white/20">
             <HelpCircle className="w-3.5 h-3.5 text-white" />
             <span>{t("Frequently Asked Questions")}</span>
           </div>

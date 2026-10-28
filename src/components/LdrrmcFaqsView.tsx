@@ -365,7 +365,7 @@ export const LdrrmcFaqsView: React.FC<LdrrmcFaqsViewProps> = ({ currentUser }) =
 
       {/* Modal: Add / Edit FAQ */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className={`bg-white rounded-[24px] max-w-lg w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 ${
             isBarangay ? 'border border-[#7EA0C5]/40 shadow-[0_8px_30px_rgba(5,38,89,0.12)]' : 'border border-neutral-200/80'
           }`}>

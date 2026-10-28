@@ -305,10 +305,11 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
       {/* 2. Page Title Header & Admin View Switcher */}
       <div className="px-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className={`text-xl sm:text-2xl font-semibold tracking-tight ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
+          {/* residents see the page name in the top bar from tablet width up, so this heading is for phones only */}
+          <h1 className={`text-xl sm:text-2xl font-semibold tracking-tight ${isCitizen ? 'md:hidden' : ''} ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
             Advisories and Alerts
           </h1>
-          <p className={`text-xs sm:text-sm mt-0.5 ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
+          <p className={`text-xs sm:text-sm mt-0.5 ${isCitizen ? 'md:mt-0' : ''} ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
             {showResidentView
               ? 'Official broadcasts from the Municipal Disaster Risk Reduction and Management Office (MDRRMO Lingayen).'
               : 'Publish official broadcasts and preparedness content to residents.'}
@@ -549,7 +550,7 @@ export const AdvisoryCenter: React.FC<AdvisoryCenterProps> = ({
 
           {/* Full Advisory Reader Modal */}
           {activeModalAdvisory && (
-            <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in`}>
+            <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} flex items-center justify-center p-4 animate-in fade-in`}>
               <div className={`bg-white rounded-[24px] max-w-lg w-full border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/80'} shadow-2xl p-6 space-y-4 animate-in zoom-in-95`}>
                 <div className={`flex items-start justify-between gap-3 pb-3 border-b ${isBarangay ? 'border-[#7EA0C5]/20' : 'border-neutral-100'}`}>
                   <div className="space-y-1">

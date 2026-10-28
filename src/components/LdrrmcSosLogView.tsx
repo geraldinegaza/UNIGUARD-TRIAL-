@@ -1,4 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import L from 'leaflet';
+import { openable } from '../hooks/useFocusItem';
+import { DetailModal, DetailRow } from './DetailModal';
+import { fmtCoords } from '../lib/geo';
 import { User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
@@ -73,6 +77,8 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
   const [filterStatus, setFilterStatus] = useState<'all' | 'Active' | 'Resolved'>('all');
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Details: the full SOS record with where it was sent from
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   // Acknowledge tells the sender help is being arranged; Mark resolved closes it.
   // Both notify the sender and are written to the activity log.
@@ -249,7 +255,9 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
                 {filteredEvents.map((event) => (
                   <tr
                     key={event.id}
-                    className={`transition-colors ${
+                    {...openable(() => setDetailId(event.id))}
+                    aria-label={`SOS from ${event.citizenName}: details`}
+                    className={`cursor-pointer transition-colors ${
                       isBarangay ? 'hover:bg-[#C2E8FF]/15' : 'hover:bg-neutral-50/60'
                     }`}
                   >
@@ -287,6 +295,7 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
                     <td className="px-6 py-4 font-mono text-xs">
                       <a
                         href={telHref(event.phoneNumber)}
+                        onClick={(e) => e.stopPropagation()}
                         className={`inline-flex items-center gap-1.5 py-2 pr-2 font-semibold transition-colors ${
                           isBarangay ? 'text-[#011025] hover:text-[#052659]' : 'text-neutral-800 hover:text-black'
                         }`}
@@ -326,8 +335,8 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
                       </div>
                     </td>
 
-                    {/* Status & Actions */}
-                    <td className="px-6 py-4 text-right">
+                    {/* Status & Actions: taps here act on the button, not the row */}
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2 shrink-0">
                         {/* Direct Dial Call Button */}
                         <a
@@ -405,6 +414,97 @@ export const LdrrmcSosLogView: React.FC<LdrrmcSosLogViewProps> = ({
           )}
         </div>
       </div>
+      {detailId && (() => {
+        const raw = sosLog.find((x) => x.id === detailId);
+        if (!raw) return null;
+        const ev = events.find((e) => e.id === detailId)!;
+        const tone = isBarangay ? 'barangay' : 'staff';
+        const btn = 'inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50';
+        const dark = isBarangay ? 'bg-[#052659] hover:bg-[#011025] text-white' : 'bg-[#18181b] hover:bg-neutral-800 text-white';
+        const soft = 'bg-white border border-neutral-200 text-neutral-800 hover:bg-neutral-100';
+        const located = raw.lat !== null && raw.lng !== null;
+        return (
+          <DetailModal
+            title={`SOS from ${ev.citizenName}`}
+            subtitle={new Date(raw.created_at).toLocaleString()}
+            tone={tone}
+            onClose={() => setDetailId(null)}
+            actions={
+              <>
+                {raw.profile_phone && (
+                  <a href={telHref(raw.profile_phone)} className={`${btn} ${soft}`}>
+                    <PhoneCall className="w-3.5 h-3.5" />
+                    Call
+                  </a>
+                )}
+                {located && (
+                  <a href={wazeUrl(raw.lat!, raw.lng!)} target="_blank" rel="noopener noreferrer" className={`${btn} ${soft}`}>
+                    <Navigation className="w-3.5 h-3.5" />
+                    Open in Waze
+                  </a>
+                )}
+                {raw.status === 'sent' && (
+                  <button type="button" disabled={busyId === raw.id} onClick={() => setStatus(ev, 'acknowledged')} className={`${btn} ${dark}`}>
+                    <Check className="w-3.5 h-3.5" />
+                    Acknowledge
+                  </button>
+                )}
+                {raw.status !== 'resolved' && (
+                  <button type="button" disabled={busyId === raw.id} onClick={() => setStatus(ev, 'resolved')} className={`${btn} ${raw.status === 'sent' ? soft : dark}`}>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Mark resolved
+                  </button>
+                )}
+              </>
+            }
+          >
+            <div>
+              <DetailRow tone={tone} label="Status" value={raw.status === 'resolved' ? 'Resolved' : raw.status === 'acknowledged' ? 'Acknowledged' : 'New'} />
+              <DetailRow tone={tone} label="Received" value={new Date(raw.created_at).toLocaleString()} />
+              <DetailRow tone={tone} label="Sender" value={raw.profile_name} />
+              <DetailRow tone={tone} label="Contact number" value={raw.profile_phone ? <a href={telHref(raw.profile_phone)} className="underline">{raw.profile_phone}</a> : ''} />
+              <DetailRow tone={tone} label="Barangay (at send time)" value={raw.barangay} />
+              <DetailRow tone={tone} label="Position" value={located ? fmtCoords(raw.lat, raw.lng) : 'No GPS fix'} />
+              <DetailRow tone={tone} label="Accuracy" value={raw.accuracy != null ? `${raw.accuracy} m` : ''} />
+              {raw.note && <DetailRow tone={tone} label="Note" value={raw.note} />}
+            </div>
+            {located ? (
+              <SosMiniMap lat={raw.lat!} lng={raw.lng!} />
+            ) : (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                This SOS was sent without a GPS fix. Call the sender back on the number above.
+              </p>
+            )}
+          </DetailModal>
+        );
+      })()}
     </div>
   );
+};
+
+// Where one SOS was sent from. Not limited to Lingayen: an SOS sent from
+// outside the town still shows its real position.
+const SosMiniMap: React.FC<{ lat: number; lng: number }> = ({ lat, lng }) => {
+  const el = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!el.current) return;
+    const map = L.map(el.current, { center: [lat, lng], zoom: 16, zoomControl: true, attributionControl: true });
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri',
+      maxZoom: 18,
+    }).addTo(map);
+    L.marker([lat, lng], {
+      icon: L.divIcon({
+        className: 'bg-transparent',
+        html: '<div style="background:#B91C1C;color:#fff;font:800 10px ui-sans-serif,system-ui;padding:3px 7px;border-radius:6px;border:1.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)">SOS</div>',
+        iconAnchor: [16, 10],
+      }),
+    }).addTo(map);
+    const timer = setTimeout(() => map.invalidateSize(), 200);
+    return () => {
+      clearTimeout(timer);
+      map.remove();
+    };
+  }, [lat, lng]);
+  return <div ref={el} className="h-44 w-full rounded-xl overflow-hidden border border-neutral-200 z-0" aria-label="Where the SOS was sent from" />;
 };

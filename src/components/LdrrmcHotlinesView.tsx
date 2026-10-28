@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { EmergencyHotline, User } from '../types';
 import * as repo from '../services/repo';
 import { useRepo } from '../hooks/useRepo';
-import { relTime } from '../lib/util';
+import { relTime, telHref } from '../lib/util';
+import { openable } from '../hooks/useFocusItem';
+import { DetailModal, DetailRow } from './DetailModal';
 import { download, toCSV } from '../lib/util';
 import {
   Phone,
@@ -37,6 +39,10 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
   const [newAgency, setNewAgency] = useState('');
   const [newContactNumber, setNewContactNumber] = useState('');
   const [newScope, setNewScope] = useState('');
+
+  // Details pop-up (reference build: tap a hotline row)
+  const [detailHotline, setDetailHotline] = useState<EmergencyHotline | null>(null);
+  const { barangays } = useRepo();
 
   // Edit Modal state
   const [editingHotline, setEditingHotline] = useState<EmergencyHotline | null>(null);
@@ -275,7 +281,12 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                 const isVerified = verifiedIds[hotline.id] ?? true;
 
                 return (
-                  <tr key={hotline.id} className={`${isBarangay ? 'hover:bg-[#C2E8FF]/20' : 'hover:bg-neutral-50/60'} transition-colors`}>
+                  <tr
+                    key={hotline.id}
+                    {...openable(() => setDetailHotline(hotline))}
+                    aria-label={`${hotline.agency_name}: details`}
+                    className={`${isBarangay ? 'hover:bg-[#C2E8FF]/20' : 'hover:bg-neutral-50/60'} transition-colors cursor-pointer`}
+                  >
                     {/* Agency / Department */}
                     <td className={`px-6 py-4 font-semibold text-sm ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
                       <div className="flex items-center gap-3">
@@ -294,6 +305,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                     <td className={`px-6 py-4 font-mono font-semibold text-sm ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>
                       <a
                         href={`tel:${hotline.contact_number}`}
+                        onClick={(e) => e.stopPropagation()}
                         className={`inline-flex items-center gap-1.5 ${isBarangay ? 'hover:text-[#052659]' : 'hover:text-black'} transition-colors`}
                       >
                         <span>{hotline.contact_number}</span>
@@ -324,7 +336,7 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
                     </td>
 
                     {/* Actions */}
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2 shrink-0">
                         {/* Direct Call Button */}
                         <a
@@ -504,8 +516,59 @@ export const LdrrmcHotlinesView: React.FC<LdrrmcHotlinesViewProps> = ({
       )}
 
       {/* Modal: Edit Hotline */}
+      {detailHotline && (() => {
+        const h = hotlines.find((x) => x.id === detailHotline.id) || detailHotline;
+        const tone = isBarangay ? 'barangay' : 'staff';
+        const brgy = h.barangay_uuid ? barangays.find((b) => b.uuid === h.barangay_uuid)?.name : '';
+        const btn = 'inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold cursor-pointer transition-colors';
+        return (
+          <DetailModal
+            title={h.agency_name}
+            tone={tone}
+            onClose={() => setDetailHotline(null)}
+            actions={
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailHotline(null);
+                    handleOpenEdit(h);
+                  }}
+                  className={`${btn} bg-white border border-neutral-200 text-neutral-800 hover:bg-neutral-100`}
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  {directEdit ? 'Edit' : 'Request change'}
+                </button>
+                <a href={telHref(h.contact_number)} className={`${btn} text-white ${isBarangay ? 'bg-[#052659] hover:bg-[#011025]' : 'bg-[#18181b] hover:bg-neutral-800'}`}>
+                  <PhoneCall className="w-3.5 h-3.5" />
+                  Call
+                </a>
+              </>
+            }
+          >
+            <a href={telHref(h.contact_number)} className={`block text-xl font-mono font-semibold ${isBarangay ? 'text-[#052659]' : 'text-neutral-900'}`}>
+              {h.contact_number}
+            </a>
+            <div>
+              <DetailRow tone={tone} label="Agency" value={h.agency_name} />
+              <DetailRow tone={tone} label="Category" value={h.category} />
+              <DetailRow tone={tone} label="Contact number" value={h.contact_number} />
+              <DetailRow tone={tone} label="Scope" value={h.scope} />
+              {brgy && <DetailRow tone={tone} label="Barangay" value={brgy} />}
+              <DetailRow tone={tone} label="Description" value={h.description} />
+              <DetailRow tone={tone} label="Active" value={h.active ? 'Yes' : 'No'} />
+            </div>
+            {!directEdit && (
+              <p className={`text-[11px] ${isBarangay ? 'text-[#5482B4]' : 'text-neutral-500'}`}>
+                Changes to the directory go to the Super Admin for review before residents see them.
+              </p>
+            )}
+          </DetailModal>
+        );
+      })()}
+
       {editingHotline && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className={`bg-white rounded-[24px] max-w-md w-full p-6 shadow-2xl border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/80'} animate-in zoom-in-95 duration-200`}>
             <div className={`flex items-center justify-between pb-3.5 border-b ${isBarangay ? 'border-[#7EA0C5]/30' : 'border-neutral-100'}`}>
               <h3 className={`font-semibold text-base ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'}`}>

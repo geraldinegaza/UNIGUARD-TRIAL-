@@ -1404,7 +1404,7 @@ export const DispatchPortal: React.FC<DispatchPortalProps> = ({ currentUser, onS
       <div aria-hidden="true" className="pointer-events-none absolute -bottom-48 right-[-120px] w-[620px] h-[620px] rounded-full bg-[#F6B9A2]/50 blur-3xl" />
 
       <div className="relative h-full w-full p-0 sm:p-3 lg:p-6 flex items-center justify-center">
-        <div className="h-full w-full max-w-[1500px] flex overflow-hidden sm:rounded-[28px] bg-[#FDF6F3]/80 backdrop-blur-xl sm:border border-white shadow-[0_30px_80px_-30px_rgba(160,70,40,0.35)]">
+        <div className="h-full w-full max-w-[1500px] flex overflow-hidden sm:rounded-[28px] bg-[#FDF6F3]/80 sm:border border-white shadow-[0_30px_80px_-30px_rgba(160,70,40,0.35)]">
           {/* ---------------- left rail (tablet and desktop) */}
           <aside className="hidden md:flex w-[96px] shrink-0 flex-col">
             <button

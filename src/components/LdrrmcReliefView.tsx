@@ -25,6 +25,9 @@ import {
   Download
 } from 'lucide-react';
 import { exportPdf, fileStamp } from '../lib/pdf';
+import { DetailModal, DetailRow } from './DetailModal';
+import { canNavigate, wazeUrl } from '../lib/geo';
+import { telHref } from '../lib/util';
 
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
@@ -119,6 +122,17 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
   // Filter states matching screenshot
   const [filterBarangay, setFilterBarangay] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  // View: the full record of one distribution (reference build "relief-view")
+  const [viewDistId, setViewDistId] = useState<string | null>(null);
+  // Verify beneficiary: the authorized list below, filtered to that barangay
+  const verifyBeneficiaries = (barangay: string) => {
+    setFilterBarangay(barangay && LINGAYEN_BARANGAY_LIST.includes(barangay) ? barangay : 'All');
+    setSearchQuery('');
+    setTimeout(() => {
+      document.getElementById('relief-beneficiaries')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('relief-beneficiary-search')?.focus({ preventScroll: true });
+    }, 60);
+  };
 
   // Modals
   const [isAddDistributionOpen, setIsAddDistributionOpen] = useState<boolean>(false);
@@ -461,6 +475,17 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
                     </button>
                   )}
                   <button
+                    onClick={() => setViewDistId(dist.id)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium border ${
+                      isBarangay
+                        ? 'border-[#7EA0C5]/40 bg-[#C2E8FF]/20 hover:bg-[#C2E8FF]/50 text-[#052659]'
+                        : 'border-neutral-200/80 bg-white hover:bg-neutral-100 text-neutral-700 hover:text-neutral-900'
+                    } shadow-2xs transition-colors cursor-pointer flex items-center gap-1.5`}
+                  >
+                    <FileText className={`w-3.5 h-3.5 ${isBarangay ? 'text-[#052659]' : 'text-neutral-400'}`} />
+                    <span>View</span>
+                  </button>
+                  <button
                     onClick={() => handleEditDistribution(dist)}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-medium border ${
                       isBarangay
@@ -515,7 +540,7 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
       </div>
 
       {/* 3. Authorized Beneficiaries Section Card */}
-      <div className={`bg-white rounded-[24px] border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/70'} shadow-xs overflow-hidden space-y-4`}>
+      <div id="relief-beneficiaries" className={`scroll-mt-24 bg-white rounded-[24px] border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/70'} shadow-xs overflow-hidden space-y-4`}>
         {/* Card Header Bar with Title and + Add Button */}
         <div className={`px-6 py-4.5 ${isBarangay ? 'bg-[#C2E8FF]/10 border-[#7EA0C5]/20' : 'bg-neutral-50/50 border-neutral-100'} border-b flex items-center justify-between`}>
           <div className="flex items-center gap-2.5">
@@ -574,6 +599,7 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
             <div className="relative flex items-center">
               <Search className={`w-4 h-4 ${isBarangay ? 'text-[#7EA0C5]' : 'text-neutral-400'} absolute left-3.5 pointer-events-none`} />
               <input
+                id="relief-beneficiary-search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -689,7 +715,7 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
 
       {/* Modal 1: Add Distribution Schedule */}
       {isAddDistributionOpen && (
-        <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} backdrop-blur-xs flex items-center justify-center p-4`}>
+        <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} flex items-center justify-center p-4`}>
           <div className={`bg-white rounded-[24px] max-w-lg w-full p-6 shadow-2xl border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/80'} animate-in zoom-in-95 duration-200`}>
             <div className={`flex items-center justify-between pb-3 border-b ${isBarangay ? 'border-[#7EA0C5]/20' : 'border-neutral-100'}`}>
               <h3 className={`font-semibold ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'} text-base`}>
@@ -861,7 +887,7 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
 
       {/* Modal 2: Add Authorized Beneficiary */}
       {isAddBeneficiaryOpen && (
-        <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} backdrop-blur-xs flex items-center justify-center p-4`}>
+        <div className={`fixed inset-0 z-50 ${isBarangay ? 'bg-[#011025]/40' : 'bg-black/40'} flex items-center justify-center p-4`}>
           <div className={`bg-white rounded-[24px] max-w-md w-full p-6 shadow-2xl border ${isBarangay ? 'border-[#7EA0C5]/40' : 'border-neutral-200/80'} animate-in zoom-in-95 duration-200`}>
             <div className={`flex items-center justify-between pb-3 border-b ${isBarangay ? 'border-[#7EA0C5]/20' : 'border-neutral-100'}`}>
               <h3 className={`font-semibold ${isBarangay ? 'text-[#011025]' : 'text-neutral-900'} text-base`}>
@@ -994,6 +1020,92 @@ export const LdrrmcReliefView: React.FC<LdrrmcReliefViewProps> = ({
           </div>
         </div>
       )}
+      {viewDistId && (() => {
+        const r = store.relief.find((x) => x.id === viewDistId);
+        const drive = distributions.find((d) => d.id === viewDistId);
+        if (!r) return null;
+        const tone = isBarangay ? 'barangay' : 'staff';
+        const btn = 'inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold cursor-pointer transition-colors';
+        const soft = 'bg-white border border-neutral-200 text-neutral-800 hover:bg-neutral-100';
+        const dark = isBarangay ? 'bg-[#052659] hover:bg-[#011025] text-white' : 'bg-[#18181b] hover:bg-neutral-800 text-white';
+        return (
+          <DetailModal
+            title={r.title || 'Distribution'}
+            subtitle={r.barangay ? `Barangay ${r.barangay}` : 'Municipality-wide'}
+            tone={tone}
+            onClose={() => setViewDistId(null)}
+            actions={
+              <>
+                {r.lat !== null && r.lng !== null && canNavigate(r.lat, r.lng) && (
+                  <a href={wazeUrl(r.lat, r.lng)} target="_blank" rel="noopener noreferrer" className={`${btn} ${soft}`}>
+                    Open in Waze
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewDistId(null);
+                    verifyBeneficiaries(r.barangay);
+                  }}
+                  className={`${btn} ${soft}`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  Verify beneficiary
+                </button>
+                {drive && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewDistId(null);
+                      handleEditDistribution(drive);
+                    }}
+                    className={`${btn} ${dark}`}
+                  >
+                    Edit
+                  </button>
+                )}
+              </>
+            }
+          >
+            <div className="flex flex-wrap gap-2">
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${r.active ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-500 border-neutral-200'}`}>
+                {r.active ? 'Active' : 'Inactive'}
+              </span>
+              {r.escort_status !== 'none' && (
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-neutral-100 text-neutral-700 border-neutral-200">
+                  {r.escort_status === 'confirmed' ? 'PNP escort confirmed' : 'PNP escort requested'}
+                </span>
+              )}
+            </div>
+            <div>
+              <DetailRow tone={tone} label="Barangay" value={r.barangay || 'Municipality-wide'} />
+              <DetailRow tone={tone} label="Location" value={r.location_name} />
+              <DetailRow tone={tone} label="Address" value={r.address} />
+              <DetailRow tone={tone} label="Schedule" value={r.distribution_at ? new Date(r.distribution_at).toLocaleString() : 'To be announced'} />
+              <DetailRow tone={tone} label="Contact person" value={r.contact_person} />
+              <DetailRow tone={tone} label="Contact phone" value={r.contact_phone ? <a href={telHref(r.contact_phone)} className="underline">{r.contact_phone}</a> : ''} />
+              {r.escort_note && <DetailRow tone={tone} label="Escort note" value={r.escort_note} />}
+            </div>
+            {r.eligibility.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 mb-1">Eligibility</p>
+                <ul className="list-disc pl-5 text-xs text-neutral-800 space-y-0.5">
+                  {r.eligibility.map((e) => <li key={e}>{e}</li>)}
+                </ul>
+              </div>
+            )}
+            {r.required_docs.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 mb-1">Required documents</p>
+                <ul className="list-disc pl-5 text-xs text-neutral-800 space-y-0.5">
+                  {r.required_docs.map((d) => <li key={d}>{d}</li>)}
+                </ul>
+              </div>
+            )}
+            {r.note && <p className="text-xs text-neutral-700 bg-neutral-50 border border-neutral-100 rounded-xl px-3 py-2">{r.note}</p>}
+          </DetailModal>
+        );
+      })()}
     </div>
   );
 };

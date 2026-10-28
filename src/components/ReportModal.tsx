@@ -198,7 +198,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const selectedBarangayName = currentBarangayObj ? currentBarangayObj.name : '';
 
   return (
-    <div className="fixed inset-0 z-50 bg-neutral-950/50 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-neutral-950/50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
       {/* Background click overlay */}
       <div className="fixed inset-0 cursor-pointer" onClick={onClose} />
 

@@ -4,6 +4,7 @@ import { Barangay, InventoryCategory, InventoryItem, User } from '../types';
 import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { exportPdf, fileStamp } from '../lib/pdf';
+import { DetailBar, DetailModal, DetailRow } from './DetailModal';
 import { opsTone, shortWhen } from './opsTone';
 
 // Relief stock on hand (relief_inventory) and the goods handed out
@@ -28,6 +29,8 @@ export const ReliefStockPanel: React.FC<{ currentUser: User; barangays: Barangay
   const [editing, setEditing] = useState<InventoryItem | 'new' | null>(null);
   const [form, setForm] = useState(blankItem);
   const [distributing, setDistributing] = useState<InventoryItem | null>(null);
+  // Details: one stock item (reference build "inv-detail")
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [qty, setQty] = useState('1');
   const [family, setFamily] = useState('');
   const [toBarangay, setToBarangay] = useState(currentUser.barangay_name || '');
@@ -248,7 +251,13 @@ export const ReliefStockPanel: React.FC<{ currentUser: User; barangays: Barangay
                       <li key={i.id} className="px-3.5 sm:px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-baseline gap-x-2">
-                            <span className={`text-xs font-semibold ${t.ink}`}>{i.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setDetailId(i.id)}
+                              className={`text-xs font-semibold underline-offset-2 hover:underline cursor-pointer text-left ${t.ink}`}
+                            >
+                              {i.name}
+                            </button>
                             <span className={`text-[11px] ${t.muted}`}>{[i.location, i.supplier].filter(Boolean).join(' · ')}</span>
                           </div>
                           <div className={`mt-1.5 h-1.5 rounded-full overflow-hidden border ${t.track}`}>
@@ -313,7 +322,7 @@ export const ReliefStockPanel: React.FC<{ currentUser: User; barangays: Barangay
 
       {/* Add / edit an item (LDRRMO) */}
       {editing && (
-        <div className={`fixed inset-0 z-50 ${t.modalBack} backdrop-blur-xs flex items-center justify-center p-4`}>
+        <div className={`fixed inset-0 z-50 ${t.modalBack} flex items-center justify-center p-4`}>
           <form onSubmit={saveItem} className={`bg-white rounded-[24px] max-w-lg w-full max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 shadow-2xl border ${t.modal} space-y-4`}>
             <div className={`flex items-center justify-between pb-3 border-b ${t.border}`}>
               <h3 className={`font-semibold text-base ${t.ink}`}>{editing === 'new' ? 'Add Inventory Item' : 'Edit or Restock Item'}</h3>
@@ -371,7 +380,7 @@ export const ReliefStockPanel: React.FC<{ currentUser: User; barangays: Barangay
 
       {/* Record a distribution */}
       {distributing && (
-        <div className={`fixed inset-0 z-50 ${t.modalBack} backdrop-blur-xs flex items-center justify-center p-4`}>
+        <div className={`fixed inset-0 z-50 ${t.modalBack} flex items-center justify-center p-4`}>
           <form onSubmit={saveDistribution} className={`bg-white rounded-[24px] max-w-md w-full max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 shadow-2xl border ${t.modal} space-y-4`}>
             <div className={`flex items-center justify-between pb-3 border-b ${t.border}`}>
               <div className="min-w-0">
@@ -418,6 +427,73 @@ export const ReliefStockPanel: React.FC<{ currentUser: User; barangays: Barangay
           </form>
         </div>
       )}
+      {detailId && (() => {
+        const item = inventory.find((x) => x.id === detailId);
+        if (!item) return null;
+        const out = item.stock <= 0;
+        const lowStock = item.stock <= item.reorder;
+        const state = out ? 'Out of stock' : lowStock ? 'Low stock' : 'In stock';
+        const color = out ? '#B91C1C' : lowStock ? '#D97706' : '#15803D';
+        const pct = item.reorder > 0 ? Math.min(100, Math.round((item.stock / Math.max(item.reorder * 2, 1)) * 100)) : 100;
+        const tone = isBarangay ? 'barangay' : 'staff';
+        return (
+          <DetailModal
+            title={item.name}
+            subtitle={item.category}
+            tone={tone}
+            onClose={() => setDetailId(null)}
+            actions={
+              <>
+                <button
+                  type="button"
+                  disabled={item.stock <= 0}
+                  onClick={() => {
+                    setDetailId(null);
+                    openDistribute(item);
+                  }}
+                  className={t.ghost}
+                >
+                  <PackageMinus className="w-3.5 h-3.5" />
+                  <span>Distribute</span>
+                </button>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDetailId(null);
+                      openEditor(item);
+                    }}
+                    className={t.primary}
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit / Restock</span>
+                  </button>
+                )}
+              </>
+            }
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border" style={{ color, borderColor: `${color}55`, background: `${color}14` }}>
+                {state}
+              </span>
+              <span className="text-xs font-mono text-neutral-600">
+                {item.stock} / {item.reorder} {item.unit}
+              </span>
+            </div>
+            <DetailBar pct={pct} color={color} />
+            <div>
+              <DetailRow tone={tone} label="Item name" value={item.name} />
+              <DetailRow tone={tone} label="Category" value={item.category} />
+              <DetailRow tone={tone} label="Unit of measure" value={item.unit} />
+              <DetailRow tone={tone} label="In stock" value={`${item.stock.toLocaleString()} ${item.unit}`} />
+              <DetailRow tone={tone} label="Reorder threshold" value={`${item.reorder.toLocaleString()} ${item.unit}`} />
+              <DetailRow tone={tone} label="Warehouse location" value={item.location} />
+              <DetailRow tone={tone} label="Supplier" value={item.supplier} />
+              <DetailRow tone={tone} label="Last updated" value={item.updated_at ? new Date(item.updated_at).toLocaleString() : ''} />
+            </div>
+          </DetailModal>
+        );
+      })()}
     </section>
   );
 };

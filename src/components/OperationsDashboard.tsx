@@ -1182,7 +1182,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
 
       {/* 5. Declare Emergency Modal (Triggered by Declare Emergency button) */}
       {isDeclareEmergencyModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-[28px] max-w-lg w-full border border-neutral-200 shadow-2xl p-7 space-y-5 animate-in zoom-in-95">
             <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-neutral-100">
               <div className="flex items-center gap-2.5">

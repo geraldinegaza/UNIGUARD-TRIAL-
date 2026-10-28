@@ -1385,7 +1385,7 @@ export const BarangayOfficialPortal: React.FC<BarangayOfficialPortalProps> = ({
 
       {/* 5. Declare Emergency Modal (Scoped to Barangay) */}
       {isDeclareEmergencyModalOpen && (
-        <div className="fixed inset-0 z-50 bg-[#011025]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-50 bg-[#011025]/50 flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-[28px] max-w-lg w-full border border-[#7EA0C5]/30 shadow-2xl p-7 space-y-5 animate-in zoom-in-95">
             <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-[#7EA0C5]/20">
               <div className="flex items-center gap-2.5">

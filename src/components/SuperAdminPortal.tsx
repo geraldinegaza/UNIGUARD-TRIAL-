@@ -28,6 +28,8 @@ import { useRepo } from '../hooks/useRepo';
 import * as repo from '../services/repo';
 import { relTime, download, toCSV } from '../lib/util';
 import { exportPdf, fileStamp } from '../lib/pdf';
+import { openable } from '../hooks/useFocusItem';
+import { DetailModal, DetailRow } from './DetailModal';
 import { TriadEmblem, THEMES, type Portal } from '../brand';
 
 // Super Admin console. Initial draft of the layout: a light sidebar with the
@@ -452,6 +454,8 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   // change requests: hotline edits proposed by LGU staff and barangay officials
   const pending = data.changeRequests.filter((c) => c.status === 'pending');
   const [openRequest, setOpenRequest] = useState<ChangeRequest | null>(null);
+  // Activity Log: the entry whose details are open
+  const [openEntryId, setOpenEntryId] = useState<string | null>(null);
   const [decisionNote, setDecisionNote] = useState('');
   const [deciding, setDeciding] = useState(false);
   const [requestNotice, setRequestNotice] = useState<string | null>(null);
@@ -1257,6 +1261,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
   const pages = Math.max(1, Math.ceil(filteredAudit.length / PAGE));
   const page = Math.min(actPage, pages);
   const pageRows = filteredAudit.slice((page - 1) * PAGE, page * PAGE);
+  const openEntry = openEntryId ? data.audit.find((a) => a.id === openEntryId) || null : null;
   const clearActivity = () => {
     setActQuery('');
     setActRole('all');
@@ -1414,7 +1419,12 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
         {pageRows.map((a) => {
           const target = a.entity ? ENTITY_TAB[a.entity] : undefined;
           return (
-            <div key={a.id} className="flex items-start gap-3 px-3 sm:px-4 py-3 rounded-2xl hover:bg-[#FFFBF0]">
+            <div
+              key={a.id}
+              {...openable(() => setOpenEntryId(a.id))}
+              aria-label="Activity entry: details"
+              className="flex items-start gap-3 px-3 sm:px-4 py-3 rounded-2xl hover:bg-[#FFFBF0] cursor-pointer"
+            >
               <span className="w-8 h-8 rounded-xl bg-[#FFF3C9] text-[#C98A0B] flex items-center justify-center shrink-0 mt-0.5">
                 <Activity className="w-4 h-4" />
               </span>
@@ -1429,7 +1439,11 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
               {target && (target === 'accounts' || onOpenOperations) && (
                 <button
                   type="button"
-                  onClick={() => (target === 'accounts' ? setView('accounts') : onOpenOperations && onOpenOperations(target))}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (target === 'accounts') setView('accounts');
+                    else if (onOpenOperations) onOpenOperations(target);
+                  }}
                   className="shrink-0 h-8 px-3 rounded-full bg-[#FFF3C9] text-[#8A5A00] text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer hover:bg-[#FFE89A]"
                   title="Open the screen that holds this record"
                 >
@@ -1444,6 +1458,66 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({ currentUser,
           <p className="px-4 py-10 text-center text-[13px] text-neutral-400">{data.audit.length ? 'Nothing matches these filters.' : 'No activity recorded yet.'}</p>
         )}
       </div>
+      {openEntry && (() => {
+        const a = openEntry;
+        const target = a.entity ? ENTITY_TAB[a.entity] : undefined;
+        const changed = (a.meta && typeof a.meta === 'object' && (a.meta as any).changed) as Record<string, { from: unknown; to: unknown }> | undefined;
+        const show = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+        const otherMeta = a.meta && Object.keys(a.meta).filter((k) => k !== 'changed').length ? a.meta : null;
+        return (
+          <DetailModal
+            title="Activity entry"
+            subtitle={a.description || a.event_type}
+            onClose={() => setOpenEntryId(null)}
+            actions={
+              target && (target === 'accounts' || onOpenOperations) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenEntryId(null);
+                    if (target === 'accounts') setView('accounts');
+                    else if (onOpenOperations) onOpenOperations(target);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold bg-[#FFF3C9] text-[#8A5A00] hover:bg-[#FFE89A] cursor-pointer"
+                >
+                  Open this record
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </button>
+              ) : null
+            }
+          >
+            <div>
+              <DetailRow label="When" value={new Date(a.timestamp).toLocaleString()} />
+              <DetailRow label="Actor" value={a.actor_name || 'System'} />
+              <DetailRow label="Role" value={a.actor_role ? ROLE_TEXT[a.actor_role] || a.actor_role : 'System'} />
+              <DetailRow label="Barangay" value={a.actor_barangay} />
+              <DetailRow label="Module" value={ENTITY_TEXT[a.entity] || a.entity} />
+              <DetailRow label="Action" value={a.event_type} />
+              <DetailRow label="Record id" value={<span className="font-mono text-[11px]">{a.target_id}</span>} />
+            </div>
+            {changed && Object.keys(changed).length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 mb-1">Changed fields (before → after)</p>
+                <ul className="divide-y divide-neutral-100 text-xs">
+                  {Object.entries(changed).map(([field, v]) => (
+                    <li key={field} className="py-1.5 break-words">
+                      <span className="font-semibold text-neutral-900">{field}</span>: <span className="text-neutral-500">{show(v?.from)}</span> → <span className="text-neutral-900">{show(v?.to)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {otherMeta && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 mb-1">Detail</p>
+                <pre className="text-[11px] bg-neutral-50 border border-neutral-100 rounded-xl p-3 whitespace-pre-wrap break-words max-h-48 overflow-auto">
+                  {JSON.stringify(Object.fromEntries(Object.entries(otherMeta).filter(([k]) => k !== 'changed')), null, 2)}
+                </pre>
+              </div>
+            )}
+          </DetailModal>
+        );
+      })()}
       {filteredAudit.length > PAGE && (
         <div className="flex flex-wrap items-center justify-between gap-2 mt-3 px-1">
           <span className="text-[12px] text-[#5C3A0A]/70">
